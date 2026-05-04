@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.amazon.agentio.lib.ctx.cmm.ContextMemoryManagersTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.215Z" hostname="b0f1d872d5fa" time="0.012">
+<testsuite name="com.amazon.agentio.lib.ctx.cmm.ContextMemoryManagersTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-05-04T04:57:46.068Z" hostname="b0f1d872d5fa" time="0.013">
   <properties/>
   <testcase name="single NoOp CMM should pass through unchanged()" classname="com.amazon.agentio.lib.ctx.cmm.ContextMemoryManagersTest" time="0.002"/>
   <testcase name="CMMs should execute in order, each receiving previous output()" classname="com.amazon.agentio.lib.ctx.cmm.ContextMemoryManagersTest" time="0.005"/>
   <testcase name="empty chain should return original conversation()" classname="com.amazon.agentio.lib.ctx.cmm.ContextMemoryManagersTest" time="0.002"/>
-  <testcase name="CMM that declines a turn should be skipped()" classname="com.amazon.agentio.lib.ctx.cmm.ContextMemoryManagersTest" time="0.003"/>
+  <testcase name="CMM that declines a turn should be skipped()" classname="com.amazon.agentio.lib.ctx.cmm.ContextMemoryManagersTest" time="0.004"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

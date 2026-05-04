@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.amazon.agentio.lib.ctx.ContextMemoryManagerTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.158Z" hostname="b0f1d872d5fa" time="0.007">
+<testsuite name="com.amazon.agentio.lib.ctx.ContextMemoryManagerTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-05-04T04:57:46.013Z" hostname="b0f1d872d5fa" time="0.006">
   <properties/>
-  <testcase name="shouldExecuteOnTurn default should return true for all turns()" classname="com.amazon.agentio.lib.ctx.ContextMemoryManagerTest" time="0.002"/>
+  <testcase name="shouldExecuteOnTurn default should return true for all turns()" classname="com.amazon.agentio.lib.ctx.ContextMemoryManagerTest" time="0.001"/>
   <testcase name="NoOperationContextMemoryManager should pass through conversation unchanged()" classname="com.amazon.agentio.lib.ctx.ContextMemoryManagerTest" time="0.002"/>
   <testcase name="ContextMemoryManagerInput should hold conversation, llm, and turnNumber()" classname="com.amazon.agentio.lib.ctx.ContextMemoryManagerTest" time="0.0"/>
   <testcase name="ContextMemoryManagerInput should handle complex conversations()" classname="com.amazon.agentio.lib.ctx.ContextMemoryManagerTest" time="0.0"/>

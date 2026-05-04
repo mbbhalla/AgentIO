@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.amazon.agentio.model.IndexedConversationTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:29.011Z" hostname="b0f1d872d5fa" time="0.003">
+<testsuite name="com.amazon.agentio.model.IndexedConversationTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-05-04T04:57:46.837Z" hostname="b0f1d872d5fa" time="0.003">
   <properties/>
-  <testcase name="should create with valid turnNumber()" classname="com.amazon.agentio.model.IndexedConversationTest" time="0.001"/>
-  <testcase name="next chain should produce sequential turn numbers()" classname="com.amazon.agentio.model.IndexedConversationTest" time="0.0"/>
+  <testcase name="should create with valid turnNumber()" classname="com.amazon.agentio.model.IndexedConversationTest" time="0.0"/>
+  <testcase name="next chain should produce sequential turn numbers()" classname="com.amazon.agentio.model.IndexedConversationTest" time="0.001"/>
   <testcase name="should reject negative turnNumber()" classname="com.amazon.agentio.model.IndexedConversationTest" time="0.002"/>
   <testcase name="next should increment turnNumber by 1()" classname="com.amazon.agentio.model.IndexedConversationTest" time="0.0"/>
   <testcase name="next should adopt the other conversation()" classname="com.amazon.agentio.model.IndexedConversationTest" time="0.0"/>

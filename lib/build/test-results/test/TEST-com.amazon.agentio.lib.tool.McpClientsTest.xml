@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.amazon.agentio.lib.tool.McpClientsTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.747Z" hostname="b0f1d872d5fa" time="0.221">
+<testsuite name="com.amazon.agentio.lib.tool.McpClientsTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-05-04T04:57:46.575Z" hostname="b0f1d872d5fa" time="0.225">
   <properties/>
-  <testcase name="should respect denied tools()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.093"/>
-  <testcase name="should use server version as client identifier when name is null()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.029"/>
-  <testcase name="should handle tool execution errors()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.035"/>
-  <testcase name="should handle client with null name and null server version()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.004"/>
+  <testcase name="should respect denied tools()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.096"/>
+  <testcase name="should use server version as client identifier when name is null()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.024"/>
+  <testcase name="should handle tool execution errors()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.034"/>
+  <testcase name="should handle client with null name and null server version()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.006"/>
   <testcase name="should call tool on correct client()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.01"/>
-  <testcase name="should handle tool with no required fields()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.003"/>
+  <testcase name="should handle tool with no required fields()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.004"/>
   <testcase name="should handle tool result with plain text content()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.009"/>
-  <testcase name="should list tools from all clients()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.004"/>
-  <testcase name="should handle long tool names by truncating()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.002"/>
+  <testcase name="should list tools from all clients()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.007"/>
+  <testcase name="should handle long tool names by truncating()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.004"/>
   <testcase name="should require unique client names()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.0"/>
-  <testcase name="should handle tool call with null input()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.008"/>
-  <testcase name="should handle tool name sanitization()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.004"/>
+  <testcase name="should handle tool call with null input()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.012"/>
+  <testcase name="should handle tool name sanitization()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.003"/>
   <testcase name="should handle tool name without joiner()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.007"/>
-  <testcase name="should handle tool result with JSON content()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.01"/>
+  <testcase name="should handle tool result with JSON content()" classname="com.amazon.agentio.lib.tool.McpClientsTest" time="0.007"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

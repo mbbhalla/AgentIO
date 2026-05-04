@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.amazon.agentio.common.InlineExtensionsTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:25.586Z" hostname="b0f1d872d5fa" time="0.161">
+<testsuite name="com.amazon.agentio.common.InlineExtensionsTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-05-04T04:57:43.437Z" hostname="b0f1d872d5fa" time="0.168">
   <properties/>
-  <testcase name="Should handle exact tie scenario: attr='abc' 5 times, attr='def' 5 times" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.143"/>
-  <testcase name="Should be deterministic - same input produces same output" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.001"/>
-  <testcase name="Should throw exception for empty list" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.001"/>
-  <testcase name="Should handle nullable properties when non-null is most frequent" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.003"/>
+  <testcase name="Should handle exact tie scenario: attr='abc' 5 times, attr='def' 5 times" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.151"/>
+  <testcase name="Should be deterministic - same input produces same output" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.0"/>
+  <testcase name="Should throw exception for empty list" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.002"/>
+  <testcase name="Should handle nullable properties when non-null is most frequent" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.002"/>
   <testcase name="Should handle nullable properties when null is most frequent" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.001"/>
   <testcase name="Should find most frequent values in simple data class" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.0"/>
   <testcase name="Should handle single item list by returning that item" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.0"/>
-  <testcase name="Should work with extension function syntax" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.0"/>
-  <testcase name="Should handle ties by picking first occurrence in groupBy order" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.001"/>
+  <testcase name="Should work with extension function syntax" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.001"/>
+  <testcase name="Should handle ties by picking first occurrence in groupBy order" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.0"/>
   <testcase name="Verify frequency counting logic with detailed assertions" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.0"/>
-  <testcase name="Should handle complex objects with sets and nested objects" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.009"/>
-  <testcase name="Should handle list where all items are identical" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.001"/>
+  <testcase name="Should handle complex objects with sets and nested objects" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.01"/>
+  <testcase name="Should handle list where all items are identical" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.0"/>
   <testcase name="Step-by-step manual verification of algorithm" classname="com.amazon.agentio.common.InlineExtensionsTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.amazon.agentio.lib.ctx.cmm.adaptive.MeasurementStrategyTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.302Z" hostname="b0f1d872d5fa" time="0.009">
+<testsuite name="com.amazon.agentio.lib.ctx.cmm.adaptive.MeasurementStrategyTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-05-04T04:57:46.135Z" hostname="b0f1d872d5fa" time="0.005">
   <properties/>
-  <testcase name="ProbeResponse should reject rankPosition less than 1()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.MeasurementStrategyTest" time="0.004"/>
+  <testcase name="ProbeResponse should reject rankPosition less than 1()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.MeasurementStrategyTest" time="0.001"/>
   <testcase name="SingleProbeRecallStrategy buildQuery should return non-empty string()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.MeasurementStrategyTest" time="0.001"/>
   <testcase name="MultiProbeRecallStrategy should parse multiple probes from response()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.MeasurementStrategyTest" time="0.001"/>
   <testcase name="ProbeResponse should reject blank probeValue()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.MeasurementStrategyTest" time="0.001"/>

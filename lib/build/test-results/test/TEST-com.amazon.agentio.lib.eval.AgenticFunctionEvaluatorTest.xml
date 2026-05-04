@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.334Z" hostname="b0f1d872d5fa" time="0.191">
+<testsuite name="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-05-04T04:57:46.159Z" hostname="b0f1d872d5fa" time="0.191">
   <properties/>
-  <testcase name="should produce fresh instance per iteration when using withFactory()" classname="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" time="0.177"/>
-  <testcase name="should handle partial failures and matches()" classname="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" time="0.003"/>
-  <testcase name="should work with single iteration()" classname="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" time="0.003"/>
-  <testcase name="should handle all failures()" classname="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" time="0.003"/>
+  <testcase name="should produce fresh instance per iteration when using withFactory()" classname="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" time="0.174"/>
+  <testcase name="should handle partial failures and matches()" classname="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" time="0.005"/>
+  <testcase name="should work with single iteration()" classname="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" time="0.004"/>
+  <testcase name="should handle all failures()" classname="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" time="0.004"/>
   <testcase name="should evaluate successfully with all matching results using withFunction()" classname="com.amazon.agentio.lib.eval.AgenticFunctionEvaluatorTest" time="0.004"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

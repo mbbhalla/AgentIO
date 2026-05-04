@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.283Z" hostname="b0f1d872d5fa" time="0.01">
+<testsuite name="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-05-04T04:57:46.122Z" hostname="b0f1d872d5fa" time="0.007">
   <properties/>
-  <testcase name="result should be sorted by position()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.006"/>
-  <testcase name="single segment should remain unchanged()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.001"/>
+  <testcase name="result should be sorted by position()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.003"/>
+  <testcase name="single segment should remain unchanged()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.0"/>
   <testcase name="all anchored segments should preserve original positions()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.0"/>
   <testcase name="anchored segments should not move()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.0"/>
-  <testcase name="adjacency group members should be placed consecutively()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.002"/>
-  <testcase name="should place highest importance at highest attention position()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.0"/>
+  <testcase name="adjacency group members should be placed consecutively()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.001"/>
+  <testcase name="should place highest importance at highest attention position()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.001"/>
   <testcase name="empty heatmap should still produce valid output()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextReshufflerTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
