@@ -1,3 +1,6 @@
+![Build](https://github.com/mbbhalla/AgentIO/actions/workflows/build.yml/badge.svg)
+
+
 # AgentIO
 
 A Kotlin SDK for building GenAI agents that provides a simple yet powerful abstraction for creating agentic systems on the JVM. **Features breakthrough in-process MCP integration via PipedStreams**, eliminating the complexity of distributed MCP architectures while maintaining full protocol compliance.
