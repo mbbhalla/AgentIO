@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.311Z" hostname="b0f1d872d5fa" time="0.006">
+  <properties/>
+  <testcase name="formatProbeToken should produce correct format()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.001"/>
+  <testcase name="stripProbes on content without probes should be idempotent()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <testcase name="ProbeEmbeddingResult should reject mismatched sizes()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.001"/>
+  <testcase name="embed then strip should restore original content()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <testcase name="ProbeRegistry empty should be valid()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <testcase name="embedProbes should produce a bijective registry()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <testcase name="PROBE_TOKEN_REGEX should match valid probe tokens()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <testcase name="stripProbes should remove all probe tokens from content()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <testcase name="ProbeRegistry probeFor should return null for unknown segment()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <testcase name="ProbeRegistry should reject non-bijective mappings()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.001"/>
+  <testcase name="PROBE_RESPONSE_REGEX should match lenient LLM response formats()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <testcase name="embedProbes should instrument each segment with a probe token()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <testcase name="ProbeRegistry segmentFor should return null for unknown probe()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ProbeTokenManagerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

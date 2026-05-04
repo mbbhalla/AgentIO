@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextSegmentTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.293Z" hostname="b0f1d872d5fa" time="0.009">
+  <properties/>
+  <testcase name="SegmentConstraints should reject negative adjacencyOrder()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextSegmentTest" time="0.002"/>
+  <testcase name="should create segment with valid parameters()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextSegmentTest" time="0.0"/>
+  <testcase name="should accept boundary importanceScore values()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextSegmentTest" time="0.0"/>
+  <testcase name="should reject negative position()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextSegmentTest" time="0.002"/>
+  <testcase name="anchored segment should preserve isAnchored flag()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextSegmentTest" time="0.0"/>
+  <testcase name="should reject importanceScore above 1()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextSegmentTest" time="0.002"/>
+  <testcase name="should reject importanceScore below 0()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextSegmentTest" time="0.003"/>
+  <testcase name="SegmentConstraints defaults should be non-anchored with no group()" classname="com.amazon.agentio.lib.ctx.cmm.adaptive.ContextSegmentTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

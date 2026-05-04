@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.amazon.agentio.common.JsonSchemaUtilTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:25.748Z" hostname="b0f1d872d5fa" time="0.341">
+  <properties/>
+  <testcase name="validateJsonWithSchema should return errors for missing required fields()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.209"/>
+  <testcase name="generateSchemaJsonObject should handle unknown primitive type with fallback()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.006"/>
+  <testcase name="generateSchemaJsonObject should handle enum collections()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.018"/>
+  <testcase name="generateSchemaJsonObject should handle nested objects()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.006"/>
+  <testcase name="generateSchemaJsonObject should handle mutable collections()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.002"/>
+  <testcase name="validateJsonWithSchema should validate correct JSON()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.001"/>
+  <testcase name="JsonString should validate JSON on creation()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.003"/>
+  <testcase name="JsonString should handle various JSON types()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.0"/>
+  <testcase name="generateSchemaJsonObject should create schema for simple types()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.005"/>
+  <testcase name="generateSchemaJsonObject should handle collections with all numeric types()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.003"/>
+  <testcase name="generateSchemaJsonObject should handle collections()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.0"/>
+  <testcase name="generateSchemaJsonObject should handle collections with custom data class items()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.002"/>
+  <testcase name="generate Schema()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.041"/>
+  <testcase name="generateJsonSchema should handle required fields correctly()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.002"/>
+  <testcase name="generateSchemaJsonObject should handle enums()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.0"/>
+  <testcase name="generateJsonSchema should create valid schema for simple data class()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.002"/>
+  <testcase name="jacksonObjectMapper should have correct configuration()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.032"/>
+  <testcase name="generateSchemaJsonObject should handle collections with Boolean items()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.002"/>
+  <testcase name="validateJsonWithSchema should return errors for invalid JSON()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.0"/>
+  <testcase name="generateJsonSchema should handle title and description annotations()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.002"/>
+  <testcase name="json instance should have correct configuration()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.0"/>
+  <testcase name="generateSchemaJsonObject should handle Set with custom data class items()" classname="com.amazon.agentio.common.JsonSchemaUtilTest" time="0.002"/>
+  <system-out><![CDATA[{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"age":{"type":"integer"},"email":{"type":"string","format":"email"},"isActive":{"type":"boolean"},"name":{"type":"string","description":"Person's name","pattern":"^Z[a-zA-Z]+$"}},"required":["age","isActive","name"],"title":"Test Person","description":"A test person data class"}
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

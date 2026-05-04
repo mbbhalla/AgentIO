@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.amazon.agentio.common.ExtensionsTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:25.550Z" hostname="b0f1d872d5fa" time="0.035">
+  <properties/>
+  <testcase name="Should convert JsonPrimitive long to Document.Number" classname="com.amazon.agentio.common.ExtensionsTest" time="0.018"/>
+  <testcase name="Should convert all numeric types in Document.Number correctly" classname="com.amazon.agentio.common.ExtensionsTest" time="0.004"/>
+  <testcase name="Should convert JsonPrimitive float to Document.Number" classname="com.amazon.agentio.common.ExtensionsTest" time="0.001"/>
+  <testcase name="Should convert Document.Number with Double to JsonPrimitive" classname="com.amazon.agentio.common.ExtensionsTest" time="0.0"/>
+  <testcase name="Should convert JsonPrimitive int to Document.Number" classname="com.amazon.agentio.common.ExtensionsTest" time="0.001"/>
+  <testcase name="Should convert Document.List with null elements to JsonArray with JsonNull" classname="com.amazon.agentio.common.ExtensionsTest" time="0.006"/>
+  <testcase name="Should handle empty JsonArray" classname="com.amazon.agentio.common.ExtensionsTest" time="0.001"/>
+  <testcase name="Should convert JsonPrimitive boolean to Document.Boolean" classname="com.amazon.agentio.common.ExtensionsTest" time="0.0"/>
+  <testcase name="Should convert Document.Number with Float to JsonPrimitive" classname="com.amazon.agentio.common.ExtensionsTest" time="0.001"/>
+  <testcase name="Should convert JsonArray to Document.List recursively" classname="com.amazon.agentio.common.ExtensionsTest" time="0.0"/>
+  <testcase name="Should convert Document.Number with Long to JsonPrimitive" classname="com.amazon.agentio.common.ExtensionsTest" time="0.0"/>
+  <testcase name="Should convert Document.Number with Int to JsonPrimitive" classname="com.amazon.agentio.common.ExtensionsTest" time="0.001"/>
+  <testcase name="Should handle complex nested structures with arrays and objects" classname="com.amazon.agentio.common.ExtensionsTest" time="0.0"/>
+  <testcase name="Should handle JsonPrimitive fallback to string" classname="com.amazon.agentio.common.ExtensionsTest" time="0.0"/>
+  <testcase name="Should convert JsonPrimitive double to Document.Number" classname="com.amazon.agentio.common.ExtensionsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

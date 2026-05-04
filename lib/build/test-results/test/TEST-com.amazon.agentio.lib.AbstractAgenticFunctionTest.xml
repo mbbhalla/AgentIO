@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.amazon.agentio.lib.AbstractAgenticFunctionTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:26.095Z" hostname="b0f1d872d5fa" time="2.062">
+  <properties/>
+  <testcase name="should handle MaxTokens stop reason()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="1.081"/>
+  <testcase name="should handle thinking mode with multiple iterations()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.067"/>
+  <testcase name="should handle exceptions and return failure when tools provider fails()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.009"/>
+  <testcase name="should return correct input and output class types()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.002"/>
+  <testcase name="should handle ToolUse stop reason()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.13"/>
+  <testcase name="should handle bedrock client failures()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.023"/>
+  <testcase name="should handle additional model request fields()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.064"/>
+  <testcase name="should handle null system instruction()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.065"/>
+  <testcase name="should handle successful conversation with valid JSON output()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.06"/>
+  <testcase name="should handle tool use in conversation flow()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.193"/>
+  <testcase name="should handle null problem domain in agent configuration()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.06"/>
+  <testcase name="should handle custom system instruction()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.058"/>
+  <testcase name="should handle empty usage in response()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.061"/>
+  <testcase name="should handle ContentGuardRail stop reason()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.061"/>
+  <testcase name="should handle conversation with StopSequence stop reason()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.062"/>
+  <testcase name="should handle thinking mode reaching max iterations()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.038"/>
+  <testcase name="should handle context memory manager failures()" classname="com.amazon.agentio.lib.AbstractAgenticFunctionTest" time="0.024"/>
+  <system-out><![CDATA[20:48:27.253 [DefaultDispatcher-worker-1 @coroutine#17] ERROR c.a.a.lib.AbstractAgenticFunction - Failure in computing result for test-123
+20:48:27.408 [DefaultDispatcher-worker-1 @coroutine#31] ERROR c.a.a.lib.AbstractAgenticFunction - Failure in computing result for test-789
+20:48:28.157 [DefaultDispatcher-worker-1 @coroutine#111] ERROR c.a.a.lib.AbstractAgenticFunction - Failure in computing result for test-456
+]]></system-out>
+  <system-err><![CDATA[WARNING: A Java agent has been loaded dynamically (/Users/mbbhalla/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.14.17/e3c251a39dc90badaf71c83427ba46840f219d8d/byte-buddy-agent-1.14.17.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>

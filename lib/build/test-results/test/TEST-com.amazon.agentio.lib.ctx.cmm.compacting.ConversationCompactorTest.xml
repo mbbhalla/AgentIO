@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.325Z" hostname="b0f1d872d5fa" time="0.009">
+  <properties/>
+  <testcase name="reconstruct should maintain valid role alternation when recent starts with Assistant()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.004"/>
+  <testcase name="reconstruct should maintain valid role alternation when recent starts with User()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="middleToText should include ToolUse names()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.001"/>
+  <testcase name="reconstruct with empty recent should still produce valid alternation()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="reconstruct should reset total token usage()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.001"/>
+  <testcase name="reconstruct should preserve recent messages verbatim()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="middleToText should format text messages with roles()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="split anchor is always the first message()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="split should separate anchor, middle, and recent()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="reconstruct should contain compaction marker in summary message()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="middleToText with empty list should return empty string()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="buildCompactionInstruction should include the middle text()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="middleToText should include ToolResult content()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.001"/>
+  <testcase name="split with small conversation should not be compactable()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="split with preservedTurnPairs larger than conversation should preserve all after anchor()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="reconstruct should preserve stopReason and thinkingModeCounter()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <testcase name="reconstruct should preserve anchor content()" classname="com.amazon.agentio.lib.ctx.cmm.compacting.ConversationCompactorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

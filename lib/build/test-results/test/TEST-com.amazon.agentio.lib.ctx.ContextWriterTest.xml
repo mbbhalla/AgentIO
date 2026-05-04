@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.amazon.agentio.lib.ctx.ContextWriterTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-05-04T03:48:28.172Z" hostname="b0f1d872d5fa" time="0.043">
+  <properties/>
+  <testcase name="ContextWriters should hold set of writers()" classname="com.amazon.agentio.lib.ctx.ContextWriterTest" time="0.018"/>
+  <testcase name="ContextWriters with empty set should work()" classname="com.amazon.agentio.lib.ctx.ContextWriterTest" time="0.0"/>
+  <testcase name="ContextWriter interface should be callable()" classname="com.amazon.agentio.lib.ctx.ContextWriterTest" time="0.021"/>
+  <testcase name="custom ContextWriter implementation should work()" classname="com.amazon.agentio.lib.ctx.ContextWriterTest" time="0.001"/>
+  <testcase name="NoOpContextWriter should not throw()" classname="com.amazon.agentio.lib.ctx.ContextWriterTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
