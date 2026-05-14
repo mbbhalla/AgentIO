@@ -3,8 +3,7 @@
 
 # Ignore Gradle build output directory
 build
-lib/bin
-lib/build/
+**/build/
 
 # Ignore IDE files
 .idea
@@ -19,3 +18,5 @@ AgentIO.iml
 
 # Docs
 docs
+
+
