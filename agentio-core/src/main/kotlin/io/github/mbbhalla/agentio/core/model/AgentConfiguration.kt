@@ -5,6 +5,7 @@ import io.github.mbbhalla.agentio.core.lib.ctx.cmm.ContextMemoryManagers
 import io.github.mbbhalla.agentio.core.lib.ctx.cmm.NoOperationContextMemoryManager
 import io.github.mbbhalla.agentio.core.lib.ctx.provider.ContextProviders
 import io.github.mbbhalla.agentio.core.lib.ctx.writer.ContextWriters
+import io.github.mbbhalla.agentio.core.lib.event.EventListener
 import io.github.mbbhalla.agentio.core.lib.tool.ToolsProvider
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -44,6 +45,9 @@ data class AgentConfiguration(
 
     // Context Writers
     val contextWriters: ContextWriters = ContextWriters(value = emptySet()),
+
+    // Event listener for observability hooks (logging, metrics, tracing)
+    val eventListener: EventListener? = null,
 
     /*
         Max Turns Limit - To prevent unending conversations

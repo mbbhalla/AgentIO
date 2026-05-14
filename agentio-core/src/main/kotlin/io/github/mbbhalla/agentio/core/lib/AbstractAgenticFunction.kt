@@ -16,6 +16,8 @@ import io.github.mbbhalla.agentio.core.common.JsonString
 import io.github.mbbhalla.agentio.core.common.REGEX_JSON_EXTRACT
 import io.github.mbbhalla.agentio.core.common.toDocument
 import io.github.mbbhalla.agentio.core.lib.ctx.cmm.ContextMemoryManager
+import io.github.mbbhalla.agentio.core.model.event.Event
+import io.github.mbbhalla.agentio.core.model.event.EventPayload
 import io.github.mbbhalla.agentio.core.model.AgentConfiguration
 import io.github.mbbhalla.agentio.core.model.Conversation
 import io.github.mbbhalla.agentio.core.model.IndexedConversation
@@ -40,6 +42,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.serializer
 import org.slf4j.LoggerFactory
 import kotlin.reflect.KClass
+import kotlin.time.measureTimedValue
 
 interface Instructible<I : Instructible.WithInstruction, O : Any> {
     interface WithInstruction {
@@ -83,14 +86,45 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
     final override suspend fun invoke(
         input: I,
     ): Try<AgentOutput<O>> = withContext(Dispatchers.IO) {
-        try {
-            val result = coreLogic(input)
-            LOG.debug("Successfully computed result for ${input.instructionId()}")
-            success(result)
-        } catch (e: Exception) {
-            LOG.error("Failure in computing result for ${input.instructionId()}")
-            failure(e)
+        val eventListener = agentConfiguration.eventListener
+
+        eventListener?.onEvent(
+            Event(
+                payload = EventPayload.AgentInvocationStart(
+                    agentId = agentConfiguration.agentId,
+                    instructionId = input.instructionId(),
+                    instruction = input.instruction(),
+                ),
+            ),
+        )
+
+        val (result, duration) = measureTimedValue {
+            try {
+                val output = coreLogic(input)
+                LOG.debug("Successfully computed result for ${input.instructionId()}")
+                success(output)
+            } catch (e: Exception) {
+                LOG.error("Failure in computing result for ${input.instructionId()}")
+                failure(e)
+            }
         }
+
+        eventListener?.onEvent(
+            Event(
+                payload = EventPayload.AgentInvocationEnd(
+                    agentId = agentConfiguration.agentId,
+                    instructionId = input.instructionId(),
+                    totalTurns = result.map { it.conversation.messages.size }.getOrElse { 0 },
+                    totalInputTokens = result.map { it.conversation.tokenUsage.totalInputTokens }.getOrElse { 0 },
+                    totalOutputTokens = result.map { it.conversation.tokenUsage.totalOutputTokens }.getOrElse { 0 },
+                    success = result.isSuccess,
+                    error = if (result.isFailure) result.cause else null,
+                    latency = duration,
+                ),
+            ),
+        )
+
+        result
     }
 
     /*
@@ -287,11 +321,54 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                 }
 
                 role is ConversationRole.User && (lastContentBlock is ContentBlock.Text || lastContentBlock is ContentBlock.ToolResult) -> {
-                    val response = callBedrock(
-                        input = input,
-                        agentConfiguration = agentConfiguration,
-                        conversation = conversation,
-                        tools = tools,
+                    agentConfiguration.eventListener?.onEvent(
+                        Event(
+                            payload = EventPayload.BeforeLlmCall(
+                                modelId = agentConfiguration.languageModelParameters.llm.id,
+                                messageCount = conversation.messages.size,
+                                turnNumber = indexed.turnNumber,
+                            ),
+                        ),
+                    )
+
+                    val (llmResult, llmLatency) = measureTimedValue {
+                        runCatching {
+                            callBedrock(
+                                input = input,
+                                agentConfiguration = agentConfiguration,
+                                conversation = conversation,
+                                tools = tools,
+                            )
+                        }
+                    }
+
+                    val response = llmResult.getOrElse { e ->
+                        agentConfiguration.eventListener?.onEvent(
+                            Event(
+                                payload = EventPayload.AfterLlmCall(
+                                    modelId = agentConfiguration.languageModelParameters.llm.id,
+                                    stopReason = null,
+                                    inputTokens = 0,
+                                    outputTokens = 0,
+                                    latency = llmLatency,
+                                    error = e,
+                                ),
+                            ),
+                        )
+                        throw e
+                    }
+
+                    agentConfiguration.eventListener?.onEvent(
+                        Event(
+                            payload = EventPayload.AfterLlmCall(
+                                modelId = agentConfiguration.languageModelParameters.llm.id,
+                                stopReason = response.stopReason,
+                                inputTokens = response.usage?.inputTokens ?: 0,
+                                outputTokens = response.usage?.outputTokens ?: 0,
+                                latency = llmLatency,
+                                error = null,
+                            ),
+                        ),
                     )
 
                     val responseMessage = response.output?.asMessageOrNull()
@@ -346,7 +423,53 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                     val toolResults = coroutineScope {
                         toolUseBlocks.map { toolUseBlock ->
                             async {
-                                agentConfiguration.toolsProvider.callTool(toolUseBlock)
+                                val toolName = toolUseBlock.value.name
+                                val toolInput = toolUseBlock.value.input
+
+                                agentConfiguration.eventListener?.onEvent(
+                                    Event(
+                                        payload = EventPayload.BeforeToolCall(
+                                            toolName = toolName,
+                                            toolInput = toolInput ?: Unit,
+                                            turnNumber = indexed.turnNumber,
+                                        ),
+                                    ),
+                                )
+
+                                val (toolResult, toolLatency) = measureTimedValue {
+                                    runCatching {
+                                        agentConfiguration.toolsProvider.callTool(toolUseBlock)
+                                    }
+                                }
+
+                                val result = toolResult.getOrElse { e ->
+                                    agentConfiguration.eventListener?.onEvent(
+                                        Event(
+                                            payload = EventPayload.AfterToolCall(
+                                                toolName = toolName,
+                                                toolInput = toolInput ?: Unit,
+                                                toolResult = Unit,
+                                                latency = toolLatency,
+                                                error = e,
+                                            ),
+                                        ),
+                                    )
+                                    throw e
+                                }
+
+                                agentConfiguration.eventListener?.onEvent(
+                                    Event(
+                                        payload = EventPayload.AfterToolCall(
+                                            toolName = toolName,
+                                            toolInput = toolInput ?: Unit,
+                                            toolResult = result,
+                                            latency = toolLatency,
+                                            error = null,
+                                        ),
+                                    ),
+                                )
+
+                                result
                             }
                         }.awaitAll()
                     }
