@@ -18,7 +18,7 @@ dependencies {
     // AWS SDK for Bedrock Runtime
     implementation("aws.sdk.kotlin:bedrockruntime:1.6.68")
 
-    // Logging
+    // Logging — only the SLF4J API facade; consumers provide their own backend
     implementation("org.slf4j:slf4j-api:2.0.16")
-    implementation("ch.qos.logback:logback-classic:1.5.12")
+    testRuntimeOnly("ch.qos.logback:logback-classic:1.5.12")
 }

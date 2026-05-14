@@ -88,7 +88,6 @@ internal object HackerNewsAgenticFunctionProvider {
                 languageModelParameters = LanguageModelParameters(
                     llm = LLM.ANTHROPIC_CLAUDE_OPUS_4_5_V1_CROSS_REGION_INFERENCE,
                     temperature = Temperature(TEMPERATURE),
-                    topP = TopP(TOP_P),
                 ),
                 bedrockRuntimeClient = BedrockRuntimeClient {
                     this.region = "us-west-2"

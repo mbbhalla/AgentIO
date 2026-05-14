@@ -34,9 +34,9 @@ dependencies {
     // Model Context Protocol Kotlin SDK
     implementation("io.modelcontextprotocol:kotlin-sdk:0.12.0")
 
-    // Logging
+    // Logging — only the SLF4J API facade; consumers provide their own backend
     implementation("org.slf4j:slf4j-api:2.0.16")
-    implementation("ch.qos.logback:logback-classic:1.5.12")
+    testRuntimeOnly("ch.qos.logback:logback-classic:1.5.12")
 
     // Kotlin reflection
     implementation("org.jetbrains.kotlin:kotlin-reflect:2.2.0")

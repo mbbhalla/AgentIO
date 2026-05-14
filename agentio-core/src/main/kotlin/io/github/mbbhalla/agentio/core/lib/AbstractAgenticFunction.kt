@@ -76,7 +76,6 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
 
     companion object {
         private val LOG = LoggerFactory.getLogger(AbstractAgenticFunction::class.java)
-        private const val TOGGLE_VERBOSE_LOGGING = false
     }
 
     abstract fun getInputKClass(): KClass<I>
@@ -219,11 +218,9 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
 
         val tools = agentConfiguration.toolsProvider.listTools()
 
-        if (TOGGLE_VERBOSE_LOGGING) {
-            LOG.info("Got input schema: $inputSchemaJson")
-            LOG.info("Got output schema: $outputSchemaJson")
-            LOG.info("Got tools: ${tools.map { it.value.name }}")
-        }
+        LOG.debug("Got input schema: {}", inputSchemaJson)
+        LOG.debug("Got output schema: {}", outputSchemaJson)
+        LOG.debug("Got tools: {}", tools.map { it.value.name })
 
         /*
             Generate a Flow of Conversations. The last message in the previous
@@ -285,16 +282,10 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
         ) { indexed ->
             val conversation = indexed.conversation
 
-            if (TOGGLE_VERBOSE_LOGGING) {
-                println(conversation.lastMessage())
-                LOG.info(
-                    """
-                    ###############################################
-                    ${conversation.lastMessage().message.content}
-                    ###############################################
-                    """.trimIndent(),
-                )
-            }
+            LOG.debug(
+                "###############################################\n{}\n###############################################",
+                conversation.lastMessage().message.content,
+            )
 
             delay(duration = agentConfiguration.delayBetweenTurns)
 

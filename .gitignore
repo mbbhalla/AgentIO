@@ -19,4 +19,9 @@ AgentIO.iml
 # Docs
 docs
 
+# Bin files
+agentio-cmm-impl/bin
+agentio-core/bin/
+agentio-examples/bin/
+agentio-experiments/bin/
 

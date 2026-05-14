@@ -25,6 +25,7 @@ import io.github.mbbhalla.agentio.core.model.TopP
 import io.github.mbbhalla.agentio.core.model.event.Event
 import io.github.mbbhalla.agentio.core.model.event.EventPayload
 import io.mockk.coEvery
+import java.util.Collections
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -105,7 +106,7 @@ internal class EventListenerTest {
     fun setup() {
         mockBedrockClient = mockk()
         mockToolsProvider = mockk()
-        capturedEvents = mutableListOf()
+        capturedEvents = Collections.synchronizedList(mutableListOf())
     }
 
     private fun capturingListener(): EventListener = EventListener { event ->
