@@ -12,7 +12,6 @@ import io.github.mbbhalla.agentio.core.model.AgentConfiguration
 import io.github.mbbhalla.agentio.core.model.LLM
 import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
-import io.github.mbbhalla.agentio.core.model.TopP
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.client.StdioClientTransport
@@ -66,7 +65,6 @@ internal class HackerNewsAgenticFunction(
  */
 internal object HackerNewsAgenticFunctionProvider {
     private const val TEMPERATURE = 0.5f
-    private const val TOP_P = 0.9f
 
     suspend fun get(
         agentId: String,
