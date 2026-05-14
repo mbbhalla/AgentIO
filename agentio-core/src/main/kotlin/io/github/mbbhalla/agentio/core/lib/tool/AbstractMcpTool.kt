@@ -12,6 +12,7 @@ import io.vavr.kotlin.Try
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.KClass
 
 abstract class AbstractMcpTool<I : Any, O : Any> {
@@ -34,7 +35,7 @@ abstract class AbstractMcpTool<I : Any, O : Any> {
     abstract fun getOutputKClass(): KClass<O>
     abstract fun getToolConfig(): ToolConfig
 
-    private var invokeCounter = 0
+    private val invokeCounter = AtomicInteger(0)
 
     @Suppress("LongMethod")
     operator fun invoke(): RegisteredTool {
@@ -75,7 +76,7 @@ abstract class AbstractMcpTool<I : Any, O : Any> {
 
                 CallToolResult(
                     content = mutableListOf<TextContent>().apply {
-                        if (invokeCounter++ == 0 || getToolConfig().emitSchemaAndRequiredAttributesForAllToolCalls) {
+                        if (invokeCounter.getAndIncrement() == 0 || getToolConfig().emitSchemaAndRequiredAttributesForAllToolCalls) {
                             add(
                                 TextContent(
                                     "Tool '${tool.name()}' JSON Schema: ${
