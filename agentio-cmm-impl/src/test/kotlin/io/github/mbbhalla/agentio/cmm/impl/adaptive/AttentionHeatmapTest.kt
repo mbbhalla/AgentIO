@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.core.lib.ctx.cmm.adaptive
+package io.github.mbbhalla.agentio.cmm.impl.adaptive
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue

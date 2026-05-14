@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.core.lib.ctx.cmm.compacting
+package io.github.mbbhalla.agentio.cmm.impl.compacting
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test

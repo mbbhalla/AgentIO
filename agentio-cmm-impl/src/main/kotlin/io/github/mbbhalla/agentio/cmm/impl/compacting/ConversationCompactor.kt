@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.core.lib.ctx.cmm.compacting
+package io.github.mbbhalla.agentio.cmm.impl.compacting
 
 import aws.sdk.kotlin.services.bedrockruntime.model.ContentBlock
 import aws.sdk.kotlin.services.bedrockruntime.model.ConversationRole

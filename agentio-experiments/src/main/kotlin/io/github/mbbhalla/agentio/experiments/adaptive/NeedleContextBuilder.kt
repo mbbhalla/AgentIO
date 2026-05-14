@@ -33,7 +33,7 @@ data class Needle(
  * plus the retrieval question and expected answer.
  *
  * [contextBlocks] contains a small number of large text chunks (typically 10-20),
- * each becoming one [io.github.mbbhalla.agentio.core.lib.ctx.cmm.adaptive.ContextSegment] for the
+ * each becoming one [io.github.mbbhalla.agentio.cmm.impl.adaptive.ContextSegment] for the
  * adaptive CMM. This keeps the segment count manageable regardless of model window size.
  */
 data class NeedleContext(

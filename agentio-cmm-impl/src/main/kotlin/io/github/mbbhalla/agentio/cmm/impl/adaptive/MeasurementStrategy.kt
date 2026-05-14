@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.core.lib.ctx.cmm.adaptive
+package io.github.mbbhalla.agentio.cmm.impl.adaptive
 
 /**
  * A parsed probe response from the LLM — one recalled probe value with metadata.

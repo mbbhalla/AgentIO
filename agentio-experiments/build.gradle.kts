@@ -1,5 +1,6 @@
 dependencies {
     implementation(project(":agentio-core"))
+    implementation(project(":agentio-cmm-impl"))
 
     // Vavr
     implementation("io.vavr:vavr-kotlin:0.10.2")

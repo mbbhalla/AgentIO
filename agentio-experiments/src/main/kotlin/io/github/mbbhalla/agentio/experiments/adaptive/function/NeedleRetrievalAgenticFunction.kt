@@ -9,8 +9,8 @@ import io.github.mbbhalla.agentio.core.lib.AbstractAgenticFunction
 import io.github.mbbhalla.agentio.core.lib.Instructible
 import io.github.mbbhalla.agentio.core.lib.ctx.cmm.ContextMemoryManagers
 import io.github.mbbhalla.agentio.core.lib.ctx.cmm.NoOperationContextMemoryManager
-import io.github.mbbhalla.agentio.core.lib.ctx.cmm.adaptive.AdaptiveConfig
-import io.github.mbbhalla.agentio.core.lib.ctx.cmm.adaptive.AdaptiveContextMemoryManager
+import io.github.mbbhalla.agentio.cmm.impl.adaptive.AdaptiveConfig
+import io.github.mbbhalla.agentio.cmm.impl.adaptive.AdaptiveContextMemoryManager
 import io.github.mbbhalla.agentio.core.lib.ctx.provider.ContextProvider
 import io.github.mbbhalla.agentio.core.lib.ctx.provider.ContextProviders
 import io.github.mbbhalla.agentio.core.lib.tool.EmptyToolsProvider

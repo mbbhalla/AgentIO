@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.core.lib.ctx.cmm.adaptive
+package io.github.mbbhalla.agentio.cmm.impl.adaptive
 
 /**
  * Immutable attention heatmap mapping context segment positions to empirical attention scores.

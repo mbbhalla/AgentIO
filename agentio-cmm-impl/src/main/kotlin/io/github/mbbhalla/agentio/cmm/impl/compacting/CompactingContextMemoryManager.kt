@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.core.lib.ctx.cmm.compacting
+package io.github.mbbhalla.agentio.cmm.impl.compacting
 
 import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.lib.AbstractAgenticFunction
