@@ -9,9 +9,6 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.13")
     testImplementation("org.jetbrains.kotlin:kotlin-test:2.2.0")
 
-    // Guava/Gson
-    implementation("com.google.guava:guava:33.5.0-jre")
-
     // Jackson
     implementation("com.fasterxml.jackson.core:jackson-core:2.18.2")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
@@ -25,8 +22,8 @@ dependencies {
     // JSON Schema validation
     implementation("com.networknt:json-schema-validator:1.5.3")
 
-    // Vavr
-    implementation("io.vavr:vavr-kotlin:0.10.2")
+    // Vavr (exposed in public API: Try<AgentOutput<O>>)
+    api("io.vavr:vavr-kotlin:0.10.2")
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

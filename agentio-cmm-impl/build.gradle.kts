@@ -15,16 +15,10 @@ dependencies {
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    // Vavr
-    implementation("io.vavr:vavr-kotlin:0.10.2")
-
     // AWS SDK for Bedrock Runtime
     implementation("aws.sdk.kotlin:bedrockruntime:1.6.68")
 
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.16")
     implementation("ch.qos.logback:logback-classic:1.5.12")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 }

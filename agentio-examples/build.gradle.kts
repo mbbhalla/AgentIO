@@ -1,9 +1,6 @@
 dependencies {
     implementation(project(":agentio-core"))
 
-    // Vavr
-    implementation("io.vavr:vavr-kotlin:0.10.2")
-
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
