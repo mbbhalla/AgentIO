@@ -32,3 +32,48 @@ tasks.register<JavaExec>("RunHackerNewsAgenticFunction") {
         "${project.projectDir}/src/main/kotlin/io/github/mbbhalla/agentio/examples/hackernews/server/server_hacker_news.sh",
     )
 }
+
+tasks.register<JavaExec>("RunFetchAgenticFunction") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.fetch.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5012
+    }
+    args = listOf(
+        "${project.projectDir}/src/main/kotlin/io/github/mbbhalla/agentio/examples/fetch/server/server_fetch.sh",
+    )
+}
+
+tasks.register<JavaExec>("RunGitAnalyzerAgenticFunction") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.gitanalyzer.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5013
+    }
+    args = listOf(
+        rootProject.projectDir.absolutePath,
+    )
+}
+
+tasks.register<JavaExec>("RunCodeMetricsAgenticFunction") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.codemetrics.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5014
+    }
+    args = listOf(
+        rootProject.projectDir.absolutePath,
+    )
+}
