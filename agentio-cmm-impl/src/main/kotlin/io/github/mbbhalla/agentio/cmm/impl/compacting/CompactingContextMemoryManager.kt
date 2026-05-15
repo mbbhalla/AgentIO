@@ -8,7 +8,7 @@ import io.github.mbbhalla.agentio.core.lib.ctx.cmm.ContextMemoryManagers
 import io.github.mbbhalla.agentio.core.lib.ctx.cmm.NoOperationContextMemoryManager
 import io.github.mbbhalla.agentio.core.lib.tool.EmptyToolsProvider
 import io.github.mbbhalla.agentio.core.model.AgentConfiguration
-import io.github.mbbhalla.agentio.core.model.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import io.github.mbbhalla.agentio.core.model.ThinkingMode
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory

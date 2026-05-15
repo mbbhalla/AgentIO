@@ -7,6 +7,7 @@ import io.github.mbbhalla.agentio.core.lib.Instructible
 import io.github.mbbhalla.agentio.core.lib.ctx.cmm.ContextMemoryManagers
 import io.github.mbbhalla.agentio.core.lib.ctx.cmm.NoOperationContextMemoryManager
 import io.github.mbbhalla.agentio.core.lib.event.EventListener
+import io.github.mbbhalla.agentio.core.lib.event.EventListeners
 import io.github.mbbhalla.agentio.core.lib.tool.McpClients
 import io.github.mbbhalla.agentio.core.lib.tool.NamedClient
 import io.github.mbbhalla.agentio.core.model.AgentConfiguration
@@ -15,11 +16,15 @@ import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
 import io.github.mbbhalla.agentio.core.model.event.Event
 import io.github.mbbhalla.agentio.core.model.event.EventPayload
+import io.github.mbbhalla.agentio.eventlistener.impl.checkpoint.CheckpointTrigger
+import io.github.mbbhalla.agentio.eventlistener.impl.checkpoint.CheckpointingEventListener
+import io.github.mbbhalla.agentio.eventlistener.impl.checkpoint.FileSystemCheckpointWriter
 import io.github.mbbhalla.agentio.examples.codemetrics.server.CodeMetricsMcpServer
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -75,7 +80,7 @@ internal class CodeMetricsAgenticFunction(
 internal class MetricsEventListener : EventListener {
     private val log = LoggerFactory.getLogger(MetricsEventListener::class.java)
 
-    override fun onEvent(event: Event) {
+    override suspend fun onEvent(event: Event): Result<Unit> = runCatching {
         when (val payload = event.payload) {
             is EventPayload.AgentInvocationStart -> {
                 log.info("[EVENT] Agent '{}' started: {}", payload.agentId, payload.instructionId)
@@ -115,6 +120,9 @@ internal class MetricsEventListener : EventListener {
                     payload.stopReason,
                 )
             }
+            is EventPayload.TurnCompleted -> {
+                log.info("[EVENT] Turn {} completed", payload.turnNumber)
+            }
         }
     }
 }
@@ -125,6 +133,7 @@ internal object CodeMetricsAgenticFunctionProvider {
     suspend fun get(
         agentId: String,
         projectPath: String,
+        checkpointDir: Path,
     ): CodeMetricsAgenticFunction {
         val mcpServer = CodeMetricsMcpServer(projectPath)
         val pipedStreamsExchange = mcpServer.pipedStreamsExchange()
@@ -167,7 +176,15 @@ internal object CodeMetricsAgenticFunctionProvider {
                 ),
                 delayBetweenTurns = 0.seconds,
                 problemDomain = "Code Quality Analysis",
-                eventListener = MetricsEventListener(),
+                eventListeners = EventListeners(
+                    setOf(
+                        MetricsEventListener(),
+                        CheckpointingEventListener(
+                            trigger = CheckpointTrigger.EveryNTurns(n = 1),
+                            writer = FileSystemCheckpointWriter(directory = checkpointDir),
+                        ),
+                    ),
+                ),
             ),
         )
     }

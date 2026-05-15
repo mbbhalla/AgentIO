@@ -3,7 +3,7 @@ package io.github.mbbhalla.agentio.cmm.impl.adaptive
 import aws.sdk.kotlin.services.bedrockruntime.model.ContentBlock
 import aws.sdk.kotlin.services.bedrockruntime.model.ConversationRole
 import io.github.mbbhalla.agentio.core.lib.ctx.cmm.ContextMemoryManager
-import io.github.mbbhalla.agentio.core.model.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import org.slf4j.LoggerFactory
 
 /**

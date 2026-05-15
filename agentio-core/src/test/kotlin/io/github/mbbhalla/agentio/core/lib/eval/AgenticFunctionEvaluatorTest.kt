@@ -3,7 +3,7 @@ package io.github.mbbhalla.agentio.core.lib.eval
 import io.github.mbbhalla.agentio.core.lib.AbstractAgenticFunction
 import io.github.mbbhalla.agentio.core.lib.AgentOutput
 import io.github.mbbhalla.agentio.core.lib.Instructible
-import io.github.mbbhalla.agentio.core.model.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.vavr.kotlin.failure

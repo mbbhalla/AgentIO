@@ -3,9 +3,9 @@ package io.github.mbbhalla.agentio.cmm.impl.compacting
 import aws.sdk.kotlin.services.bedrockruntime.model.ContentBlock
 import aws.sdk.kotlin.services.bedrockruntime.model.ConversationRole
 import aws.sdk.kotlin.services.bedrockruntime.model.Message
-import io.github.mbbhalla.agentio.core.model.AgentTokenUsage
-import io.github.mbbhalla.agentio.core.model.Conversation
-import io.github.mbbhalla.agentio.core.model.MessageEnvelope
+import io.github.mbbhalla.agentio.core.model.conversation.AgentTokenUsage
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.MessageEnvelope
 import java.time.Instant
 
 /**

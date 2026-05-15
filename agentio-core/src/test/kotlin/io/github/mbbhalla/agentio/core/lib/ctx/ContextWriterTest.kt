@@ -4,7 +4,7 @@ import io.github.mbbhalla.agentio.core.lib.Instructible
 import io.github.mbbhalla.agentio.core.lib.ctx.writer.ContextWriter
 import io.github.mbbhalla.agentio.core.lib.ctx.writer.ContextWriters
 import io.github.mbbhalla.agentio.core.lib.ctx.writer.NoOpContextWriter
-import io.github.mbbhalla.agentio.core.model.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.serialization.Serializable

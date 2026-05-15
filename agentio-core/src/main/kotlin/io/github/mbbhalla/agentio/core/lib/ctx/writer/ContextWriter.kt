@@ -1,7 +1,7 @@
 package io.github.mbbhalla.agentio.core.lib.ctx.writer
 
 import io.github.mbbhalla.agentio.core.lib.Instructible
-import io.github.mbbhalla.agentio.core.model.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 
 /**
  * Abstraction for persisting context into long term memory (LTM) after the agent

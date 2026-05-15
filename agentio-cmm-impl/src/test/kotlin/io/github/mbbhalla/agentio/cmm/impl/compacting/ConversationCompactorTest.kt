@@ -7,9 +7,9 @@ import aws.sdk.kotlin.services.bedrockruntime.model.StopReason
 import aws.sdk.kotlin.services.bedrockruntime.model.ToolResultBlock
 import aws.sdk.kotlin.services.bedrockruntime.model.ToolResultContentBlock
 import aws.sdk.kotlin.services.bedrockruntime.model.ToolResultStatus
-import io.github.mbbhalla.agentio.core.model.AgentTokenUsage
-import io.github.mbbhalla.agentio.core.model.Conversation
-import io.github.mbbhalla.agentio.core.model.MessageEnvelope
+import io.github.mbbhalla.agentio.core.model.conversation.AgentTokenUsage
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.MessageEnvelope
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue

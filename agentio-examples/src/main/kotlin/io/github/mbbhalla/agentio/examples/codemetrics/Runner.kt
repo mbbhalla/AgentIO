@@ -7,6 +7,7 @@ import io.github.mbbhalla.agentio.examples.codemetrics.function.CodeMetricsAgent
 import io.vavr.control.Try
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 
 internal object Runner {
 
@@ -18,9 +19,11 @@ internal object Runner {
         args: Array<String>,
     ): Try<AgentOutput<CodeMetricsAgenticFunction.Output>> = runBlocking {
         val projectPath = args[0]
+        val checkpointDir = Path.of(args[1])
         val agenticFunction = CodeMetricsAgenticFunctionProvider.get(
             agentId = AGENT_ID,
             projectPath = projectPath,
+            checkpointDir = checkpointDir,
         )
 
         agenticFunction.invoke(

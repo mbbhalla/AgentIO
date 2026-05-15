@@ -1,5 +1,6 @@
 dependencies {
     implementation(project(":agentio-core"))
+    implementation(project(":agentio-eventlistener-impl"))
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -75,5 +76,7 @@ tasks.register<JavaExec>("RunCodeMetricsAgenticFunction") {
     }
     args = listOf(
         rootProject.projectDir.absolutePath,
+        project.findProperty("checkpointDir")?.toString()
+            ?: "${rootProject.projectDir}/build/checkpoints",
     )
 }

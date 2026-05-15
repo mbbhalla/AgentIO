@@ -1,6 +1,6 @@
 package io.github.mbbhalla.agentio.core.lib.ctx.cmm
 
-import io.github.mbbhalla.agentio.core.model.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import io.github.mbbhalla.agentio.core.model.LLM
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals

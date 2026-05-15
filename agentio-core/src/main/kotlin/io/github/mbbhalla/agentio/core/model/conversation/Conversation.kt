@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.core.model
+package io.github.mbbhalla.agentio.core.model.conversation
 
 import aws.sdk.kotlin.services.bedrockruntime.model.ContentBlock
 import aws.sdk.kotlin.services.bedrockruntime.model.ConversationRole

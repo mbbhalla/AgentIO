@@ -19,7 +19,7 @@ data class ContextMemoryManagers(
      */
     suspend fun getContext(
         input: ContextMemoryManager.ContextMemoryManagerInput,
-    ): io.github.mbbhalla.agentio.core.model.Conversation {
+    ): io.github.mbbhalla.agentio.core.model.conversation.Conversation {
         var conversation = input.conversation
         for (cmm in value) {
             if (cmm.shouldExecuteOnTurn(input.turnNumber)) {

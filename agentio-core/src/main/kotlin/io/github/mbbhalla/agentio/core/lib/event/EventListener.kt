@@ -10,5 +10,5 @@ import io.github.mbbhalla.agentio.core.model.event.Event
  * calls, each tool emits events from its own coroutine.
  */
 fun interface EventListener {
-    fun onEvent(event: Event)
+    suspend fun onEvent(event: Event): Result<Unit>
 }

@@ -129,7 +129,7 @@ internal class AbstractAgenticFunctionTest {
         val failingCmm = object : ContextMemoryManager {
             override suspend fun getContext(
                 input: ContextMemoryManager.ContextMemoryManagerInput,
-            ): io.github.mbbhalla.agentio.core.model.Conversation =
+            ): io.github.mbbhalla.agentio.core.model.conversation.Conversation =
                 throw RuntimeException("Context manager failed")
         }
         val failingConfig = agentConfiguration.copy(

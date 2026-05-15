@@ -1,5 +1,7 @@
 package io.github.mbbhalla.agentio.core.model
 
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.IndexedConversation
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows

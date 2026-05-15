@@ -71,7 +71,7 @@ internal class EventListenerTest {
     }
 
     private fun buildConfig(
-        eventListener: EventListener? = null,
+        eventListeners: EventListeners = EventListeners(),
     ): AgentConfiguration {
         val mockCmm = mockk<ContextMemoryManager>()
         every { mockCmm.shouldExecuteOnTurn(any()) } returns true
@@ -97,7 +97,7 @@ internal class EventListenerTest {
             delayBetweenTurns = 0.milliseconds,
             contextProviders = ContextProviders(listOf(EmptyContextProvider)),
             contextWriters = ContextWriters(emptySet()),
-            eventListener = eventListener,
+            eventListeners = eventListeners,
             maxTurnLimit = 10,
         )
     }
@@ -109,9 +109,14 @@ internal class EventListenerTest {
         capturedEvents = Collections.synchronizedList(mutableListOf())
     }
 
-    private fun capturingListener(): EventListener = EventListener { event ->
-        capturedEvents.add(event)
-    }
+    private fun capturingListeners(): EventListeners = EventListeners(
+        setOf(
+            EventListener { event ->
+                capturedEvents.add(event)
+                Result.success(Unit)
+            },
+        ),
+    )
 
     private fun mockSuccessResponse(
         jsonOutput: String = """{"result": "done", "success": true}""",
@@ -139,7 +144,7 @@ internal class EventListenerTest {
     @Test
     fun `should emit AgentInvocationStart and AgentInvocationEnd on successful invocation`() = runBlocking {
         // Given
-        val config = buildConfig(eventListener = capturingListener())
+        val config = buildConfig(eventListeners = capturingListeners())
         val function = TestAgenticFunction(config)
         val testInput = TestInput(id = "inv-1", instruction = "Do something")
 
@@ -175,7 +180,7 @@ internal class EventListenerTest {
     @Test
     fun `should emit AgentInvocationEnd with error on failure`() = runBlocking {
         // Given
-        val config = buildConfig(eventListener = capturingListener())
+        val config = buildConfig(eventListeners = capturingListeners())
         val function = TestAgenticFunction(config)
         val testInput = TestInput(id = "inv-fail", instruction = "Fail")
 
@@ -201,7 +206,7 @@ internal class EventListenerTest {
     @Test
     fun `should emit BeforeLlmCall and AfterLlmCall around bedrock call`() = runBlocking {
         // Given
-        val config = buildConfig(eventListener = capturingListener())
+        val config = buildConfig(eventListeners = capturingListeners())
         val function = TestAgenticFunction(config)
         val testInput = TestInput(id = "llm-1", instruction = "Call LLM")
 
@@ -238,7 +243,7 @@ internal class EventListenerTest {
     @Test
     fun `should emit AfterLlmCall with error when bedrock throws`() = runBlocking {
         // Given
-        val config = buildConfig(eventListener = capturingListener())
+        val config = buildConfig(eventListeners = capturingListeners())
         val function = TestAgenticFunction(config)
         val testInput = TestInput(id = "llm-fail", instruction = "LLM will fail")
 
@@ -268,7 +273,7 @@ internal class EventListenerTest {
     @Test
     fun `should emit BeforeToolCall and AfterToolCall around tool execution`() = runBlocking {
         // Given
-        val config = buildConfig(eventListener = capturingListener())
+        val config = buildConfig(eventListeners = capturingListeners())
         val function = TestAgenticFunction(config)
         val testInput = TestInput(id = "tool-1", instruction = "Use tool")
 
@@ -333,7 +338,7 @@ internal class EventListenerTest {
     @Test
     fun `should emit AfterToolCall with error when tool throws`() = runBlocking {
         // Given
-        val config = buildConfig(eventListener = capturingListener())
+        val config = buildConfig(eventListeners = capturingListeners())
         val function = TestAgenticFunction(config)
         val testInput = TestInput(id = "tool-fail", instruction = "Tool will fail")
 
@@ -383,7 +388,7 @@ internal class EventListenerTest {
     @Test
     fun `should emit events for parallel tool calls`() = runBlocking {
         // Given
-        val config = buildConfig(eventListener = capturingListener())
+        val config = buildConfig(eventListeners = capturingListeners())
         val function = TestAgenticFunction(config)
         val testInput = TestInput(id = "parallel-tools", instruction = "Use multiple tools")
 
@@ -461,7 +466,7 @@ internal class EventListenerTest {
     @Test
     fun `should emit events in correct lifecycle order`() = runBlocking {
         // Given
-        val config = buildConfig(eventListener = capturingListener())
+        val config = buildConfig(eventListeners = capturingListeners())
         val function = TestAgenticFunction(config)
         val testInput = TestInput(id = "order-1", instruction = "Check order")
 
@@ -483,12 +488,155 @@ internal class EventListenerTest {
         assertTrue(afterLlmIndex < payloads.lastIndex) // before end
     }
 
-    // --- No listener (null) ---
+    // --- TURN_COMPLETED ---
 
     @Test
-    fun `should work correctly when no event listener is configured`() = runBlocking {
-        // Given — no event listener
-        val config = buildConfig(eventListener = null)
+    fun `should emit TurnCompleted after each turn`() = runBlocking {
+        // Given
+        val config = buildConfig(eventListeners = capturingListeners())
+        val function = TestAgenticFunction(config)
+        val testInput = TestInput(id = "turn-1", instruction = "Complete a turn")
+
+        coEvery { mockToolsProvider.listTools() } returns emptyList()
+        coEvery { mockBedrockClient.converse(any()) } returns mockSuccessResponse()
+
+        // When
+        val result = function.invoke(testInput)
+
+        // Then
+        assertTrue(result.isSuccess)
+
+        val turnCompleted = capturedEvents.map { it.payload }.filterIsInstance<EventPayload.TurnCompleted>()
+        assertTrue(turnCompleted.isNotEmpty())
+
+        val first = turnCompleted.first()
+        assertEquals("test-agent", first.agentId)
+        assertTrue(first.turnNumber > 0)
+        assertTrue(first.conversation.messages.isNotEmpty())
+    }
+
+    @Test
+    fun `should emit TurnCompleted with correct turn numbers across multiple turns`() = runBlocking {
+        // Given — tool use forces multiple turns
+        val config = buildConfig(eventListeners = capturingListeners())
+        val function = TestAgenticFunction(config)
+        val testInput = TestInput(id = "multi-turn", instruction = "Multi turn")
+
+        val mockToolUseBlock = mockk<aws.sdk.kotlin.services.bedrockruntime.model.ToolUseBlock> {
+            every { toolUseId } returns "tool-use-mt"
+            every { name } returns "some-tool"
+            every { input } returns mockk()
+        }
+
+        val toolUseResponse = mockk<ConverseResponse> {
+            every { output } returns mockk {
+                every { asMessageOrNull() } returns Message {
+                    role = ConversationRole.Assistant
+                    content = listOf(
+                        ContentBlock.ToolUse(value = mockToolUseBlock),
+                    )
+                }
+            }
+            every { usage } returns TokenUsage {
+                inputTokens = 50
+                outputTokens = 25
+                totalTokens = 75
+            }
+            every { stopReason } returns StopReason.ToolUse
+        }
+
+        val mockToolResultBlock = mockk<aws.sdk.kotlin.services.bedrockruntime.model.ToolResultBlock> {
+            every { toolUseId } returns "tool-use-mt"
+            every { content } returns emptyList()
+            every { status } returns ToolResultStatus.Success
+        }
+
+        coEvery { mockToolsProvider.listTools() } returns emptyList()
+        coEvery { mockToolsProvider.callTool(any()) } returns ContentBlock.ToolResult(value = mockToolResultBlock)
+        coEvery { mockBedrockClient.converse(any()) } returnsMany listOf(
+            toolUseResponse,
+            mockSuccessResponse(),
+        )
+
+        // When
+        val result = function.invoke(testInput)
+
+        // Then
+        assertTrue(result.isSuccess)
+
+        val turnCompleted = capturedEvents.map { it.payload }.filterIsInstance<EventPayload.TurnCompleted>()
+        assertTrue(turnCompleted.size >= 2)
+
+        val turnNumbers = turnCompleted.map { it.turnNumber }
+        assertEquals(turnNumbers.sorted(), turnNumbers)
+        assertTrue(turnNumbers.all { it > 0 })
+    }
+
+    @Test
+    fun `should emit TurnCompleted with conversation containing accumulated messages`() = runBlocking {
+        // Given — tool use means conversation grows
+        val config = buildConfig(eventListeners = capturingListeners())
+        val function = TestAgenticFunction(config)
+        val testInput = TestInput(id = "accum-1", instruction = "Accumulate")
+
+        val mockToolUseBlock = mockk<aws.sdk.kotlin.services.bedrockruntime.model.ToolUseBlock> {
+            every { toolUseId } returns "tool-accum"
+            every { name } returns "accum-tool"
+            every { input } returns mockk()
+        }
+
+        val toolUseResponse = mockk<ConverseResponse> {
+            every { output } returns mockk {
+                every { asMessageOrNull() } returns Message {
+                    role = ConversationRole.Assistant
+                    content = listOf(
+                        ContentBlock.ToolUse(value = mockToolUseBlock),
+                    )
+                }
+            }
+            every { usage } returns TokenUsage {
+                inputTokens = 40
+                outputTokens = 20
+                totalTokens = 60
+            }
+            every { stopReason } returns StopReason.ToolUse
+        }
+
+        val mockToolResultBlock = mockk<aws.sdk.kotlin.services.bedrockruntime.model.ToolResultBlock> {
+            every { toolUseId } returns "tool-accum"
+            every { content } returns emptyList()
+            every { status } returns ToolResultStatus.Success
+        }
+
+        coEvery { mockToolsProvider.listTools() } returns emptyList()
+        coEvery { mockToolsProvider.callTool(any()) } returns ContentBlock.ToolResult(value = mockToolResultBlock)
+        coEvery { mockBedrockClient.converse(any()) } returnsMany listOf(
+            toolUseResponse,
+            mockSuccessResponse(),
+        )
+
+        // When
+        val result = function.invoke(testInput)
+
+        // Then
+        assertTrue(result.isSuccess)
+
+        val turnCompleted = capturedEvents.map { it.payload }.filterIsInstance<EventPayload.TurnCompleted>()
+        assertTrue(turnCompleted.size >= 2)
+
+        // Later turns should have more messages than earlier turns
+        val messageCounts = turnCompleted.map { it.conversation.messages.size }
+        for (i in 1 until messageCounts.size) {
+            assertTrue(messageCounts[i] >= messageCounts[i - 1])
+        }
+    }
+
+    // --- No listener ---
+
+    @Test
+    fun `should work correctly when no event listeners are configured`() = runBlocking {
+        // Given — empty event listeners
+        val config = buildConfig(eventListeners = EventListeners())
         val function = TestAgenticFunction(config)
         val testInput = TestInput(id = "no-listener", instruction = "No listener")
 

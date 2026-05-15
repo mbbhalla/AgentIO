@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.core.model
+package io.github.mbbhalla.agentio.core.model.conversation
 
 /**
  * A [Conversation] paired with its turn number in the agent's execution flow.

@@ -19,8 +19,8 @@ import io.github.mbbhalla.agentio.core.lib.ctx.cmm.ContextMemoryManager
 import io.github.mbbhalla.agentio.core.model.event.Event
 import io.github.mbbhalla.agentio.core.model.event.EventPayload
 import io.github.mbbhalla.agentio.core.model.AgentConfiguration
-import io.github.mbbhalla.agentio.core.model.Conversation
-import io.github.mbbhalla.agentio.core.model.IndexedConversation
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
+import io.github.mbbhalla.agentio.core.model.conversation.IndexedConversation
 import io.github.mbbhalla.agentio.core.model.ThinkingMode
 import io.vavr.control.Try
 import io.vavr.kotlin.Try
@@ -85,9 +85,9 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
     final override suspend fun invoke(
         input: I,
     ): Try<AgentOutput<O>> = withContext(Dispatchers.IO) {
-        val eventListener = agentConfiguration.eventListener
+        val eventListeners = agentConfiguration.eventListeners
 
-        eventListener?.onEvent(
+        eventListeners.dispatch(
             Event(
                 payload = EventPayload.AgentInvocationStart(
                     agentId = agentConfiguration.agentId,
@@ -108,7 +108,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
             }
         }
 
-        eventListener?.onEvent(
+        eventListeners.dispatch(
             Event(
                 payload = EventPayload.AgentInvocationEnd(
                     agentId = agentConfiguration.agentId,
@@ -312,7 +312,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                 }
 
                 role is ConversationRole.User && (lastContentBlock is ContentBlock.Text || lastContentBlock is ContentBlock.ToolResult) -> {
-                    agentConfiguration.eventListener?.onEvent(
+                    agentConfiguration.eventListeners.dispatch(
                         Event(
                             payload = EventPayload.BeforeLlmCall(
                                 modelId = agentConfiguration.languageModelParameters.llm.id,
@@ -334,7 +334,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                     }
 
                     val response = llmResult.getOrElse { e ->
-                        agentConfiguration.eventListener?.onEvent(
+                        agentConfiguration.eventListeners.dispatch(
                             Event(
                                 payload = EventPayload.AfterLlmCall(
                                     modelId = agentConfiguration.languageModelParameters.llm.id,
@@ -349,7 +349,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                         throw e
                     }
 
-                    agentConfiguration.eventListener?.onEvent(
+                    agentConfiguration.eventListeners.dispatch(
                         Event(
                             payload = EventPayload.AfterLlmCall(
                                 modelId = agentConfiguration.languageModelParameters.llm.id,
@@ -417,7 +417,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                                 val toolName = toolUseBlock.value.name
                                 val toolInput = toolUseBlock.value.input
 
-                                agentConfiguration.eventListener?.onEvent(
+                                agentConfiguration.eventListeners.dispatch(
                                     Event(
                                         payload = EventPayload.BeforeToolCall(
                                             toolName = toolName,
@@ -434,7 +434,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                                 }
 
                                 val result = toolResult.getOrElse { e ->
-                                    agentConfiguration.eventListener?.onEvent(
+                                    agentConfiguration.eventListeners.dispatch(
                                         Event(
                                             payload = EventPayload.AfterToolCall(
                                                 toolName = toolName,
@@ -448,7 +448,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                                     throw e
                                 }
 
-                                agentConfiguration.eventListener?.onEvent(
+                                agentConfiguration.eventListeners.dispatch(
                                     Event(
                                         payload = EventPayload.AfterToolCall(
                                             toolName = toolName,
@@ -483,12 +483,24 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                         turnNumber = indexed.turnNumber + 1,
                     ),
                 )
-                indexed.next(
+                val nextIndexed = indexed.next(
                     IndexedConversation(
                         turnNumber = indexed.turnNumber + 1,
                         conversation = managed,
                     ),
                 )
+
+                agentConfiguration.eventListeners.dispatch(
+                    Event(
+                        payload = EventPayload.TurnCompleted(
+                            agentId = agentConfiguration.agentId,
+                            turnNumber = nextIndexed.turnNumber,
+                            conversation = managed,
+                        ),
+                    ),
+                )
+
+                nextIndexed
             }
         } // end Flow
 

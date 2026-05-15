@@ -1,6 +1,7 @@
 package io.github.mbbhalla.agentio.core.model.event
 
 import aws.sdk.kotlin.services.bedrockruntime.model.StopReason
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import kotlin.time.Duration
 
 sealed class EventPayload {
@@ -49,5 +50,11 @@ sealed class EventPayload {
         val toolResult: Any,
         val latency: Duration,
         val error: Throwable?,
+    ) : EventPayload()
+
+    data class TurnCompleted(
+        val agentId: String,
+        val turnNumber: Int,
+        val conversation: Conversation,
     ) : EventPayload()
 }
