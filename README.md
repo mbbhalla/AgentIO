@@ -17,10 +17,11 @@ This approach preserves the ergonomic benefits of traditional function compositi
 
 ```
 AgentIO/
-├── agentio-core/           Core SDK — agents, tools, MCP, context management interfaces
-├── agentio-cmm-impl/       Context Memory Manager implementations (adaptive, compacting)
-├── agentio-examples/       Example agents (Hacker News)
-└── agentio-experiments/    Research experiments (Needle-in-a-Haystack, Distributed Counting)
+├── agentio-core/                  Core SDK — agents, tools, MCP, context management interfaces
+├── agentio-cmm-impl/              Context Memory Manager implementations (adaptive, compacting)
+├── agentio-eventlistener-impl/    Event listener implementations (checkpointing)
+├── agentio-examples/              Example agents (Hacker News)
+└── agentio-experiments/           Research experiments (Needle-in-a-Haystack, Distributed Counting)
 ```
 
 ### Maven Coordinates
@@ -28,6 +29,7 @@ AgentIO/
 ```
 io.github.mbbhalla:agentio-core
 io.github.mbbhalla:agentio-cmm-impl
+io.github.mbbhalla:agentio-eventlistener-impl
 io.github.mbbhalla:agentio-examples
 io.github.mbbhalla:agentio-experiments
 ```
@@ -35,9 +37,10 @@ io.github.mbbhalla:agentio-experiments
 ### Dependency Graph
 
 ```
-agentio-examples ──────→ agentio-core
-agentio-experiments ───→ agentio-core + agentio-cmm-impl
-agentio-cmm-impl ─────→ agentio-core
+agentio-examples ──────────────→ agentio-core
+agentio-experiments ───────────→ agentio-core + agentio-cmm-impl
+agentio-cmm-impl ─────────────→ agentio-core
+agentio-eventlistener-impl ───→ agentio-core
 ```
 
 ## Key Features
