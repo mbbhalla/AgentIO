@@ -16,8 +16,8 @@ dependencies {
 
     // JSON Schema generation
     implementation("com.github.victools:jsonschema-generator:4.36.0")
-    implementation("com.github.victools:jsonschema-module-javax-validation:4.36.0")
-    implementation("javax.validation:validation-api:2.0.1.Final")
+    implementation("com.github.victools:jsonschema-module-jakarta-validation:4.36.0")
+    implementation("jakarta.validation:jakarta.validation-api:3.1.1")
 
     // JSON Schema validation
     implementation("com.networknt:json-schema-validator:1.5.3")

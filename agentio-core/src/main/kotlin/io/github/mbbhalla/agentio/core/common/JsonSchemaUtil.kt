@@ -8,8 +8,8 @@ import com.github.victools.jsonschema.generator.OptionPreset
 import com.github.victools.jsonschema.generator.SchemaGenerator
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder
 import com.github.victools.jsonschema.generator.SchemaVersion
-import com.github.victools.jsonschema.module.javax.validation.JavaxValidationModule
-import com.github.victools.jsonschema.module.javax.validation.JavaxValidationOption
+import com.github.victools.jsonschema.module.jakarta.validation.JakartaValidationModule
+import com.github.victools.jsonschema.module.jakarta.validation.JakartaValidationOption
 import com.networknt.schema.InputFormat
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
@@ -48,8 +48,8 @@ object JsonSchemaUtil {
             SchemaVersion.DRAFT_2020_12,
             OptionPreset.PLAIN_JSON,
         ).with(Option.DEFINITIONS_FOR_ALL_OBJECTS)
-            . with(JavaxValidationModule(
-                JavaxValidationOption.INCLUDE_PATTERN_EXPRESSIONS,
+            .with(JakartaValidationModule(
+                JakartaValidationOption.INCLUDE_PATTERN_EXPRESSIONS,
             ))
 
         configBuilder

@@ -9,8 +9,8 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import javax.validation.constraints.Email
-import javax.validation.constraints.Pattern
+import jakarta.validation.constraints.Email
+import jakarta.validation.constraints.Pattern
 
 internal class JsonSchemaUtilTest {
 
