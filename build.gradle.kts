@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "2.2.0" apply false
     kotlin("plugin.serialization") version "2.2.0" apply false
+    id("org.owasp.dependencycheck") version "12.1.1"
 }
 
 allprojects {
@@ -28,4 +29,15 @@ subprojects {
     tasks.withType<Test> {
         useJUnitPlatform()
     }
+
+    dependencyLocking {
+        lockAllConfigurations()
+    }
+}
+
+dependencyCheck {
+    failBuildOnCVSS = 7.0f
+    formats = listOf("HTML", "JSON")
+    analyzers.assemblyEnabled = false
+    nvd.apiKey = System.getenv("NVD_API_KEY") ?: ""
 }
