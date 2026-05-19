@@ -80,3 +80,35 @@ tasks.register<JavaExec>("RunCodeMetricsAgenticFunction") {
             ?: "${rootProject.projectDir}/build/checkpoints",
     )
 }
+
+tasks.register<JavaExec>("RunAdversarialAgenticFunction") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.adversarial.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5015
+    }
+    args = listOf(
+        project.findProperty("requirements")?.toString()
+            ?: "Build a task management API with users, projects, tasks, and comments. Users authenticate via OAuth2. Tasks have priorities and due dates. Support filtering and pagination.",
+    )
+}
+
+tasks.register<JavaExec>("RunOrchestrationAgenticFunction") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.orchestration.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5016
+    }
+    args = listOf(
+        rootProject.projectDir.absolutePath,
+        "kt",
+    )
+}

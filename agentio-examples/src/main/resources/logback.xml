@@ -6,7 +6,7 @@
     </appender>
 
     <!-- AgentIO framework logging -->
-    <logger name="io.github.mbbhalla.agentio" level="DEBUG"/>
+    <logger name="io.github.mbbhalla.agentio" level="INFO"/>
 
     <!-- Suppress MCP SDK noise from non-JSON stdio lines during server startup -->
     <logger name="io.modelcontextprotocol.kotlin.sdk" level="OFF"/>

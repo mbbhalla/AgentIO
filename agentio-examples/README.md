@@ -10,6 +10,8 @@ Example agents built with AgentIO, demonstrating how to use the SDK for real-wor
 | Fetch | External (uvx) | `RunFetchAgenticFunction` | Technical content analysis from URLs |
 | Git Analyzer | In-process | `RunGitAnalyzerAgenticFunction` | `AbstractMcpServer` + `PipedStreamsExchange` + custom tools |
 | Code Metrics | In-process | `RunCodeMetricsAgenticFunction` | `AbstractMcpServer` + `EventListener` for observability |
+| Adversarial | In-process | `RunAdversarialAgenticFunction` | Agent ↔ CriticAgent iterative refinement pattern |
+| Orchestration | In-process | `RunOrchestrationAgenticFunction` | Orchestrator + parallel Workers pattern |
 
 All examples are self-sufficient — no API keys or tokens required.
 
@@ -27,6 +29,12 @@ All examples are self-sufficient — no API keys or tokens required.
 
 # Code Metrics — analyze codebase complexity with full event observability
 ./gradlew :agentio-examples:RunCodeMetricsAgenticFunction
+
+# Adversarial — designer agent iterates with a critic agent until API design is approved
+./gradlew :agentio-examples:RunAdversarialAgenticFunction
+
+# Orchestration — orchestrator dispatches parallel workers and synthesizes results
+./gradlew :agentio-examples:RunOrchestrationAgenticFunction
 ```
 
 ## Hacker News Agent
@@ -72,6 +80,56 @@ An agent that analyzes source code complexity, dependency structure, and produce
 - **Custom tools** — `list_source_files`, `file_complexity`, `dependency_graph`
 - Runs against the AgentIO repository itself
 
+## Adversarial Agent (Designer ↔ Critic)
+
+Two agents iterating on an API design: a Designer proposes, a Critic reviews adversarially, and the Designer revises based on feedback until the Critic approves (max 3 iterations).
+
+### Key Patterns
+
+- **Multi-agent communication** — Designer output feeds into Critic input, Critic feedback loops back to Designer
+- **Iterative refinement** — bounded loop with convergence condition (`verdict == "APPROVED"`)
+- **Shared MCP tooling** — both agents use the same `ApiDesignMcpServer` for schema validation and security checks
+- **Custom tools** — `parse_requirements`, `validate_schema_consistency`, `check_security_patterns`
+
+### Architecture
+
+```
+┌────────────┐   design JSON   ┌──────────────┐
+│  Designer  │ ──────────────▶ │    Critic    │
+│   Agent    │ ◀────────────── │    Agent     │
+└────────────┘   feedback      └──────────────┘
+     │                               │
+     └───── ApiDesignMcpServer ──────┘
+```
+
+## Orchestration Agent (Orchestrator + Workers)
+
+An Orchestrator dispatches three Worker agents in parallel, each with a focused responsibility, then synthesizes their reports into a unified project health assessment.
+
+### Key Patterns
+
+- **Parallel worker dispatch** — `coroutineScope { async { ... } }` for concurrent execution
+- **Separation of concerns** — each worker has its own `AbstractMcpServer` with domain-specific tools
+- **Orchestrator has no tools** — purely synthesizes worker outputs using LLM reasoning
+- **Worker isolation** — workers execute their responsibility and do NOT orchestrate
+
+### Architecture
+
+```
+                ┌──────────────────┐
+                │   Orchestrator   │  (no tools, synthesis only)
+                └────────┬─────────┘
+           ┌─────────────┼─────────────┐
+           ▼             ▼             ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│   Security   │ │   Quality    │ │    Docs      │
+│    Worker    │ │    Worker    │ │    Worker    │
+└──────┬───────┘ └──────┬───────┘ └──────┬───────┘
+       │                │                │
+  scan_deps     test_coverage +     scan_docs
+                complexity
+```
+
 ## Package Structure
 
 ```
@@ -88,10 +146,18 @@ io.github.mbbhalla.agentio.examples/
 │   ├── Runner.kt
 │   ├── function/GitAnalyzerAgenticFunction.kt
 │   └── server/GitAnalyzerMcpServer.kt, GitTools.kt
-└── codemetrics/
+├── codemetrics/
+│   ├── Runner.kt
+│   ├── function/CodeMetricsAgenticFunction.kt
+│   └── server/CodeMetricsMcpServer.kt, CodeMetricsTools.kt
+├── adversarial/
+│   ├── Runner.kt
+│   ├── function/AdversarialAgenticFunctions.kt
+│   └── server/ApiDesignMcpServer.kt, ApiDesignTools.kt
+└── orchestration/
     ├── Runner.kt
-    ├── function/CodeMetricsAgenticFunction.kt
-    └── server/CodeMetricsMcpServer.kt, CodeMetricsTools.kt
+    ├── function/OrchestrationAgenticFunctions.kt
+    └── server/OrchestrationMcpServers.kt, OrchestrationTools.kt
 ```
 
 ## Dependencies
