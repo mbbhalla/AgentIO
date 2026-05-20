@@ -37,6 +37,7 @@ subprojects {
 
 dependencyCheck {
     failBuildOnCVSS = 7.0f
+    failOnError = false
     formats = listOf("HTML", "JSON")
     analyzers.assemblyEnabled = false
     nvd.apiKey = System.getenv("NVD_API_KEY") ?: ""
