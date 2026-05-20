@@ -33,6 +33,14 @@ subprojects {
     dependencyLocking {
         lockAllConfigurations()
     }
+
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin" && requested.name.startsWith("kotlin-stdlib")) {
+                useVersion("2.2.0")
+            }
+        }
+    }
 }
 
 dependencyCheck {
