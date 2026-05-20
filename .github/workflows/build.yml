@@ -29,10 +29,18 @@ jobs:
         with:
           java-version: '21'
           distribution: 'corretto'
+      - name: Get week number
+        id: date
+        run: echo "week=$(date +%Y-W%V)" >> "$GITHUB_OUTPUT"
+      - name: Cache OWASP DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: owasp-db-${{ steps.date.outputs.week }}
       - name: OWASP Dependency Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: ./gradlew dependencyCheckAggregate
+        run: ./gradlew dependencyCheckAggregate --no-configuration-cache
       - name: Upload CVE report
         if: always()
         uses: actions/upload-artifact@v4
