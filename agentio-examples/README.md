@@ -12,6 +12,7 @@ Example agents built with AgentIO, demonstrating how to use the SDK for real-wor
 | Code Metrics | In-process | `RunCodeMetricsAgenticFunction` | `AbstractMcpServer` + `EventListener` for observability |
 | Adversarial | In-process | `RunAdversarialAgenticFunction` | Agent ↔ CriticAgent iterative refinement pattern |
 | Orchestration | In-process | `RunOrchestrationAgenticFunction` | Orchestrator + parallel Workers pattern |
+| Text2SQL | In-process | `RunText2SqlAgenticFunction` | DuckDB + correctness-at-construction output validation |
 
 All examples are self-sufficient — no API keys or tokens required.
 
@@ -35,6 +36,10 @@ All examples are self-sufficient — no API keys or tokens required.
 
 # Orchestration — orchestrator dispatches parallel workers and synthesizes results
 ./gradlew :agentio-examples:RunOrchestrationAgenticFunction
+
+# Text2SQL — convert natural language to SQL against an in-memory DuckDB retail database
+./gradlew :agentio-examples:RunText2SqlAgenticFunction
+./gradlew :agentio-examples:RunText2SqlAgenticFunction -Pquery="which sites have inventory more than 1000"
 ```
 
 ## Hacker News Agent
@@ -130,6 +135,36 @@ An Orchestrator dispatches three Worker agents in parallel, each with a focused 
                 complexity
 ```
 
+## Text2SQL Agent
+
+An agent that converts natural language questions into valid DuckDB SQL against an in-memory retail database (products, inventory, suppliers, purchase orders, sales orders).
+
+### Key Patterns
+
+- **Correctness at construction** — `Output.init` validates SQL via DuckDB `EXPLAIN`; invalid SQL cannot be instantiated
+- **Agent reinforcement loop** — `ExecuteSqlTool` validates and returns errors to the agent for self-correction
+- **In-memory DuckDB** — schema and seed data defined in Kotlin objects, zero external dependencies
+- **Domain-agnostic models** — `DataValue`, `Dataset`, `ExplainResult`, `ColumnType` in `model/` package are reusable beyond retail
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│         Text2SqlAgenticFunction             │
+│  Input: natural language query              │
+│  Output: validated SQL (init block proves)  │
+└────────────────────┬────────────────────────┘
+                     │ tools
+        ┌────────────┼────────────┐
+        ▼            ▼            ▼
+  list_tables   get_tables   execute_sql
+        │            │            │
+        └────────────┴────────────┘
+                     │
+              RetailDatabase
+            (DuckDB in-memory)
+```
+
 ## Package Structure
 
 ```
@@ -154,10 +189,16 @@ io.github.mbbhalla.agentio.examples/
 │   ├── Runner.kt
 │   ├── function/AdversarialAgenticFunctions.kt
 │   └── server/ApiDesignMcpServer.kt, ApiDesignTools.kt
-└── orchestration/
+├── orchestration/
+│   ├── Runner.kt
+│   ├── function/OrchestrationAgenticFunctions.kt
+│   └── server/OrchestrationMcpServers.kt, OrchestrationTools.kt
+└── text2sql/
     ├── Runner.kt
-    ├── function/OrchestrationAgenticFunctions.kt
-    └── server/OrchestrationMcpServers.kt, OrchestrationTools.kt
+    ├── model/DataValue.kt, Dataset.kt, ExplainResult.kt, TableInfo.kt
+    ├── data/RetailDatabase.kt, RetailSchema.kt, RetailSeedData.kt
+    ├── function/Text2SqlAgenticFunction.kt
+    └── server/Text2SqlMcpServer.kt, Text2SqlTools.kt
 ```
 
 ## Dependencies
@@ -167,6 +208,7 @@ io.github.mbbhalla.agentio.examples/
 - Model Context Protocol Kotlin SDK
 - Vavr
 - Kotlinx Serialization
+- DuckDB JDBC (for Text2SQL example)
 
 ## Build
 
