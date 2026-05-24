@@ -17,6 +17,9 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+
+    // DuckDB JDBC (for text2sql example)
+    implementation("org.duckdb:duckdb_jdbc:1.5.2.0")
 }
 
 tasks.register<JavaExec>("RunHackerNewsAgenticFunction") {
@@ -110,5 +113,21 @@ tasks.register<JavaExec>("RunOrchestrationAgenticFunction") {
     args = listOf(
         rootProject.projectDir.absolutePath,
         "kt",
+    )
+}
+
+tasks.register<JavaExec>("RunText2SqlAgenticFunction") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.text2sql.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5017
+    }
+    args = listOf(
+        project.findProperty("query")?.toString()
+            ?: "What products have inventory below safety stock levels?",
     )
 }
