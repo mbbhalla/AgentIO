@@ -2,16 +2,20 @@ package io.github.mbbhalla.agentio.examples.text2sql.server
 
 import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.lib.tool.AbstractMcpTool
-import io.github.mbbhalla.agentio.examples.text2sql.data.RetailDatabase
 import io.github.mbbhalla.agentio.examples.text2sql.model.ColumnType
+import io.github.mbbhalla.agentio.examples.text2sql.model.DatabaseEnvironment
 import io.github.mbbhalla.agentio.examples.text2sql.model.Dataset
 import io.github.mbbhalla.agentio.examples.text2sql.model.ExplainResult
+import io.github.mbbhalla.agentio.examples.text2sql.model.ForeignKeyRef
+import io.github.mbbhalla.agentio.examples.text2sql.model.TableName
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
-internal class ListTablesTool : AbstractMcpTool<Unit, ListTablesTool.Output>() {
+internal class ListTablesTool(
+    private val env: DatabaseEnvironment,
+) : AbstractMcpTool<Unit, ListTablesTool.Output>() {
 
     @Serializable
     data class Output(
@@ -20,17 +24,21 @@ internal class ListTablesTool : AbstractMcpTool<Unit, ListTablesTool.Output>() {
     )
 
     override fun name() = "list_tables"
-    override fun description() = "List all tables available in the retail database"
+    override fun description() = "List all tables available in the database"
     override fun getInputKClass() = Unit::class
     override fun getOutputKClass() = Output::class
     override fun getToolConfig() = ToolConfig(emitSchemaAndRequiredAttributesForAllToolCalls = true)
 
     override fun buildInput(callToolRequest: CallToolRequest) = Unit
 
-    override fun invoke(input: Unit) = Output(tableNames = RetailDatabase.listTables())
+    override fun invoke(input: Unit) = Output(
+        tableNames = env.listTables().map { it.value }.toSet(),
+    )
 }
 
-internal class GetTablesTool : AbstractMcpTool<GetTablesTool.Input, GetTablesTool.Output>() {
+internal class GetTablesTool(
+    private val env: DatabaseEnvironment,
+) : AbstractMcpTool<GetTablesTool.Input, GetTablesTool.Output>() {
 
     @Serializable
     data class Input(
@@ -74,34 +82,37 @@ internal class GetTablesTool : AbstractMcpTool<GetTablesTool.Input, GetTablesToo
     }
 
     override fun invoke(input: Input): Output {
-        val tables = input.tableNames.mapNotNull { name ->
-            RetailDatabase.getTableInfo(name)?.let { info ->
-                Output.TableSchema(
-                    name = info.name,
-                    description = info.description,
-                    columns = info.columns.map { col ->
-                        Output.Column(
-                            name = col.name,
-                            type = col.type,
-                            nullable = col.nullable,
-                            primaryKey = col.primaryKey,
-                            foreignKey = col.foreignKey,
-                            description = col.description,
-                        )
-                    },
-                )
-            }
+        val tables = input.tableNames.map { name ->
+            val info = env.getTableInfo(TableName(name))
+            Output.TableSchema(
+                name = info.name.value,
+                description = info.description,
+                columns = info.columns.map { col ->
+                    Output.Column(
+                        name = col.name.value,
+                        type = col.type,
+                        nullable = col.nullable,
+                        primaryKey = col.primaryKey,
+                        foreignKey = col.foreignKey?.toDisplayString(),
+                        description = col.description,
+                    )
+                },
+            )
         }
-        require(tables.isNotEmpty()) { "No matching tables found for: ${input.tableNames}" }
+        require(tables.isNotEmpty()) { "No table names provided" }
         return Output(tables = tables)
     }
+
+    private fun ForeignKeyRef.toDisplayString(): String = "${table.value}.${column.value}"
 }
 
-internal class ExecuteSqlTool : AbstractMcpTool<ExecuteSqlTool.Input, ExecuteSqlTool.Output>() {
+internal class ExecuteSqlTool(
+    private val env: DatabaseEnvironment,
+) : AbstractMcpTool<ExecuteSqlTool.Input, ExecuteSqlTool.Output>() {
 
     @Serializable
     data class Input(
-        @field:Description("DuckDB SQL SELECT statement to execute against the retail database")
+        @field:Description("DuckDB SQL SELECT statement to execute against the database")
         val sql: String,
     )
 
@@ -112,7 +123,7 @@ internal class ExecuteSqlTool : AbstractMcpTool<ExecuteSqlTool.Input, ExecuteSql
     )
 
     override fun name() = "execute_sql"
-    override fun description() = "Execute a SQL SELECT query against the retail database and return results"
+    override fun description() = "Execute a SQL SELECT query against the database and return results"
     override fun getInputKClass() = Input::class
     override fun getOutputKClass() = Output::class
     override fun getToolConfig() = ToolConfig(emitSchemaAndRequiredAttributesForAllToolCalls = true)
@@ -124,10 +135,10 @@ internal class ExecuteSqlTool : AbstractMcpTool<ExecuteSqlTool.Input, ExecuteSql
     }
 
     override fun invoke(input: Input): Output {
-        val explainResult = RetailDatabase.explain(input.sql)
+        val explainResult = env.explain(input.sql)
         require(explainResult.isSuccess) {
             "SQL validation failed: ${(explainResult as ExplainResult.Failure).error}"
         }
-        return Output(resultSet = RetailDatabase.executeQuery(input.sql))
+        return Output(resultSet = env.executeQuery(input.sql))
     }
 }

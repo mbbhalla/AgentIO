@@ -1,14 +1,16 @@
 package io.github.mbbhalla.agentio.examples.text2sql.data
 
+import io.github.mbbhalla.agentio.examples.text2sql.model.DatabaseEnvironment
 import io.github.mbbhalla.agentio.examples.text2sql.model.Dataset
 import io.github.mbbhalla.agentio.examples.text2sql.model.ExplainResult
 import io.github.mbbhalla.agentio.examples.text2sql.model.TableInfo
+import io.github.mbbhalla.agentio.examples.text2sql.model.TableName
 import java.sql.Connection
 import java.sql.DriverManager
 
-object RetailDatabase {
+object RetailDatabase : DatabaseEnvironment {
 
-    val connection: Connection by lazy {
+    private val connection: Connection by lazy {
         Class.forName("org.duckdb.DuckDBDriver")
         DriverManager.getConnection("jdbc:duckdb:").also { conn ->
             conn.createStatement().use { stmt ->
@@ -18,7 +20,7 @@ object RetailDatabase {
         }
     }
 
-    fun explain(sql: String): ExplainResult = try {
+    override fun explain(sql: String): ExplainResult = try {
         connection.createStatement().use { stmt ->
             stmt.executeQuery("EXPLAIN $sql").close()
         }
@@ -27,18 +29,13 @@ object RetailDatabase {
         ExplainResult.Failure(e.message ?: "Unknown SQL error")
     }
 
-    fun executeQuery(sql: String): Dataset = connection.createStatement().use { stmt ->
+    override fun executeQuery(sql: String): Dataset = connection.createStatement().use { stmt ->
         Dataset.from(stmt.executeQuery(sql))
     }
 
-    fun listTables(): Set<String> = RetailSchema.TABLE_METADATA.keys
+    override fun listTables(): Set<TableName> = RetailSchema.TABLES.keys
 
-    fun getTableInfo(tableName: String): TableInfo? {
-        val meta = RetailSchema.TABLE_METADATA[tableName] ?: return null
-        return TableInfo(
-            name = tableName,
-            description = meta.description,
-            columns = meta.columns,
-        )
-    }
+    override fun getTableInfo(tableName: TableName): TableInfo =
+        RetailSchema.TABLES[tableName]
+            ?: throw IllegalArgumentException("Table '${tableName.value}' not found")
 }

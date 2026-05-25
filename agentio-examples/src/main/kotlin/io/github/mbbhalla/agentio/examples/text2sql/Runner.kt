@@ -3,9 +3,9 @@ package io.github.mbbhalla.agentio.examples.text2sql
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
 import io.github.mbbhalla.agentio.core.lib.AgentOutput
 import io.github.mbbhalla.agentio.examples.text2sql.data.RetailDatabase
-import io.github.mbbhalla.agentio.examples.text2sql.model.Dataset
 import io.github.mbbhalla.agentio.examples.text2sql.function.Text2SqlAgenticFunction
 import io.github.mbbhalla.agentio.examples.text2sql.function.Text2SqlAgenticFunctionProvider
+import io.github.mbbhalla.agentio.examples.text2sql.model.Dataset
 import io.vavr.control.Try
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -23,7 +23,10 @@ internal object Runner {
         val query = args.firstOrNull()
             ?: "What products have inventory below safety stock levels?"
 
-        val agenticFunction = Text2SqlAgenticFunctionProvider.get(agentId = AGENT_ID)
+        val agenticFunction = Text2SqlAgenticFunctionProvider.get(
+            agentId = AGENT_ID,
+            env = RetailDatabase,
+        )
 
         agenticFunction.invoke(
             Text2SqlAgenticFunction.Input(text = query),

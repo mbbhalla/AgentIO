@@ -1,77 +1,82 @@
 package io.github.mbbhalla.agentio.examples.text2sql.data
 
 import io.github.mbbhalla.agentio.examples.text2sql.model.ColumnInfo
+import io.github.mbbhalla.agentio.examples.text2sql.model.ColumnName
 import io.github.mbbhalla.agentio.examples.text2sql.model.ColumnType
+import io.github.mbbhalla.agentio.examples.text2sql.model.ForeignKeyRef
+import io.github.mbbhalla.agentio.examples.text2sql.model.TableInfo
+import io.github.mbbhalla.agentio.examples.text2sql.model.TableName
 
 object RetailSchema {
 
-    data class TableMeta(
-        val description: String,
-        val columns: List<ColumnInfo>,
-    )
-
-    val TABLE_METADATA: Map<String, TableMeta> = mapOf(
-        "site" to TableMeta(
+    val TABLES: Map<TableName, TableInfo> = mapOf(
+        TableName("site") to TableInfo(
+            name = TableName("site"),
             description = "Physical locations (warehouses, stores) where inventory is held",
             columns = listOf(
-                ColumnInfo("site_id", ColumnType.VARCHAR, false, true, null, "Unique site identifier"),
-                ColumnInfo("site_name", ColumnType.VARCHAR, false, false, null, "Human-readable site name"),
-                ColumnInfo("site_type", ColumnType.VARCHAR, false, false, null, "Type: WAREHOUSE or STORE"),
-                ColumnInfo("city", ColumnType.VARCHAR, false, false, null, "City where site is located"),
-                ColumnInfo("state", ColumnType.VARCHAR, false, false, null, "State code"),
+                ColumnInfo(ColumnName("site_id"), ColumnType.VARCHAR, false, true, null, "Unique site identifier"),
+                ColumnInfo(ColumnName("site_name"), ColumnType.VARCHAR, false, false, null, "Human-readable site name"),
+                ColumnInfo(ColumnName("site_type"), ColumnType.VARCHAR, false, false, null, "Type: WAREHOUSE or STORE"),
+                ColumnInfo(ColumnName("city"), ColumnType.VARCHAR, false, false, null, "City where site is located"),
+                ColumnInfo(ColumnName("state"), ColumnType.VARCHAR, false, false, null, "State code"),
             ),
         ),
-        "product" to TableMeta(
+        TableName("product") to TableInfo(
+            name = TableName("product"),
             description = "Products available in the retail catalog",
             columns = listOf(
-                ColumnInfo("product_id", ColumnType.VARCHAR, false, true, null, "Unique product identifier (SKU)"),
-                ColumnInfo("product_name", ColumnType.VARCHAR, false, false, null, "Product display name"),
-                ColumnInfo("category", ColumnType.VARCHAR, false, false, null, "Product category"),
-                ColumnInfo("unit_cost", ColumnType.DOUBLE, false, false, null, "Cost per unit in USD"),
-                ColumnInfo("unit_price", ColumnType.DOUBLE, false, false, null, "Selling price per unit in USD"),
+                ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, true, null, "Unique product identifier (SKU)"),
+                ColumnInfo(ColumnName("product_name"), ColumnType.VARCHAR, false, false, null, "Product display name"),
+                ColumnInfo(ColumnName("category"), ColumnType.VARCHAR, false, false, null, "Product category"),
+                ColumnInfo(ColumnName("unit_cost"), ColumnType.DOUBLE, false, false, null, "Cost per unit in USD"),
+                ColumnInfo(ColumnName("unit_price"), ColumnType.DOUBLE, false, false, null, "Selling price per unit in USD"),
             ),
         ),
-        "inventory" to TableMeta(
+        TableName("inventory") to TableInfo(
+            name = TableName("inventory"),
             description = "Current inventory levels per product per site",
             columns = listOf(
-                ColumnInfo("site_id", ColumnType.VARCHAR, false, true, "site.site_id", "Site holding the inventory"),
-                ColumnInfo("product_id", ColumnType.VARCHAR, false, true, "product.product_id", "Product in inventory"),
-                ColumnInfo("quantity_on_hand", ColumnType.INTEGER, false, false, null, "Current stock quantity"),
-                ColumnInfo("safety_stock", ColumnType.INTEGER, false, false, null, "Minimum threshold before reorder"),
-                ColumnInfo("last_updated", ColumnType.TIMESTAMP, false, false, null, "Last inventory update timestamp"),
+                ColumnInfo(ColumnName("site_id"), ColumnType.VARCHAR, false, true, ForeignKeyRef(TableName("site"), ColumnName("site_id")), "Site holding the inventory"),
+                ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, true, ForeignKeyRef(TableName("product"), ColumnName("product_id")), "Product in inventory"),
+                ColumnInfo(ColumnName("quantity_on_hand"), ColumnType.INTEGER, false, false, null, "Current stock quantity"),
+                ColumnInfo(ColumnName("safety_stock"), ColumnType.INTEGER, false, false, null, "Minimum threshold before reorder"),
+                ColumnInfo(ColumnName("last_updated"), ColumnType.TIMESTAMP, false, false, null, "Last inventory update timestamp"),
             ),
         ),
-        "supplier" to TableMeta(
+        TableName("supplier") to TableInfo(
+            name = TableName("supplier"),
             description = "Suppliers who provide products",
             columns = listOf(
-                ColumnInfo("supplier_id", ColumnType.VARCHAR, false, true, null, "Unique supplier identifier"),
-                ColumnInfo("supplier_name", ColumnType.VARCHAR, false, false, null, "Supplier company name"),
-                ColumnInfo("lead_time_days", ColumnType.INTEGER, false, false, null, "Average delivery lead time in days"),
-                ColumnInfo("reliability_score", ColumnType.DOUBLE, false, false, null, "Supplier reliability rating 0.0-1.0"),
+                ColumnInfo(ColumnName("supplier_id"), ColumnType.VARCHAR, false, true, null, "Unique supplier identifier"),
+                ColumnInfo(ColumnName("supplier_name"), ColumnType.VARCHAR, false, false, null, "Supplier company name"),
+                ColumnInfo(ColumnName("lead_time_days"), ColumnType.INTEGER, false, false, null, "Average delivery lead time in days"),
+                ColumnInfo(ColumnName("reliability_score"), ColumnType.DOUBLE, false, false, null, "Supplier reliability rating 0.0-1.0"),
             ),
         ),
-        "purchase_order" to TableMeta(
+        TableName("purchase_order") to TableInfo(
+            name = TableName("purchase_order"),
             description = "Purchase orders placed with suppliers for inventory replenishment",
             columns = listOf(
-                ColumnInfo("po_id", ColumnType.VARCHAR, false, true, null, "Unique purchase order identifier"),
-                ColumnInfo("supplier_id", ColumnType.VARCHAR, false, false, "supplier.supplier_id", "Supplier fulfilling this order"),
-                ColumnInfo("site_id", ColumnType.VARCHAR, false, false, "site.site_id", "Destination site for delivery"),
-                ColumnInfo("product_id", ColumnType.VARCHAR, false, false, "product.product_id", "Product being ordered"),
-                ColumnInfo("quantity", ColumnType.INTEGER, false, false, null, "Number of units ordered"),
-                ColumnInfo("status", ColumnType.VARCHAR, false, false, null, "Order status: PENDING, IN_TRANSIT, DELIVERED, DELAYED"),
-                ColumnInfo("order_date", ColumnType.TIMESTAMP, false, false, null, "Date order was placed"),
-                ColumnInfo("expected_date", ColumnType.TIMESTAMP, false, false, null, "Expected delivery date"),
+                ColumnInfo(ColumnName("po_id"), ColumnType.VARCHAR, false, true, null, "Unique purchase order identifier"),
+                ColumnInfo(ColumnName("supplier_id"), ColumnType.VARCHAR, false, false, ForeignKeyRef(TableName("supplier"), ColumnName("supplier_id")), "Supplier fulfilling this order"),
+                ColumnInfo(ColumnName("site_id"), ColumnType.VARCHAR, false, false, ForeignKeyRef(TableName("site"), ColumnName("site_id")), "Destination site for delivery"),
+                ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, false, ForeignKeyRef(TableName("product"), ColumnName("product_id")), "Product being ordered"),
+                ColumnInfo(ColumnName("quantity"), ColumnType.INTEGER, false, false, null, "Number of units ordered"),
+                ColumnInfo(ColumnName("status"), ColumnType.VARCHAR, false, false, null, "Order status: PENDING, IN_TRANSIT, DELIVERED, DELAYED"),
+                ColumnInfo(ColumnName("order_date"), ColumnType.TIMESTAMP, false, false, null, "Date order was placed"),
+                ColumnInfo(ColumnName("expected_date"), ColumnType.TIMESTAMP, false, false, null, "Expected delivery date"),
             ),
         ),
-        "sales_order" to TableMeta(
+        TableName("sales_order") to TableInfo(
+            name = TableName("sales_order"),
             description = "Customer sales orders",
             columns = listOf(
-                ColumnInfo("order_id", ColumnType.VARCHAR, false, true, null, "Unique sales order identifier"),
-                ColumnInfo("site_id", ColumnType.VARCHAR, false, false, "site.site_id", "Site fulfilling the order"),
-                ColumnInfo("product_id", ColumnType.VARCHAR, false, false, "product.product_id", "Product sold"),
-                ColumnInfo("quantity", ColumnType.INTEGER, false, false, null, "Units sold"),
-                ColumnInfo("order_date", ColumnType.TIMESTAMP, false, false, null, "Date order was placed"),
-                ColumnInfo("customer_id", ColumnType.VARCHAR, false, false, null, "Customer identifier"),
+                ColumnInfo(ColumnName("order_id"), ColumnType.VARCHAR, false, true, null, "Unique sales order identifier"),
+                ColumnInfo(ColumnName("site_id"), ColumnType.VARCHAR, false, false, ForeignKeyRef(TableName("site"), ColumnName("site_id")), "Site fulfilling the order"),
+                ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, false, ForeignKeyRef(TableName("product"), ColumnName("product_id")), "Product sold"),
+                ColumnInfo(ColumnName("quantity"), ColumnType.INTEGER, false, false, null, "Units sold"),
+                ColumnInfo(ColumnName("order_date"), ColumnType.TIMESTAMP, false, false, null, "Date order was placed"),
+                ColumnInfo(ColumnName("customer_id"), ColumnType.VARCHAR, false, false, null, "Customer identifier"),
             ),
         ),
     )
