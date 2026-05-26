@@ -12,6 +12,7 @@ Every data type enforces validity in its `init` block. If an object exists, it i
 | `ColumnName` | Matches `[a-z][a-z0-9_]*` |
 | `ColumnType` | Enum — only valid DB types |
 | `S3Uri` | Valid `s3://bucket/prefix` format |
+| `MVELExpression` | Compiles via `MVEL.compileExpression()` — syntactically valid |
 | `SelectSqlStatement` | EXPLAIN passes + plan is SELECT |
 | `InsertSqlStatement` | EXPLAIN passes + plan is INSERT |
 | `UpdateSqlStatement` | EXPLAIN passes + plan is UPDATE |
@@ -29,7 +30,8 @@ io.github.mbbhalla.agentio.data/
 │   ├── TableInfo.kt        — TableInfo, ColumnInfo, ForeignKeyRef
 │   ├── ExplainResult.kt    — sealed: Success | Failure
 │   ├── DataValue.kt        — sealed: String | Long | Double | Timestamp | Boolean | Null
-│   ├── Dataset.kt          — typed result set with ColumnName-based access
+│   ├── Dataset.kt          — typed result set with ColumnName-based access + MVEL evaluation
+│   ├── MVELExpression.kt   — validated MVEL expression (compiled at construction)
 │   └── S3Uri.kt            — validated S3 URI with bucket/prefix extraction
 └── env/
     ├── DatabaseEnvironment.kt        — abstract class, companion holds active env
@@ -100,6 +102,30 @@ val id = firstRecord[ColumnName("id")]         // DataValue.StringValue("O-1")
 val amount = firstRecord[ColumnName("amount")] // DataValue.DoubleValue(42.0)
 ```
 
+### Evaluate MVEL expressions over a Dataset
+
+SQL produces a `Dataset`, MVEL evaluates over it to a boolean. The `Dataset` is bound as `this` in the MVEL context.
+
+```kotlin
+val dataset = env.executeQuery(
+    SelectSqlStatement("SELECT * FROM orders WHERE amount < 10")
+)
+
+// Default: non-empty result = true
+val hasLowOrders = dataset.evaluate(MVELExpression("!this.records.empty"))
+
+// Size-based
+val tooMany = dataset.evaluate(MVELExpression("this.records.size() > 100"))
+
+// Scalar access
+val belowThreshold = dataset.evaluate(
+    MVELExpression("""((io.github.mbbhalla.agentio.data.model.DataValue${'$'}LongValue) this.records[0].values["amount"]).value < 500""")
+)
+
+// Use the default constant (equivalent to "!this.records.empty")
+val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
+```
+
 ## Design Decisions
 
 - **DuckDB is the engine.** Customer data arrives as Parquet (local or S3) or DDL+INSERT. DuckDB validates and executes. No JDBC driver matrix.
@@ -114,6 +140,7 @@ val amount = firstRecord[ColumnName("amount")] // DataValue.DoubleValue(42.0)
 
 - `agentio-core` (for `generateList` utility)
 - DuckDB JDBC 1.5.2.0
+- MVEL2 2.5.2.Final
 - AWS SDK Kotlin S3 1.6.68
 - Kotlinx Serialization
 - Kotlinx Coroutines

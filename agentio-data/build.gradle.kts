@@ -19,6 +19,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
 
+    // MVEL2 expression engine
+    implementation("org.mvel:mvel2:2.5.2.Final")
+
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.16")
 

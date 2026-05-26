@@ -1,6 +1,7 @@
 package io.github.mbbhalla.agentio.data.model
 
 import kotlinx.serialization.Serializable
+import org.mvel2.MVEL
 import java.sql.ResultSet
 
 @Serializable
@@ -15,6 +16,9 @@ data class Dataset(
     data class Record(val values: Map<String, DataValue>) {
         operator fun get(columnName: ColumnName): DataValue? = values[columnName.value]
     }
+
+    fun evaluate(expression: MVELExpression): Boolean =
+        MVEL.evalToBoolean(expression.value, this)
 
     companion object {
         fun from(rs: ResultSet): Dataset {
