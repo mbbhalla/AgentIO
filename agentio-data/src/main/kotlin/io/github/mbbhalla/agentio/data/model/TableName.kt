@@ -1,7 +1,6 @@
-package io.github.mbbhalla.agentio.examples.text2sql.model
+package io.github.mbbhalla.agentio.data.model
 
-@JvmInline
-value class TableName(val value: String) {
+data class TableName(val value: String) {
     init {
         require(value.matches(VALID_PATTERN)) { "Invalid table name: '$value'" }
     }

@@ -1,16 +1,16 @@
 package io.github.mbbhalla.agentio.examples.text2sql.data
 
-import io.github.mbbhalla.agentio.examples.text2sql.model.ColumnInfo
-import io.github.mbbhalla.agentio.examples.text2sql.model.ColumnName
-import io.github.mbbhalla.agentio.examples.text2sql.model.ColumnType
-import io.github.mbbhalla.agentio.examples.text2sql.model.ForeignKeyRef
-import io.github.mbbhalla.agentio.examples.text2sql.model.TableInfo
-import io.github.mbbhalla.agentio.examples.text2sql.model.TableName
+import io.github.mbbhalla.agentio.data.model.ColumnInfo
+import io.github.mbbhalla.agentio.data.model.ColumnName
+import io.github.mbbhalla.agentio.data.model.ColumnType
+import io.github.mbbhalla.agentio.data.model.ForeignKeyRef
+import io.github.mbbhalla.agentio.data.model.TableInfo
+import io.github.mbbhalla.agentio.data.model.TableName
 
 object RetailSchema {
 
-    val TABLES: Map<TableName, TableInfo> = mapOf(
-        TableName("site") to TableInfo(
+    val TABLES: Set<TableInfo> = setOf(
+        TableInfo(
             name = TableName("site"),
             description = "Physical locations (warehouses, stores) where inventory is held",
             columns = listOf(
@@ -21,7 +21,7 @@ object RetailSchema {
                 ColumnInfo(ColumnName("state"), ColumnType.VARCHAR, false, false, null, "State code"),
             ),
         ),
-        TableName("product") to TableInfo(
+        TableInfo(
             name = TableName("product"),
             description = "Products available in the retail catalog",
             columns = listOf(
@@ -32,7 +32,7 @@ object RetailSchema {
                 ColumnInfo(ColumnName("unit_price"), ColumnType.DOUBLE, false, false, null, "Selling price per unit in USD"),
             ),
         ),
-        TableName("inventory") to TableInfo(
+        TableInfo(
             name = TableName("inventory"),
             description = "Current inventory levels per product per site",
             columns = listOf(
@@ -43,7 +43,7 @@ object RetailSchema {
                 ColumnInfo(ColumnName("last_updated"), ColumnType.TIMESTAMP, false, false, null, "Last inventory update timestamp"),
             ),
         ),
-        TableName("supplier") to TableInfo(
+        TableInfo(
             name = TableName("supplier"),
             description = "Suppliers who provide products",
             columns = listOf(
@@ -53,7 +53,7 @@ object RetailSchema {
                 ColumnInfo(ColumnName("reliability_score"), ColumnType.DOUBLE, false, false, null, "Supplier reliability rating 0.0-1.0"),
             ),
         ),
-        TableName("purchase_order") to TableInfo(
+        TableInfo(
             name = TableName("purchase_order"),
             description = "Purchase orders placed with suppliers for inventory replenishment",
             columns = listOf(
@@ -67,7 +67,7 @@ object RetailSchema {
                 ColumnInfo(ColumnName("expected_date"), ColumnType.TIMESTAMP, false, false, null, "Expected delivery date"),
             ),
         ),
-        TableName("sales_order") to TableInfo(
+        TableInfo(
             name = TableName("sales_order"),
             description = "Customer sales orders",
             columns = listOf(

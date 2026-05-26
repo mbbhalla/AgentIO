@@ -1,5 +1,6 @@
 dependencies {
     implementation(project(":agentio-core"))
+    implementation(project(":agentio-data"))
     implementation(project(":agentio-eventlistener-impl"))
 
     // Kotlinx Serialization
@@ -18,8 +19,6 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
-    // DuckDB JDBC (for text2sql example)
-    implementation("org.duckdb:duckdb_jdbc:1.5.2.0")
 }
 
 tasks.register<JavaExec>("RunHackerNewsAgenticFunction") {

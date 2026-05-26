@@ -12,8 +12,8 @@ import io.github.mbbhalla.agentio.core.model.AgentConfiguration
 import io.github.mbbhalla.agentio.core.model.LLM
 import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
-import io.github.mbbhalla.agentio.examples.text2sql.model.DatabaseEnvironment
-import io.github.mbbhalla.agentio.examples.text2sql.model.ExplainResult
+import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.examples.text2sql.server.Text2SqlMcpServer
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
@@ -49,22 +49,12 @@ internal class Text2SqlAgenticFunction(
         val sql: String,
     ) {
         init {
-            val env = activeEnvironment
-                ?: throw IllegalStateException("DatabaseEnvironment not set before Output construction")
-            val result = env.explain(sql)
-            require(result.isSuccess) {
-                "Output SQL is invalid: ${(result as ExplainResult.Failure).error}"
-            }
+            SelectSqlStatement(sql)
         }
     }
 
     override fun getInputKClass() = Input::class
     override fun getOutputKClass() = Output::class
-
-    companion object {
-        @Volatile
-        var activeEnvironment: DatabaseEnvironment? = null
-    }
 }
 
 internal object Text2SqlAgenticFunctionProvider {
@@ -74,7 +64,7 @@ internal object Text2SqlAgenticFunctionProvider {
         agentId: String,
         env: DatabaseEnvironment,
     ): Text2SqlAgenticFunction {
-        Text2SqlAgenticFunction.activeEnvironment = env
+        DatabaseEnvironment.activate(env)
 
         val mcpServer = Text2SqlMcpServer(env)
         val exchange = mcpServer.pipedStreamsExchange()

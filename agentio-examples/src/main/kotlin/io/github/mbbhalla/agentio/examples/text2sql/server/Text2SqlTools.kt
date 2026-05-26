@@ -2,12 +2,12 @@ package io.github.mbbhalla.agentio.examples.text2sql.server
 
 import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.lib.tool.AbstractMcpTool
-import io.github.mbbhalla.agentio.examples.text2sql.model.ColumnType
-import io.github.mbbhalla.agentio.examples.text2sql.model.DatabaseEnvironment
-import io.github.mbbhalla.agentio.examples.text2sql.model.Dataset
-import io.github.mbbhalla.agentio.examples.text2sql.model.ExplainResult
-import io.github.mbbhalla.agentio.examples.text2sql.model.ForeignKeyRef
-import io.github.mbbhalla.agentio.examples.text2sql.model.TableName
+import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
+import io.github.mbbhalla.agentio.data.model.ColumnType
+import io.github.mbbhalla.agentio.data.model.Dataset
+import io.github.mbbhalla.agentio.data.model.ForeignKeyRef
+import io.github.mbbhalla.agentio.data.model.TableName
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonArray
@@ -135,10 +135,7 @@ internal class ExecuteSqlTool(
     }
 
     override fun invoke(input: Input): Output {
-        val explainResult = env.explain(input.sql)
-        require(explainResult.isSuccess) {
-            "SQL validation failed: ${(explainResult as ExplainResult.Failure).error}"
-        }
-        return Output(resultSet = env.executeQuery(input.sql))
+        val validated = SelectSqlStatement(input.sql)
+        return Output(resultSet = env.executeQuery(validated))
     }
 }

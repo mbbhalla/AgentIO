@@ -1,7 +1,7 @@
 package io.github.mbbhalla.agentio.examples.text2sql.server
 
 import io.github.mbbhalla.agentio.core.lib.server.AbstractMcpServer
-import io.github.mbbhalla.agentio.examples.text2sql.model.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
 import io.modelcontextprotocol.kotlin.sdk.server.RegisteredTool
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 

@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.examples.text2sql.model
+package io.github.mbbhalla.agentio.data.model
 
 sealed class ExplainResult {
     data object Success : ExplainResult()

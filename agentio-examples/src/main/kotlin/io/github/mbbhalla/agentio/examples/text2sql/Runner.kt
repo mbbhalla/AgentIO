@@ -2,10 +2,10 @@ package io.github.mbbhalla.agentio.examples.text2sql
 
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
 import io.github.mbbhalla.agentio.core.lib.AgentOutput
+import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.examples.text2sql.data.RetailDatabase
 import io.github.mbbhalla.agentio.examples.text2sql.function.Text2SqlAgenticFunction
 import io.github.mbbhalla.agentio.examples.text2sql.function.Text2SqlAgenticFunctionProvider
-import io.github.mbbhalla.agentio.examples.text2sql.model.Dataset
 import io.vavr.control.Try
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -23,9 +23,11 @@ internal object Runner {
         val query = args.firstOrNull()
             ?: "What products have inventory below safety stock levels?"
 
+        val env = RetailDatabase.environment
+
         val agenticFunction = Text2SqlAgenticFunctionProvider.get(
             agentId = AGENT_ID,
-            env = RetailDatabase,
+            env = env,
         )
 
         agenticFunction.invoke(
@@ -36,11 +38,8 @@ internal object Runner {
         }.onSuccess { agentOutput ->
             LOG.info("Generated SQL: ${agentOutput.output.sql}")
             LOG.info("Results:")
-            LOG.info(
-                JsonSchemaUtil.json.encodeToString(
-                    RetailDatabase.executeQuery(agentOutput.output.sql),
-                ),
-            )
+            val validated = SelectSqlStatement(agentOutput.output.sql)
+            LOG.info(JsonSchemaUtil.json.encodeToString(env.executeQuery(validated)))
         }
     }
 }

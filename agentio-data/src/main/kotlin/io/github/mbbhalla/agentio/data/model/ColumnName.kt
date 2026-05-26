@@ -1,7 +1,9 @@
-package io.github.mbbhalla.agentio.examples.text2sql.model
+package io.github.mbbhalla.agentio.data.model
 
-@JvmInline
-value class ColumnName(val value: String) {
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class ColumnName(val value: String) {
     init {
         require(value.matches(VALID_PATTERN)) { "Invalid column name: '$value'" }
     }

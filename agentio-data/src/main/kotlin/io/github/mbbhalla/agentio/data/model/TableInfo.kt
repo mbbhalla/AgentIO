@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.examples.text2sql.model
+package io.github.mbbhalla.agentio.data.model
 
 data class TableInfo(
     val name: TableName,
@@ -19,12 +19,3 @@ data class ForeignKeyRef(
     val table: TableName,
     val column: ColumnName,
 )
-
-enum class ColumnType {
-    VARCHAR,
-    INTEGER,
-    BIGINT,
-    DOUBLE,
-    BOOLEAN,
-    TIMESTAMP,
-}

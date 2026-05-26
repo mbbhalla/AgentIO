@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.examples.text2sql.model
+package io.github.mbbhalla.agentio.data.model
 
 import kotlinx.serialization.Serializable
 import java.sql.ResultSet
@@ -9,21 +9,26 @@ data class Dataset(
     val records: List<Record>,
 ) {
     @Serializable
-    data class ColumnMeta(val name: String, val type: String)
+    data class ColumnMeta(val name: ColumnName, val type: ColumnType)
 
     @Serializable
-    data class Record(val values: Map<String, DataValue>)
+    data class Record(val values: Map<String, DataValue>) {
+        operator fun get(columnName: ColumnName): DataValue? = values[columnName.value]
+    }
 
     companion object {
         fun from(rs: ResultSet): Dataset {
             val meta = rs.metaData
             val columns = (1..meta.columnCount).map {
-                ColumnMeta(name = meta.getColumnName(it), type = meta.getColumnTypeName(it))
+                ColumnMeta(
+                    name = ColumnName(meta.getColumnName(it).lowercase()),
+                    type = ColumnType.fromTypeName(meta.getColumnTypeName(it)),
+                )
             }
             val records = mutableListOf<Record>()
             while (rs.next()) {
                 val values = columns.associate { col ->
-                    col.name to DataValue.from(rs.getObject(col.name))
+                    col.name.value to DataValue.from(rs.getObject(col.name.value))
                 }
                 records.add(Record(values))
             }

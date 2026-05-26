@@ -7,6 +7,7 @@ rootProject.name = "AgentIO"
 
 include("agentio-core")
 include("agentio-cmm-impl")
+include("agentio-data")
 include("agentio-eventlistener-impl")
 include("agentio-examples")
 include("agentio-experiments")
