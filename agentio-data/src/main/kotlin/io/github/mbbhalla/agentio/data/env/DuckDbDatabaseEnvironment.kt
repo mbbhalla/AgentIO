@@ -1,12 +1,21 @@
 package io.github.mbbhalla.agentio.data.env
 
+import aws.sdk.kotlin.services.s3.S3Client
+import aws.sdk.kotlin.services.s3.model.GetObjectRequest
+import aws.sdk.kotlin.services.s3.model.ListObjectsV2Request
+import aws.smithy.kotlin.runtime.content.toByteArray
+import io.github.mbbhalla.agentio.core.common.generateList
 import io.github.mbbhalla.agentio.data.model.ColumnInfo
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.ColumnType
 import io.github.mbbhalla.agentio.data.model.Dataset
 import io.github.mbbhalla.agentio.data.model.ExplainResult
+import io.github.mbbhalla.agentio.data.model.S3Uri
 import io.github.mbbhalla.agentio.data.model.TableInfo
 import io.github.mbbhalla.agentio.data.model.TableName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.Connection
 import java.sql.DriverManager
@@ -95,6 +104,53 @@ class DuckDbDatabaseEnvironment private constructor(
             val env = DuckDbDatabaseEnvironment(connection, tableMetadata)
             activate(env)
             return env
+        }
+
+        suspend fun fromS3(
+            s3Uri: S3Uri,
+            s3Client: S3Client,
+        ): DuckDbDatabaseEnvironment {
+            val tempDir = withContext(Dispatchers.IO) {
+                Files.createTempDirectory("agentio-parquet-${java.util.UUID.randomUUID()}")
+            }
+
+            val parquetKeys = generateList(
+                seed = s3Client.listObjectsV2(ListObjectsV2Request {
+                    bucket = s3Uri.bucket
+                    prefix = s3Uri.prefix
+                }),
+            ) { prev ->
+                if (prev.isTruncated == true)
+                    s3Client.listObjectsV2(ListObjectsV2Request {
+                        bucket = s3Uri.bucket
+                        prefix = s3Uri.prefix
+                        continuationToken = prev.nextContinuationToken
+                    })
+                else null
+            }.flatMap { response ->
+                response.contents
+                    ?.filter { it.key?.endsWith(".parquet") == true }
+                    ?.mapNotNull { it.key }
+                    ?: emptyList()
+            }
+
+            require(parquetKeys.isNotEmpty()) { "No .parquet files found at: ${s3Uri.value}" }
+
+            parquetKeys.forEach { key ->
+                val fileName = key.substringAfterLast('/')
+                val localFile = tempDir.resolve(fileName)
+                s3Client.getObject(
+                    GetObjectRequest {
+                        bucket = s3Uri.bucket
+                        this.key = key
+                    },
+                ) { getResponse ->
+                    val bytes = getResponse.body?.toByteArray() ?: ByteArray(0)
+                    withContext(Dispatchers.IO) { Files.write(localFile, bytes) }
+                }
+            }
+
+            return fromParquet(tempDir)
         }
 
         private fun inferColumns(

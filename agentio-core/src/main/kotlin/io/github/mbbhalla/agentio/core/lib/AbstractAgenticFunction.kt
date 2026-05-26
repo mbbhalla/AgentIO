@@ -16,12 +16,12 @@ import io.github.mbbhalla.agentio.core.common.JsonString
 import io.github.mbbhalla.agentio.core.common.REGEX_JSON_EXTRACT
 import io.github.mbbhalla.agentio.core.common.toDocument
 import io.github.mbbhalla.agentio.core.lib.ctx.cmm.ContextMemoryManager
-import io.github.mbbhalla.agentio.core.model.event.Event
-import io.github.mbbhalla.agentio.core.model.event.EventPayload
 import io.github.mbbhalla.agentio.core.model.AgentConfiguration
+import io.github.mbbhalla.agentio.core.model.ThinkingMode
 import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import io.github.mbbhalla.agentio.core.model.conversation.IndexedConversation
-import io.github.mbbhalla.agentio.core.model.ThinkingMode
+import io.github.mbbhalla.agentio.core.model.event.Event
+import io.github.mbbhalla.agentio.core.model.event.EventPayload
 import io.vavr.control.Try
 import io.vavr.kotlin.Try
 import io.vavr.kotlin.failure
@@ -32,7 +32,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.withContext
@@ -132,14 +131,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
     private fun <T> generateFlow(
         seed: T,
         nextFunction: suspend (T) -> T?,
-    ): Flow<T> = flow {
-        var current: T = seed
-        do {
-            emit(current)
-            val next = nextFunction(current) ?: break
-            current = next
-        } while (true)
-    }
+    ): Flow<T> = io.github.mbbhalla.agentio.core.common.generateFlow(seed, nextFunction)
 
     /*
         Call Bedrock Converse API

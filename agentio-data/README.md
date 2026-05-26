@@ -1,0 +1,126 @@
+# agentio-data
+
+Data environment module for AgentIO. Provides typed data models, SQL statement validation, and database environment abstraction backed by DuckDB.
+
+## Core Principle: Correctness at Construction
+
+Every data type enforces validity in its `init` block. If an object exists, it is correct. Invalid state cannot propagate.
+
+| Type | Guarantee |
+|------|-----------|
+| `TableName` | Matches `[a-z][a-z0-9_]*` |
+| `ColumnName` | Matches `[a-z][a-z0-9_]*` |
+| `ColumnType` | Enum — only valid DB types |
+| `S3Uri` | Valid `s3://bucket/prefix` format |
+| `SelectSqlStatement` | EXPLAIN passes + plan is SELECT |
+| `InsertSqlStatement` | EXPLAIN passes + plan is INSERT |
+| `UpdateSqlStatement` | EXPLAIN passes + plan is UPDATE |
+| `DeleteSqlStatement` | EXPLAIN passes + plan is DELETE |
+| `DuckDbDatabaseEnvironment` | DDL/DML executed successfully at construction |
+
+## Package Structure
+
+```
+io.github.mbbhalla.agentio.data/
+├── model/
+│   ├── TableName.kt        — validated table name
+│   ├── ColumnName.kt       — validated column name
+│   ├── ColumnType.kt       — enum + fromTypeName() factory
+│   ├── TableInfo.kt        — TableInfo, ColumnInfo, ForeignKeyRef
+│   ├── ExplainResult.kt    — sealed: Success | Failure
+│   ├── DataValue.kt        — sealed: String | Long | Double | Timestamp | Boolean | Null
+│   ├── Dataset.kt          — typed result set with ColumnName-based access
+│   └── S3Uri.kt            — validated S3 URI with bucket/prefix extraction
+└── env/
+    ├── DatabaseEnvironment.kt        — abstract class, companion holds active env
+    ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet() + fromS3()
+    └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
+```
+
+## Usage
+
+### Create from DDL + seed data
+
+```kotlin
+val env = DuckDbDatabaseEnvironment.fromStatements(
+    ddl = listOf("CREATE TABLE orders (id VARCHAR PRIMARY KEY, amount DOUBLE)"),
+    dml = listOf("INSERT INTO orders VALUES ('O-1', 42.0)"),
+    tableMetadata = setOf(
+        TableInfo(
+            name = TableName("orders"),
+            description = "Customer orders",
+            columns = listOf(
+                ColumnInfo(ColumnName("id"), ColumnType.VARCHAR, false, true, null, "Order ID"),
+                ColumnInfo(ColumnName("amount"), ColumnType.DOUBLE, false, false, null, "Amount"),
+            ),
+        ),
+    ),
+)
+```
+
+### Create from Parquet files (local)
+
+```kotlin
+val env = DuckDbDatabaseEnvironment.fromParquet(Path("/data/2025-05-26/"))
+// Tables inferred from filenames: orders.parquet → table "orders"
+// Schema inferred from Parquet metadata
+```
+
+### Create from Parquet files (S3)
+
+```kotlin
+val s3Client = S3Client { region = "us-west-2" }
+val env = DuckDbDatabaseEnvironment.fromS3(
+    s3Uri = S3Uri("s3://my-data-lake/retail/daily/2025-05-26"),
+    s3Client = s3Client,
+)
+// Downloads .parquet files to temp dir, loads into DuckDB
+// Pagination handled automatically for prefixes with >1000 files
+```
+
+### Typed SQL — cannot construct invalid SQL
+
+```kotlin
+// Valid — object constructed
+val stmt = SelectSqlStatement("SELECT * FROM orders WHERE amount > 10")
+val dataset = env.executeQuery(stmt)
+
+// Invalid — throws IllegalArgumentException at construction
+SelectSqlStatement("SELECT * FROM nonexistent_table")  // fails: EXPLAIN rejects
+InsertSqlStatement("not sql at all")                   // fails: EXPLAIN rejects
+SelectSqlStatement("INSERT INTO orders VALUES (1)")    // fails: plan type is INSERT, not SELECT
+```
+
+### Access query results with typed columns
+
+```kotlin
+val dataset = env.executeQuery(SelectSqlStatement("SELECT id, amount FROM orders"))
+val firstRecord = dataset.records[0]
+val id = firstRecord[ColumnName("id")]         // DataValue.StringValue("O-1")
+val amount = firstRecord[ColumnName("amount")] // DataValue.DoubleValue(42.0)
+```
+
+## Design Decisions
+
+- **DuckDB is the engine.** Customer data arrives as Parquet (local or S3) or DDL+INSERT. DuckDB validates and executes. No JDBC driver matrix.
+- **`DatabaseEnvironment.current`** — singleton reference used by typed SQL statements for validation. Set by factory methods via `activate()`.
+- **`fromS3` is `suspend`** — uses AWS S3 Kotlin SDK (suspend functions). Blocking I/O (`Files.createTempDirectory`, `Files.write`) wrapped in `withContext(Dispatchers.IO)`. Consistent with `agentio-core` concurrency pattern.
+- **`fromStatements` and `fromParquet` are non-suspend** — blocking JDBC. Callers wrap in `runBlocking` or `withContext(Dispatchers.IO)` if needed.
+- **Statement type detection** — uses DuckDB EXPLAIN plan's root operator node. Tested against DuckDB 1.5.2.0; version upgrades that change plan format will fail tests immediately.
+- **No additional SQL parser dependency** — DuckDB itself is both parser and validator. EXPLAIN proves correctness.
+- **S3 pagination** — uses `generateList` (from `agentio-core`) with suspend lambda. Handles any number of pages transparently.
+
+## Dependencies
+
+- `agentio-core` (for `generateList` utility)
+- DuckDB JDBC 1.5.2.0
+- AWS SDK Kotlin S3 1.6.68
+- Kotlinx Serialization
+- Kotlinx Coroutines
+
+## Build & Test
+
+```bash
+./gradlew :agentio-data:build
+./gradlew :agentio-data:test
+```
