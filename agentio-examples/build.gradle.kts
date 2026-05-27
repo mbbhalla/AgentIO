@@ -115,7 +115,7 @@ tasks.register<JavaExec>("RunOrchestrationAgenticFunction") {
     )
 }
 
-tasks.register<JavaExec>("RunText2SqlAgenticFunction") {
+tasks.register<JavaExec>("RunText2SqlAgenticFunction-RetailDB") {
     mainClass.set("io.github.mbbhalla.agentio.examples.text2sql.RunnerKt")
     classpath = sourceSets["main"].runtimeClasspath
     debug = false
@@ -125,8 +125,26 @@ tasks.register<JavaExec>("RunText2SqlAgenticFunction") {
         host = "localhost"
         port = 5017
     }
+    jvmArgs = listOf("-Dagentio.text2sql.entrypoint=retail")
     args = listOf(
         project.findProperty("query")?.toString()
             ?: "What products have inventory below safety stock levels?",
+    )
+}
+
+tasks.register<JavaExec>("RunText2SqlAgenticFunction-EmployeeDB") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.text2sql.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5018
+    }
+    jvmArgs = listOf("-Dagentio.text2sql.entrypoint=employee")
+    args = listOf(
+        project.findProperty("query")?.toString()
+            ?: "Who are the top-rated employees and what projects are they working on?",
     )
 }

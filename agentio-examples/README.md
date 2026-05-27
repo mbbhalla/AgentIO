@@ -12,7 +12,8 @@ Example agents built with AgentIO, demonstrating how to use the SDK for real-wor
 | Code Metrics | In-process | `RunCodeMetricsAgenticFunction` | `AbstractMcpServer` + `EventListener` for observability |
 | Adversarial | In-process | `RunAdversarialAgenticFunction` | Agent ↔ CriticAgent iterative refinement pattern |
 | Orchestration | In-process | `RunOrchestrationAgenticFunction` | Orchestrator + parallel Workers pattern |
-| Text2SQL | In-process | `RunText2SqlAgenticFunction` | DuckDB + correctness-at-construction output validation |
+| Text2SQL (Retail) | In-process | `RunText2SqlAgenticFunction-RetailDB` | DuckDB from SQL statements + correctness-at-construction |
+| Text2SQL (Employee) | In-process | `RunText2SqlAgenticFunction-EmployeeDB` | DuckDB from Parquet files + correctness-at-construction |
 
 All examples are self-sufficient — no API keys or tokens required.
 
@@ -37,9 +38,13 @@ All examples are self-sufficient — no API keys or tokens required.
 # Orchestration — orchestrator dispatches parallel workers and synthesizes results
 ./gradlew :agentio-examples:RunOrchestrationAgenticFunction
 
-# Text2SQL — convert natural language to SQL against an in-memory DuckDB retail database
-./gradlew :agentio-examples:RunText2SqlAgenticFunction
-./gradlew :agentio-examples:RunText2SqlAgenticFunction -Pquery="which sites have inventory more than 1000"
+# Text2SQL (Retail) — NL to SQL against in-memory DuckDB retail database (from SQL statements)
+./gradlew :agentio-examples:RunText2SqlAgenticFunction-RetailDB
+./gradlew :agentio-examples:RunText2SqlAgenticFunction-RetailDB -Pquery="which sites have inventory more than 1000"
+
+# Text2SQL (Employee) — NL to SQL against in-memory DuckDB employee database (from Parquet files)
+./gradlew :agentio-examples:RunText2SqlAgenticFunction-EmployeeDB
+./gradlew :agentio-examples:RunText2SqlAgenticFunction-EmployeeDB -Pquery="which engineers have a rating above 4"
 ```
 
 ## Hacker News Agent
@@ -137,14 +142,17 @@ An Orchestrator dispatches three Worker agents in parallel, each with a focused 
 
 ## Text2SQL Agent
 
-An agent that converts natural language questions into valid DuckDB SQL against an in-memory retail database (products, inventory, suppliers, purchase orders, sales orders).
+An agent that converts natural language questions into valid DuckDB SQL. Two database environments demonstrate different data-loading strategies:
+
+- **RetailDB** — schema and seed data defined as SQL statements in Kotlin (`DuckDbDatabaseEnvironment.fromStatements`)
+- **EmployeeDB** — loaded from Parquet files on the classpath (`DuckDbDatabaseEnvironment.fromParquet`)
 
 ### Key Patterns
 
 - **Correctness at construction** — `Output.init` validates SQL via DuckDB `EXPLAIN`; invalid SQL cannot be instantiated
 - **Agent reinforcement loop** — `ExecuteSqlTool` validates and returns errors to the agent for self-correction
-- **In-memory DuckDB** — schema and seed data defined in Kotlin objects, zero external dependencies
-- **Domain-agnostic models** — `DataValue`, `Dataset`, `ExplainResult`, `ColumnType` in `model/` package are reusable beyond retail
+- **Two data-loading strategies** — SQL statements (RetailDB) vs Parquet files (EmployeeDB)
+- **Domain-agnostic models** — `DataValue`, `Dataset`, `ExplainResult`, `ColumnType` in `model/` package are reusable across domains
 
 ### Architecture
 
@@ -161,8 +169,9 @@ An agent that converts natural language questions into valid DuckDB SQL against 
         │            │            │
         └────────────┴────────────┘
                      │
-              RetailDatabase
-            (DuckDB in-memory)
+        ┌────────────┴────────────┐
+  RetailDatabase          EmployeeDatabase
+  (from SQL stmts)        (from Parquet)
 ```
 
 ## Package Structure
@@ -195,8 +204,7 @@ io.github.mbbhalla.agentio.examples/
 │   └── server/OrchestrationMcpServers.kt, OrchestrationTools.kt
 └── text2sql/
     ├── Runner.kt
-    ├── model/DataValue.kt, Dataset.kt, ExplainResult.kt, TableInfo.kt
-    ├── data/RetailDatabase.kt, RetailSchema.kt, RetailSeedData.kt
+    ├── data/RetailDatabase.kt, EmployeeDatabase.kt
     ├── function/Text2SqlAgenticFunction.kt
     └── server/Text2SqlMcpServer.kt, Text2SqlTools.kt
 ```

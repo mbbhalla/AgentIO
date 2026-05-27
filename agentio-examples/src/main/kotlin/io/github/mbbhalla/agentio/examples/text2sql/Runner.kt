@@ -2,7 +2,9 @@ package io.github.mbbhalla.agentio.examples.text2sql
 
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
 import io.github.mbbhalla.agentio.core.lib.AgentOutput
+import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
 import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
+import io.github.mbbhalla.agentio.examples.text2sql.data.EmployeeDatabase
 import io.github.mbbhalla.agentio.examples.text2sql.data.RetailDatabase
 import io.github.mbbhalla.agentio.examples.text2sql.function.Text2SqlAgenticFunction
 import io.github.mbbhalla.agentio.examples.text2sql.function.Text2SqlAgenticFunctionProvider
@@ -18,13 +20,9 @@ internal object Runner {
     private val LOG = LoggerFactory.getLogger(Runner::class.java)
 
     fun run(
-        args: Array<String>,
+        env: DatabaseEnvironment,
+        query: String,
     ): Try<AgentOutput<Text2SqlAgenticFunction.Output>> = runBlocking {
-        val query = args.firstOrNull()
-            ?: "What products have inventory below safety stock levels?"
-
-        val env = RetailDatabase.environment
-
         val agenticFunction = Text2SqlAgenticFunctionProvider.get(
             agentId = AGENT_ID,
             env = env,
@@ -45,5 +43,16 @@ internal object Runner {
 }
 
 fun main(args: Array<String>) {
-    Runner.run(args)
+    when (System.getProperty("agentio.text2sql.entrypoint", "retail")) {
+        "employee" -> {
+            val query = args.firstOrNull()
+                ?: "Who are the top-rated employees and what projects are they working on?"
+            Runner.run(EmployeeDatabase.environment, query)
+        }
+        else -> {
+            val query = args.firstOrNull()
+                ?: "What products have inventory below safety stock levels?"
+            Runner.run(RetailDatabase.environment, query)
+        }
+    }
 }
