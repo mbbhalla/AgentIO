@@ -94,7 +94,7 @@ class DuckDbDatabaseEnvironment private constructor(
         }
 
         suspend fun fromS3(
-            snapshot: DatabaseEnvironmentSnapshot,
+            timestamp: java.time.Instant,
             s3Uri: S3Uri,
             s3Client: S3Client,
         ): DuckDbDatabaseEnvironment {
@@ -103,9 +103,9 @@ class DuckDbDatabaseEnvironment private constructor(
                     Files.createTempDirectory("agentio-parquet-${java.util.UUID.randomUUID()}")
                 }
 
-            val resolvedVersions = resolveVersionsAtTimestamp(snapshot.timestamp, s3Uri, s3Client)
+            val resolvedVersions = resolveVersionsAtTimestamp(timestamp, s3Uri, s3Client)
             require(resolvedVersions.isNotEmpty()) {
-                "No .parquet files found at ${s3Uri.value} as of ${snapshot.timestamp}"
+                "No .parquet files found at ${s3Uri.value} as of $timestamp"
             }
 
             resolvedVersions.forEach { version ->
@@ -123,14 +123,17 @@ class DuckDbDatabaseEnvironment private constructor(
                 }
             }
 
-            val versionSet = VersionSet(versions = resolvedVersions)
-            val resolvedSnapshot = snapshot.copy(versionSet = versionSet)
+            val snapshot =
+                DatabaseEnvironmentSnapshot(
+                    timestamp = timestamp,
+                    versionSet = VersionSet(versions = resolvedVersions),
+                )
 
             val parquetFiles =
                 tempDir.toFile().listFiles { f -> f.extension == "parquet" }?.toList()
                     ?: emptyList()
 
-            return loadParquetFiles(parquetFiles, snapshot = resolvedSnapshot)
+            return loadParquetFiles(parquetFiles, snapshot = snapshot)
         }
 
         private fun loadParquetFiles(

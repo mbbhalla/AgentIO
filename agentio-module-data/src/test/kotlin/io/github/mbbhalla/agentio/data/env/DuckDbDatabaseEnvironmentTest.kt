@@ -11,7 +11,6 @@ import io.github.mbbhalla.agentio.data.model.ColumnInfo
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.ColumnType
 import io.github.mbbhalla.agentio.data.model.DataValue
-import io.github.mbbhalla.agentio.data.model.DatabaseEnvironmentSnapshot
 import io.github.mbbhalla.agentio.data.model.ExplainResult
 import io.github.mbbhalla.agentio.data.model.S3ObjectKey
 import io.github.mbbhalla.agentio.data.model.S3Uri
@@ -310,8 +309,6 @@ class DuckDbDatabaseEnvironmentTest {
         private val testTimestamp = Instant.parse("2026-01-15T12:00:00Z")
         private val beforeTimestamp = AwsInstant.fromEpochSeconds(testTimestamp.epochSecond - 3600)
 
-        private fun snapshot() = DatabaseEnvironmentSnapshot(timestamp = testTimestamp, versionSet = null)
-
         @Test
         fun `loads parquet files from mocked S3`() =
             runBlocking {
@@ -323,7 +320,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(),
+                        timestamp = testTimestamp,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -348,7 +345,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(),
+                        timestamp = testTimestamp,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -367,7 +364,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(),
+                        timestamp = testTimestamp,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -387,7 +384,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 assertThrows<IllegalArgumentException> {
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(),
+                        timestamp = testTimestamp,
                         s3Uri = S3Uri("s3://my-bucket/empty-prefix"),
                         s3Client = s3Client,
                     )
@@ -409,7 +406,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(),
+                        timestamp = testTimestamp,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -428,17 +425,17 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(),
+                        timestamp = testTimestamp,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
-                val resolved = env.snapshot
-                assertEquals(testTimestamp, resolved?.timestamp)
-                assertEquals(1, resolved?.versionSet?.versions?.size)
-                val version = resolved?.versionSet?.versions?.first()
-                assertEquals(S3ObjectKey("data/orders.parquet"), version?.fileReference)
-                assertEquals("v1", version?.versionId)
+                val resolved = env.snapshot!!
+                assertEquals(testTimestamp, resolved.timestamp)
+                assertEquals(1, resolved.versionSet.versions.size)
+                val version = resolved.versionSet.versions.first()
+                assertEquals(S3ObjectKey("data/orders.parquet"), version.fileReference)
+                assertEquals("v1", version.versionId)
             }
 
         private fun mockS3Client(files: Map<String, ByteArray>): S3Client {
@@ -503,8 +500,6 @@ class DuckDbDatabaseEnvironmentTest {
 
         private fun awsInstant(instant: Instant): AwsInstant = AwsInstant.fromEpochSeconds(instant.epochSecond)
 
-        private fun snapshot(timestamp: Instant) = DatabaseEnvironmentSnapshot(timestamp = timestamp, versionSet = null)
-
         @Test
         fun `resolves latest version before timestamp`() =
             runBlocking {
@@ -522,18 +517,17 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t3),
+                        timestamp = t3,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
                 val version =
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.first()
-                assertEquals(S3ObjectKey("data/orders.parquet"), version?.fileReference)
-                assertEquals("v2", version?.versionId)
+                    env.snapshot!!
+                        .versionSet.versions
+                        .first()
+                assertEquals(S3ObjectKey("data/orders.parquet"), version.fileReference)
+                assertEquals("v2", version.versionId)
             }
 
         @Test
@@ -552,17 +546,16 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t2),
+                        timestamp = t2,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
                 val version =
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.first()
-                assertEquals("v2", version?.versionId)
+                    env.snapshot!!
+                        .versionSet.versions
+                        .first()
+                assertEquals("v2", version.versionId)
             }
 
         @Test
@@ -581,26 +574,14 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t3),
+                        timestamp = t3,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
-                assertEquals(
-                    1,
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.size,
-                )
-                assertEquals(
-                    S3ObjectKey("data/orders.parquet"),
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.first()
-                        ?.fileReference,
-                )
+                val versions = env.snapshot!!.versionSet.versions
+                assertEquals(1, versions.size)
+                assertEquals(S3ObjectKey("data/orders.parquet"), versions.first().fileReference)
             }
 
         @Test
@@ -617,7 +598,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 assertThrows<IllegalArgumentException> {
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t1),
+                        timestamp = t1,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -642,7 +623,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 assertThrows<IllegalArgumentException> {
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t3),
+                        timestamp = t3,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -669,17 +650,16 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t4),
+                        timestamp = t4,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
                 val version =
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.first()
-                assertEquals("v3", version?.versionId)
+                    env.snapshot!!
+                        .versionSet.versions
+                        .first()
+                assertEquals("v3", version.versionId)
             }
 
         @Test
@@ -701,18 +681,17 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t2),
+                        timestamp = t2,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
                 val version =
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.first()
-                assertEquals(S3ObjectKey("data/orders.parquet"), version?.fileReference)
-                assertEquals("v1", version?.versionId)
+                    env.snapshot!!
+                        .versionSet.versions
+                        .first()
+                assertEquals(S3ObjectKey("data/orders.parquet"), version.fileReference)
+                assertEquals("v1", version.versionId)
             }
 
         @Test
@@ -733,12 +712,12 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t2),
+                        timestamp = t2,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
-                val versions = env.snapshot?.versionSet?.versions ?: emptySet()
+                val versions = env.snapshot!!.versionSet.versions
                 assertEquals(2, versions.size)
 
                 val ordersVersion = versions.first { it.fileReference.value == "data/orders.parquet" }
@@ -763,17 +742,16 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t2),
+                        timestamp = t2,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
                 val version =
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.first()
-                assertNull(version?.versionId)
+                    env.snapshot!!
+                        .versionSet.versions
+                        .first()
+                assertNull(version.versionId)
             }
 
         @Test
@@ -828,17 +806,15 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t2),
+                        timestamp = t2,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
                 assertEquals(
                     2,
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.size,
+                    env.snapshot!!
+                        .versionSet.versions.size,
                 )
                 assertEquals(2, callCount)
             }
@@ -860,26 +836,14 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t2),
+                        timestamp = t2,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
-                assertEquals(
-                    1,
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.size,
-                )
-                assertEquals(
-                    S3ObjectKey("data/orders.parquet"),
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.first()
-                        ?.fileReference,
-                )
+                val versions = env.snapshot!!.versionSet.versions
+                assertEquals(1, versions.size)
+                assertEquals(S3ObjectKey("data/orders.parquet"), versions.first().fileReference)
             }
 
         @Test
@@ -902,17 +866,15 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t3),
+                        timestamp = t3,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
                 assertEquals(
                     1,
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.size,
+                    env.snapshot!!
+                        .versionSet.versions.size,
                 )
             }
 
@@ -936,7 +898,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 assertThrows<IllegalArgumentException> {
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t4),
+                        timestamp = t4,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -962,17 +924,16 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t2),
+                        timestamp = t2,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
 
                 val version =
-                    env.snapshot
-                        ?.versionSet
-                        ?.versions
-                        ?.first()
-                assertEquals("v1", version?.versionId)
+                    env.snapshot!!
+                        .versionSet.versions
+                        .first()
+                assertEquals("v1", version.versionId)
             }
 
         @Test
@@ -986,7 +947,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 assertThrows<IllegalArgumentException> {
                     DuckDbDatabaseEnvironment.fromS3(
-                        snapshot = snapshot(t2),
+                        timestamp = t2,
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )

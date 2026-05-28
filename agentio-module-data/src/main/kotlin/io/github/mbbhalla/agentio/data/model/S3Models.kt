@@ -42,5 +42,5 @@ data class VersionSet(
 
 data class DatabaseEnvironmentSnapshot(
     val timestamp: Instant,
-    val versionSet: VersionSet?,
+    val versionSet: VersionSet,
 )

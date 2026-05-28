@@ -31,7 +31,7 @@ io.github.mbbhalla.agentio.data/
 │   └── MVELExpression.kt   — validated MVEL expression (compiled at construction)
 └── env/
     ├── DatabaseEnvironment.kt        — abstract class with snapshot, companion holds active env
-    ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet() + fromS3(snapshot)
+    ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet() + fromS3(timestamp)
     └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
 ```
 
@@ -68,18 +68,14 @@ val env = DuckDbDatabaseEnvironment.fromParquet(Path("/data/2025-05-26/"))
 
 ```kotlin
 val s3Client = S3Client { region = "us-west-2" }
-val snapshot = DatabaseEnvironmentSnapshot(
-    timestamp = Instant.parse("2026-05-28T10:00:00Z"),
-    versionSet = null, // resolved during load
-)
 val env = DuckDbDatabaseEnvironment.fromS3(
-    snapshot = snapshot,
+    timestamp = Instant.parse("2026-05-28T10:00:00Z"),
     s3Uri = S3Uri("s3://my-data-lake/retail/daily/2025-05-26"),
     s3Client = s3Client,
 )
 // Resolves each .parquet file to its version at-or-before timestamp
 // Downloads with explicit versionId for reproducibility
-// env.snapshot contains resolved VersionSet with per-file versionIds
+// env.snapshot contains fully-resolved DatabaseEnvironmentSnapshot (timestamp + VersionSet)
 ```
 
 ### Typed SQL — cannot construct invalid SQL
@@ -132,7 +128,7 @@ val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
 
 - **DuckDB is the engine.** Customer data arrives as Parquet (local or S3) or DDL+INSERT. DuckDB validates and executes. No JDBC driver matrix.
 - **`DatabaseEnvironment.current`** — singleton reference used by typed SQL statements for validation. Set by factory methods via `activate()`.
-- **`DatabaseEnvironment.snapshot`** — optional provenance metadata. Non-null for S3-loaded environments (contains timestamp + resolved file versions). Null for filesystem/DDL-based environments.
+- **`DatabaseEnvironment.snapshot`** — optional provenance metadata. Non-null for S3-loaded environments (fully constructed with timestamp + resolved VersionSet). Null for filesystem/DDL-based environments.
 - **`fromS3` is `suspend`** — uses AWS S3 Kotlin SDK (suspend functions). Blocking I/O (`Files.createTempDirectory`, `Files.write`) wrapped in `withContext(Dispatchers.IO)`. Consistent with `agentio-core` concurrency pattern.
 - **Point-in-time S3 resolution** — `fromS3` uses `listObjectVersions` to resolve each parquet file to its version at-or-before the given timestamp. Downloads with explicit `versionId` for reproducibility. Pre-versioning objects (versionId="null") are included best-effort with `versionId = null` in the snapshot.
 - **`fromStatements` and `fromParquet` are non-suspend** — blocking JDBC. Callers wrap in `runBlocking` or `withContext(Dispatchers.IO)` if needed.
