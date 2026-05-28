@@ -204,19 +204,18 @@ io.github.mbbhalla.agentio.examples/
 │   └── server/OrchestrationMcpServers.kt, OrchestrationTools.kt
 └── text2sql/
     ├── Runner.kt
-    ├── data/RetailDatabase.kt, EmployeeDatabase.kt
-    ├── function/Text2SqlAgenticFunction.kt
-    └── server/Text2SqlMcpServer.kt, Text2SqlTools.kt
+    └── data/RetailDatabase.kt, EmployeeDatabase.kt
 ```
 
 ## Dependencies
 
 - `agentio-core`
+- `agentio-module-text2sql`
+- `agentio-module-data`
 - AWS SDK for Kotlin (Bedrock Runtime)
 - Model Context Protocol Kotlin SDK
 - Vavr
 - Kotlinx Serialization
-- DuckDB JDBC (for Text2SQL example)
 
 ## Build
 
