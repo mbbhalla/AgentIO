@@ -2,17 +2,21 @@ package io.github.mbbhalla.agentio.data.env
 
 import aws.sdk.kotlin.services.s3.S3Client
 import aws.sdk.kotlin.services.s3.model.GetObjectRequest
-import aws.sdk.kotlin.services.s3.model.ListObjectsV2Request
+import aws.sdk.kotlin.services.s3.model.ListObjectVersionsRequest
 import aws.smithy.kotlin.runtime.content.toByteArray
 import io.github.mbbhalla.agentio.core.common.generateList
 import io.github.mbbhalla.agentio.data.model.ColumnInfo
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.ColumnType
+import io.github.mbbhalla.agentio.data.model.DatabaseEnvironmentSnapshot
 import io.github.mbbhalla.agentio.data.model.Dataset
 import io.github.mbbhalla.agentio.data.model.ExplainResult
+import io.github.mbbhalla.agentio.data.model.S3ObjectKey
 import io.github.mbbhalla.agentio.data.model.S3Uri
 import io.github.mbbhalla.agentio.data.model.TableInfo
 import io.github.mbbhalla.agentio.data.model.TableName
+import io.github.mbbhalla.agentio.data.model.Version
+import io.github.mbbhalla.agentio.data.model.VersionSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Files
@@ -23,6 +27,7 @@ import java.sql.DriverManager
 class DuckDbDatabaseEnvironment private constructor(
     private val connection: Connection,
     private val tableMetadata: Map<TableName, TableInfo>,
+    override val snapshot: DatabaseEnvironmentSnapshot?,
 ) : DatabaseEnvironment() {
     override fun listTables(): Set<TableName> = tableMetadata.keys
 
@@ -74,20 +79,66 @@ class DuckDbDatabaseEnvironment private constructor(
                 ddl.forEach { stmt.execute(it) }
                 dml.forEach { stmt.execute(it) }
             }
-            val env = DuckDbDatabaseEnvironment(connection, tableMetadata.associateBy { it.name })
+            val env = DuckDbDatabaseEnvironment(connection, tableMetadata.associateBy { it.name }, snapshot = null)
             activate(env)
             return env
         }
 
         fun fromParquet(directory: Path): DuckDbDatabaseEnvironment {
-            Class.forName("org.duckdb.DuckDBDriver")
-            val connection = DriverManager.getConnection("jdbc:duckdb:")
-
             val parquetFiles =
                 directory.toFile().listFiles { f -> f.extension == "parquet" }
                     ?: throw IllegalArgumentException("Directory does not exist: $directory")
             require(parquetFiles.isNotEmpty()) { "No .parquet files found in: $directory" }
 
+            return loadParquetFiles(parquetFiles.toList(), snapshot = null)
+        }
+
+        suspend fun fromS3(
+            snapshot: DatabaseEnvironmentSnapshot,
+            s3Uri: S3Uri,
+            s3Client: S3Client,
+        ): DuckDbDatabaseEnvironment {
+            val tempDir =
+                withContext(Dispatchers.IO) {
+                    Files.createTempDirectory("agentio-parquet-${java.util.UUID.randomUUID()}")
+                }
+
+            val resolvedVersions = resolveVersionsAtTimestamp(snapshot.timestamp, s3Uri, s3Client)
+            require(resolvedVersions.isNotEmpty()) {
+                "No .parquet files found at ${s3Uri.value} as of ${snapshot.timestamp}"
+            }
+
+            resolvedVersions.forEach { version ->
+                val fileName = version.fileReference.value.substringAfterLast('/')
+                val localFile = tempDir.resolve(fileName)
+                s3Client.getObject(
+                    GetObjectRequest {
+                        bucket = s3Uri.bucket
+                        key = version.fileReference.value
+                        versionId = version.versionId
+                    },
+                ) { getResponse ->
+                    val bytes = getResponse.body?.toByteArray() ?: ByteArray(0)
+                    withContext(Dispatchers.IO) { Files.write(localFile, bytes) }
+                }
+            }
+
+            val versionSet = VersionSet(versions = resolvedVersions)
+            val resolvedSnapshot = snapshot.copy(versionSet = versionSet)
+
+            val parquetFiles =
+                tempDir.toFile().listFiles { f -> f.extension == "parquet" }?.toList()
+                    ?: emptyList()
+
+            return loadParquetFiles(parquetFiles, snapshot = resolvedSnapshot)
+        }
+
+        private fun loadParquetFiles(
+            parquetFiles: List<java.io.File>,
+            snapshot: DatabaseEnvironmentSnapshot?,
+        ): DuckDbDatabaseEnvironment {
+            Class.forName("org.duckdb.DuckDBDriver")
+            val connection = DriverManager.getConnection("jdbc:duckdb:")
             val tableMetadata = mutableMapOf<TableName, TableInfo>()
 
             connection.createStatement().use { stmt ->
@@ -106,65 +157,87 @@ class DuckDbDatabaseEnvironment private constructor(
                 }
             }
 
-            val env = DuckDbDatabaseEnvironment(connection, tableMetadata)
+            val env = DuckDbDatabaseEnvironment(connection, tableMetadata, snapshot = snapshot)
             activate(env)
             return env
         }
 
-        suspend fun fromS3(
+        private suspend fun resolveVersionsAtTimestamp(
+            timestamp: java.time.Instant,
             s3Uri: S3Uri,
             s3Client: S3Client,
-        ): DuckDbDatabaseEnvironment {
-            val tempDir =
-                withContext(Dispatchers.IO) {
-                    Files.createTempDirectory("agentio-parquet-${java.util.UUID.randomUUID()}")
-                }
+        ): Set<Version> {
+            val timestampEpoch = timestamp.epochSecond
 
-            val parquetKeys =
+            val allVersionResponses =
                 generateList(
                     seed =
-                        s3Client.listObjectsV2(
-                            ListObjectsV2Request {
+                        s3Client.listObjectVersions(
+                            ListObjectVersionsRequest {
                                 bucket = s3Uri.bucket
-                                prefix = s3Uri.prefix
+                                prefix = s3Uri.key.value
                             },
                         ),
                 ) { prev ->
                     if (prev.isTruncated == true) {
-                        s3Client.listObjectsV2(
-                            ListObjectsV2Request {
+                        s3Client.listObjectVersions(
+                            ListObjectVersionsRequest {
                                 bucket = s3Uri.bucket
-                                prefix = s3Uri.prefix
-                                continuationToken = prev.nextContinuationToken
+                                prefix = s3Uri.key.value
+                                keyMarker = prev.nextKeyMarker
+                                versionIdMarker = prev.nextVersionIdMarker
                             },
                         )
                     } else {
                         null
                     }
-                }.flatMap { response ->
-                    response.contents
-                        ?.filter { it.key?.endsWith(".parquet") == true }
-                        ?.mapNotNull { it.key }
-                        ?: emptyList()
                 }
 
-            require(parquetKeys.isNotEmpty()) { "No .parquet files found at: ${s3Uri.value}" }
+            val epoch0 =
+                aws.smithy.kotlin.runtime.time.Instant
+                    .fromEpochSeconds(0)
 
-            parquetKeys.forEach { key ->
-                val fileName = key.substringAfterLast('/')
-                val localFile = tempDir.resolve(fileName)
-                s3Client.getObject(
-                    GetObjectRequest {
-                        bucket = s3Uri.bucket
-                        this.key = key
-                    },
-                ) { getResponse ->
-                    val bytes = getResponse.body?.toByteArray() ?: ByteArray(0)
-                    withContext(Dispatchers.IO) { Files.write(localFile, bytes) }
-                }
-            }
+            val deleteMarkerKeys =
+                allVersionResponses
+                    .flatMap { it.deleteMarkers ?: emptyList() }
+                    .filter { marker ->
+                        marker.key?.endsWith(".parquet") == true &&
+                            marker.lastModified?.let { it.epochSeconds <= timestampEpoch } == true
+                    }.groupBy { it.key }
+                    .mapValues { (_, markers) ->
+                        markers.maxByOrNull { it.lastModified ?: epoch0 }
+                    }
 
-            return fromParquet(tempDir)
+            val candidateVersions =
+                allVersionResponses
+                    .asSequence()
+                    .flatMap { it.versions ?: emptyList() }
+                    .filter { obj ->
+                        obj.key?.endsWith(".parquet") == true &&
+                            obj.lastModified?.let { it.epochSeconds <= timestampEpoch } == true
+                    }.groupBy { it.key }
+                    .mapNotNull { (key, versions) ->
+                        val latest =
+                            versions.maxByOrNull {
+                                it.lastModified ?: epoch0
+                            } ?: return@mapNotNull null
+
+                        val deleteMarker = deleteMarkerKeys[key]
+                        if (deleteMarker != null) {
+                            val deleteTime = deleteMarker.lastModified
+                            val versionTime = latest.lastModified
+                            if (deleteTime != null && versionTime != null && deleteTime > versionTime) {
+                                return@mapNotNull null
+                            }
+                        }
+
+                        Version(
+                            fileReference = S3ObjectKey(key ?: return@mapNotNull null),
+                            versionId = latest.versionId?.takeIf { it != "null" },
+                        )
+                    }.toSet()
+
+            return candidateVersions
         }
 
         private fun inferColumns(

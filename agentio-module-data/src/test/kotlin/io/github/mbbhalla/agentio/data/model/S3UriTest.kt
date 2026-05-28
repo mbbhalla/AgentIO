@@ -4,32 +4,51 @@ import org.junit.jupiter.api.assertThrows
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+class S3ObjectKeyTest {
+    @Test
+    fun `valid key`() {
+        val key = S3ObjectKey("data/orders.parquet")
+        assertEquals("data/orders.parquet", key.value)
+    }
+
+    @Test
+    fun `rejects blank key`() {
+        assertThrows<IllegalArgumentException> { S3ObjectKey("") }
+        assertThrows<IllegalArgumentException> { S3ObjectKey("   ") }
+    }
+
+    @Test
+    fun `rejects leading slash`() {
+        assertThrows<IllegalArgumentException> { S3ObjectKey("/data/orders.parquet") }
+    }
+}
+
 class S3UriTest {
     @Test
     fun `valid S3 URI parses bucket and prefix`() {
         val uri = S3Uri("s3://my-bucket/path/to/data")
         assertEquals("my-bucket", uri.bucket)
-        assertEquals("path/to/data", uri.prefix)
+        assertEquals("path/to/data", uri.key.value)
     }
 
     @Test
     fun `valid S3 URI with single file`() {
         val uri = S3Uri("s3://my-bucket/orders.parquet")
         assertEquals("my-bucket", uri.bucket)
-        assertEquals("orders.parquet", uri.prefix)
+        assertEquals("orders.parquet", uri.key.value)
     }
 
     @Test
     fun `valid S3 URI with deep prefix`() {
         val uri = S3Uri("s3://data-lake-prod/retail/2025/05/26")
         assertEquals("data-lake-prod", uri.bucket)
-        assertEquals("retail/2025/05/26", uri.prefix)
+        assertEquals("retail/2025/05/26", uri.key.value)
     }
 
     @Test
     fun `trailing slash is trimmed from prefix`() {
         val uri = S3Uri("s3://my-bucket/path/to/data/")
-        assertEquals("path/to/data", uri.prefix)
+        assertEquals("path/to/data", uri.key.value)
     }
 
     @Test

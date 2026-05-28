@@ -11,7 +11,8 @@ Every data type enforces validity in its `init` block. If an object exists, it i
 | `TableName` | Matches `[a-z][a-z0-9_]*` |
 | `ColumnName` | Matches `[a-z][a-z0-9_]*` |
 | `ColumnType` | Enum — only valid DB types |
-| `S3Uri` | Valid `s3://bucket/prefix` format |
+| `S3ObjectKey` | Non-blank, no leading `/` |
+| `S3Uri` | Valid `s3://bucket/key` format |
 | `MVELExpression` | Compiles via `MVEL.compileExpression()` — syntactically valid |
 | `SelectSqlStatement` | EXPLAIN passes + plan is SELECT |
 | `InsertSqlStatement` | EXPLAIN passes + plan is INSERT |
@@ -24,18 +25,13 @@ Every data type enforces validity in its `init` block. If an object exists, it i
 ```
 io.github.mbbhalla.agentio.data/
 ├── model/
-│   ├── TableName.kt        — validated table name
-│   ├── ColumnName.kt       — validated column name
-│   ├── ColumnType.kt       — enum + fromTypeName() factory
-│   ├── TableInfo.kt        — TableInfo, ColumnInfo, ForeignKeyRef
+│   ├── DataModels.kt       — TableName, ColumnName, ColumnType, TableInfo, ColumnInfo, ForeignKeyRef, Dataset, DataValue
+│   ├── S3Models.kt         — S3ObjectKey, S3Uri, Version, VersionSet, DatabaseEnvironmentSnapshot
 │   ├── ExplainResult.kt    — sealed: Success | Failure
-│   ├── DataValue.kt        — sealed: String | Long | Double | Timestamp | Boolean | Null
-│   ├── Dataset.kt          — typed result set with ColumnName-based access + MVEL evaluation
-│   ├── MVELExpression.kt   — validated MVEL expression (compiled at construction)
-│   └── S3Uri.kt            — validated S3 URI with bucket/prefix extraction
+│   └── MVELExpression.kt   — validated MVEL expression (compiled at construction)
 └── env/
-    ├── DatabaseEnvironment.kt        — abstract class, companion holds active env
-    ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet() + fromS3()
+    ├── DatabaseEnvironment.kt        — abstract class with snapshot, companion holds active env
+    ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet() + fromS3(snapshot)
     └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
 ```
 
@@ -68,16 +64,22 @@ val env = DuckDbDatabaseEnvironment.fromParquet(Path("/data/2025-05-26/"))
 // Schema inferred from Parquet metadata
 ```
 
-### Create from Parquet files (S3)
+### Create from Parquet files (S3 — point-in-time snapshot)
 
 ```kotlin
 val s3Client = S3Client { region = "us-west-2" }
+val snapshot = DatabaseEnvironmentSnapshot(
+    timestamp = Instant.parse("2026-05-28T10:00:00Z"),
+    versionSet = null, // resolved during load
+)
 val env = DuckDbDatabaseEnvironment.fromS3(
+    snapshot = snapshot,
     s3Uri = S3Uri("s3://my-data-lake/retail/daily/2025-05-26"),
     s3Client = s3Client,
 )
-// Downloads .parquet files to temp dir, loads into DuckDB
-// Pagination handled automatically for prefixes with >1000 files
+// Resolves each .parquet file to its version at-or-before timestamp
+// Downloads with explicit versionId for reproducibility
+// env.snapshot contains resolved VersionSet with per-file versionIds
 ```
 
 ### Typed SQL — cannot construct invalid SQL
@@ -130,7 +132,9 @@ val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
 
 - **DuckDB is the engine.** Customer data arrives as Parquet (local or S3) or DDL+INSERT. DuckDB validates and executes. No JDBC driver matrix.
 - **`DatabaseEnvironment.current`** — singleton reference used by typed SQL statements for validation. Set by factory methods via `activate()`.
+- **`DatabaseEnvironment.snapshot`** — optional provenance metadata. Non-null for S3-loaded environments (contains timestamp + resolved file versions). Null for filesystem/DDL-based environments.
 - **`fromS3` is `suspend`** — uses AWS S3 Kotlin SDK (suspend functions). Blocking I/O (`Files.createTempDirectory`, `Files.write`) wrapped in `withContext(Dispatchers.IO)`. Consistent with `agentio-core` concurrency pattern.
+- **Point-in-time S3 resolution** — `fromS3` uses `listObjectVersions` to resolve each parquet file to its version at-or-before the given timestamp. Downloads with explicit `versionId` for reproducibility. Pre-versioning objects (versionId="null") are included best-effort with `versionId = null` in the snapshot.
 - **`fromStatements` and `fromParquet` are non-suspend** — blocking JDBC. Callers wrap in `runBlocking` or `withContext(Dispatchers.IO)` if needed.
 - **Statement type detection** — uses DuckDB EXPLAIN plan's root operator node. Tested against DuckDB 1.5.2.0; version upgrades that change plan format will fail tests immediately.
 - **No additional SQL parser dependency** — DuckDB itself is both parser and validator. EXPLAIN proves correctness.

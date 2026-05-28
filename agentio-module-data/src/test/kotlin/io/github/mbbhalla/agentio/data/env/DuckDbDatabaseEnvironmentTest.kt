@@ -2,13 +2,16 @@ package io.github.mbbhalla.agentio.data.env
 
 import aws.sdk.kotlin.services.s3.S3Client
 import aws.sdk.kotlin.services.s3.model.GetObjectResponse
-import aws.sdk.kotlin.services.s3.model.ListObjectsV2Response
+import aws.sdk.kotlin.services.s3.model.ListObjectVersionsResponse
+import aws.sdk.kotlin.services.s3.model.ObjectVersion
 import aws.smithy.kotlin.runtime.content.ByteStream
 import io.github.mbbhalla.agentio.data.model.ColumnInfo
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.ColumnType
 import io.github.mbbhalla.agentio.data.model.DataValue
+import io.github.mbbhalla.agentio.data.model.DatabaseEnvironmentSnapshot
 import io.github.mbbhalla.agentio.data.model.ExplainResult
+import io.github.mbbhalla.agentio.data.model.S3ObjectKey
 import io.github.mbbhalla.agentio.data.model.S3Uri
 import io.github.mbbhalla.agentio.data.model.TableInfo
 import io.github.mbbhalla.agentio.data.model.TableName
@@ -22,11 +25,12 @@ import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import java.sql.DriverManager
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import aws.sdk.kotlin.services.s3.model.Object as S3Object
+import aws.smithy.kotlin.runtime.time.Instant as AwsInstant
 
 class DuckDbDatabaseEnvironmentTest {
     @Nested
@@ -148,6 +152,11 @@ class DuckDbDatabaseEnvironmentTest {
         }
 
         @Test
+        fun `snapshot is null for fromStatements`() {
+            assertEquals(null, env.snapshot)
+        }
+
+        @Test
         fun `invalid DDL prevents environment creation`() {
             assertThrows<Exception> {
                 DuckDbDatabaseEnvironment.fromStatements(
@@ -212,6 +221,13 @@ class DuckDbDatabaseEnvironmentTest {
         }
 
         @Test
+        fun `snapshot is null for fromParquet`() {
+            createParquetFile("items")
+            val env = DuckDbDatabaseEnvironment.fromParquet(tempDir)
+            assertEquals(null, env.snapshot)
+        }
+
+        @Test
         fun `rejects empty directory`() {
             assertThrows<IllegalArgumentException> {
                 DuckDbDatabaseEnvironment.fromParquet(tempDir)
@@ -242,6 +258,11 @@ class DuckDbDatabaseEnvironmentTest {
         @TempDir
         lateinit var tempDir: Path
 
+        private val testTimestamp = Instant.parse("2026-01-15T12:00:00Z")
+        private val beforeTimestamp = AwsInstant.fromEpochSeconds(testTimestamp.epochSecond - 3600)
+
+        private fun snapshot() = DatabaseEnvironmentSnapshot(timestamp = testTimestamp, versionSet = null)
+
         @Test
         fun `loads parquet files from mocked S3`() =
             runBlocking {
@@ -253,6 +274,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(),
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -277,6 +299,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(),
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -295,6 +318,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(),
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -314,6 +338,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 assertThrows<IllegalArgumentException> {
                     DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(),
                         s3Uri = S3Uri("s3://my-bucket/empty-prefix"),
                         s3Client = s3Client,
                     )
@@ -335,6 +360,7 @@ class DuckDbDatabaseEnvironmentTest {
 
                 val env =
                     DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(),
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
@@ -342,12 +368,44 @@ class DuckDbDatabaseEnvironmentTest {
                 assertEquals(setOf(TableName("orders")), env.listTables())
             }
 
+        @Test
+        fun `snapshot contains resolved version set`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockS3Client(
+                        files = mapOf("data/orders.parquet" to parquetBytes),
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                val resolved = env.snapshot
+                assertEquals(testTimestamp, resolved?.timestamp)
+                assertEquals(1, resolved?.versionSet?.versions?.size)
+                val version = resolved?.versionSet?.versions?.first()
+                assertEquals(S3ObjectKey("data/orders.parquet"), version?.fileReference)
+                assertEquals("v1", version?.versionId)
+            }
+
         private fun mockS3Client(files: Map<String, ByteArray>): S3Client {
             val s3Client = mockk<S3Client>()
 
-            coEvery { s3Client.listObjectsV2(any<aws.sdk.kotlin.services.s3.model.ListObjectsV2Request>()) } returns
-                ListObjectsV2Response {
-                    contents = files.keys.map { key -> S3Object { this.key = key } }
+            coEvery { s3Client.listObjectVersions(any<aws.sdk.kotlin.services.s3.model.ListObjectVersionsRequest>()) } returns
+                ListObjectVersionsResponse {
+                    versions =
+                        files.keys.map { key ->
+                            ObjectVersion {
+                                this.key = key
+                                this.versionId = "v1"
+                                this.lastModified = beforeTimestamp
+                            }
+                        }
+                    isTruncated = false
                 }
 
             files.forEach { (key, bytes) ->
