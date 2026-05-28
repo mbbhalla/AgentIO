@@ -9,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class DataValueTest {
-
     @Test
     fun `null maps to NullValue`() {
         assertEquals(DataValue.NullValue, DataValue.from(null))
@@ -112,9 +111,10 @@ class DataValueTest {
 
     @Test
     fun `unknown type maps to StringValue via toString`() {
-        val custom = object {
-            override fun toString() = "custom-object"
-        }
+        val custom =
+            object {
+                override fun toString() = "custom-object"
+            }
         val result = DataValue.from(custom)
         assertIs<DataValue.StringValue>(result)
         assertEquals("custom-object", result.value)

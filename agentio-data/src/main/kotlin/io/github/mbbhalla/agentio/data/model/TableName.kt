@@ -1,6 +1,8 @@
 package io.github.mbbhalla.agentio.data.model
 
-data class TableName(val value: String) {
+data class TableName(
+    val value: String,
+) {
     init {
         require(value.matches(VALID_PATTERN)) { "Invalid table name: '$value'" }
     }

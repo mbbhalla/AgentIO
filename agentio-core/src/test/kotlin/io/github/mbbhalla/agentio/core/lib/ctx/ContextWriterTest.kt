@@ -13,14 +13,15 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 internal class ContextWriterTest {
-
     @Serializable
     data class TestInstruction(
         private val id: String,
         private val instruction: String,
     ) : Instructible.WithInstruction {
         override fun instructionId(): String = id
+
         override fun instruction(): String = instruction
+
         override fun systemInstruction(): String? = null
     }
 
@@ -65,12 +66,16 @@ internal class ContextWriterTest {
         var writtenInput: Instructible.WithInstruction? = null
         var writtenConversation: Conversation? = null
 
-        val customWriter = object : ContextWriter {
-            override fun <I : Instructible.WithInstruction> write(input: I, conversation: Conversation) {
-                writtenInput = input
-                writtenConversation = conversation
+        val customWriter =
+            object : ContextWriter {
+                override fun <I : Instructible.WithInstruction> write(
+                    input: I,
+                    conversation: Conversation,
+                ) {
+                    writtenInput = input
+                    writtenConversation = conversation
+                }
             }
-        }
 
         val testInput = TestInstruction("test-3", "analyze data")
         val conversation = Conversation.initialize(listOf("analysis request"))

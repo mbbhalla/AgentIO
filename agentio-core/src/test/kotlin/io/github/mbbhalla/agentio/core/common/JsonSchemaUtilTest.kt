@@ -1,5 +1,7 @@
 package io.github.mbbhalla.agentio.core.common
 
+import jakarta.validation.constraints.Email
+import jakarta.validation.constraints.Pattern
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
@@ -9,11 +11,8 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import jakarta.validation.constraints.Email
-import jakarta.validation.constraints.Pattern
 
 internal class JsonSchemaUtilTest {
-
     @Serializable
     @Title("Test Person")
     @Description("A test person data class")
@@ -22,7 +21,6 @@ internal class JsonSchemaUtilTest {
         @field:Pattern(regexp = "^Z[a-zA-Z]+$")
         val name: String,
         val age: Int,
-
         @field:Email
         val email: String?,
         val isActive: Boolean = true,
@@ -201,18 +199,19 @@ internal class JsonSchemaUtilTest {
     @Test
     fun `validateJsonWithSchema should validate correct JSON`() {
         val validJson = JsonString("""{"name": "John", "age": 30}""")
-        val schema = JsonString(
-            """
-            {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "age": {"type": "integer"}
-                },
-                "required": ["name", "age"]
-            }
-            """.trimIndent(),
-        )
+        val schema =
+            JsonString(
+                """
+                {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"}
+                    },
+                    "required": ["name", "age"]
+                }
+                """.trimIndent(),
+            )
 
         val errors = JsonSchemaUtil.validateJsonWithSchema(validJson, schema)
         assertTrue(errors.isEmpty())
@@ -221,18 +220,19 @@ internal class JsonSchemaUtilTest {
     @Test
     fun `validateJsonWithSchema should return errors for invalid JSON`() {
         val invalidJson = JsonString("""{"name": "John", "age": "thirty"}""")
-        val schema = JsonString(
-            """
-            {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "age": {"type": "integer"}
-                },
-                "required": ["name", "age"]
-            }
-            """.trimIndent(),
-        )
+        val schema =
+            JsonString(
+                """
+                {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"}
+                    },
+                    "required": ["name", "age"]
+                }
+                """.trimIndent(),
+            )
 
         val errors = JsonSchemaUtil.validateJsonWithSchema(invalidJson, schema)
         assertFalse(errors.isEmpty())
@@ -242,18 +242,19 @@ internal class JsonSchemaUtilTest {
     @Test
     fun `validateJsonWithSchema should return errors for missing required fields`() {
         val incompleteJson = JsonString("""{"name": "John"}""")
-        val schema = JsonString(
-            """
-            {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "age": {"type": "integer"}
-                },
-                "required": ["name", "age"]
-            }
-            """.trimIndent(),
-        )
+        val schema =
+            JsonString(
+                """
+                {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "age": {"type": "integer"}
+                    },
+                    "required": ["name", "age"]
+                }
+                """.trimIndent(),
+            )
 
         val errors = JsonSchemaUtil.validateJsonWithSchema(incompleteJson, schema)
         assertFalse(errors.isEmpty())
@@ -318,7 +319,10 @@ internal class JsonSchemaUtilTest {
     fun `jacksonObjectMapper should have correct configuration`() {
         val mapper = JsonSchemaUtil.jacksonObjectMapper
 
-        data class TestObject(val nonNull: String, val nullable: String?)
+        data class TestObject(
+            val nonNull: String,
+            val nullable: String?,
+        )
         val testObj = TestObject("value", null)
 
         val jsonString = mapper.writeValueAsString(testObj)
@@ -332,8 +336,13 @@ internal class JsonSchemaUtilTest {
     @Test
     fun `generateSchemaJsonObject should handle unknown primitive type with fallback`() {
         // Create a data class with a custom type that's not in the standard primitive list
-        data class CustomType(val value: String)
-        data class TestWithCustomType(val customField: CustomType)
+        data class CustomType(
+            val value: String,
+        )
+
+        data class TestWithCustomType(
+            val customField: CustomType,
+        )
 
         val nonNullables = mutableSetOf<String>()
         val schema = JsonSchemaUtil.generateSchemaJsonObject(TestWithCustomType::class, nonNullables)
@@ -347,8 +356,14 @@ internal class JsonSchemaUtilTest {
     // Test for lines 160-163: else branch for unknown item types in collections
     @Test
     fun `generateSchemaJsonObject should handle collections with custom data class items`() {
-        data class CustomItem(val id: Int, val name: String)
-        data class TestWithCustomList(val items: List<CustomItem>)
+        data class CustomItem(
+            val id: Int,
+            val name: String,
+        )
+
+        data class TestWithCustomList(
+            val items: List<CustomItem>,
+        )
 
         val nonNullables = mutableSetOf<String>()
         val schema = JsonSchemaUtil.generateSchemaJsonObject(TestWithCustomList::class, nonNullables)
@@ -378,8 +393,14 @@ internal class JsonSchemaUtilTest {
     // Test for lines 180-185: Collections with nested object schema generation
     @Test
     fun `generateSchemaJsonObject should handle Set with custom data class items`() {
-        data class Address(val street: String, val city: String)
-        data class TestWithCustomSet(val addresses: Set<Address>)
+        data class Address(
+            val street: String,
+            val city: String,
+        )
+
+        data class TestWithCustomSet(
+            val addresses: Set<Address>,
+        )
 
         val nonNullables = mutableSetOf<String>()
         val schema = JsonSchemaUtil.generateSchemaJsonObject(TestWithCustomSet::class, nonNullables)
@@ -440,7 +461,9 @@ internal class JsonSchemaUtilTest {
     // Test for Boolean in collections
     @Test
     fun `generateSchemaJsonObject should handle collections with Boolean items`() {
-        data class TestWithBooleanList(val flags: List<Boolean>)
+        data class TestWithBooleanList(
+            val flags: List<Boolean>,
+        )
 
         val nonNullables = mutableSetOf<String>()
         val schema = JsonSchemaUtil.generateSchemaJsonObject(TestWithBooleanList::class, nonNullables)

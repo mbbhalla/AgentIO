@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
 internal class IndexedConversationTest {
-
     private val conversation = Conversation.initialize(listOf("hello"))
 
     @Test
@@ -37,9 +36,10 @@ internal class IndexedConversationTest {
     @Test
     fun `next chain should produce sequential turn numbers`() {
         val seed = IndexedConversation(0, conversation)
-        val turns = generateSequence(seed) {
-            it.next(IndexedConversation(turnNumber = 0, conversation = conversation))
-        }.take(5).toList()
+        val turns =
+            generateSequence(seed) {
+                it.next(IndexedConversation(turnNumber = 0, conversation = conversation))
+            }.take(5).toList()
 
         assertEquals(listOf(0, 1, 2, 3, 4), turns.map { it.turnNumber })
     }

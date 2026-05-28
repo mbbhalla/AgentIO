@@ -10,15 +10,18 @@ import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 abstract class AbstractMcpServer {
     suspend fun pipedStreamsExchange(): PipedStreamsExchange {
         val pipedStreamsExchange = PipedStreamsExchange.Provider.buildStreams()
-        val server = Server(
-            serverInfo = Implementation(
-                name = name(),
-                version = version(),
-            ),
-            options = ServerOptions(
-                capabilities = capabilities(),
-            ),
-        )
+        val server =
+            Server(
+                serverInfo =
+                    Implementation(
+                        name = name(),
+                        version = version(),
+                    ),
+                options =
+                    ServerOptions(
+                        capabilities = capabilities(),
+                    ),
+            )
         server.addTools(
             tools().toList(),
         )

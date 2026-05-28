@@ -26,16 +26,12 @@ data class ExperimentCellConfig(
 data class ExperimentSuiteConfig(
     /** Which experiment types to run. */
     val experimentTypes: List<ExperimentType>,
-
     /** Which models to evaluate. */
     val models: List<LLM>,
-
     /** Number of attempts per cell (50 for the full run). */
     val numIterations: Int,
-
     /** Max concurrent Bedrock calls per cell. */
     val maxParallelism: Int,
-
     /** AWS region for Bedrock client. */
     val bedrockRegion: String = "us-west-2",
 ) {

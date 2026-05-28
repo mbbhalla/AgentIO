@@ -12,9 +12,9 @@ import io.github.mbbhalla.agentio.core.model.AgentConfiguration
 import io.github.mbbhalla.agentio.core.model.LLM
 import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
-import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.client.StdioClientTransport
+import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.io.asSink
@@ -30,11 +30,11 @@ import kotlin.time.Duration.Companion.seconds
 internal class HackerNewsAgenticFunction(
     agentConfiguration: AgentConfiguration,
 ) : AbstractAgenticFunction<
-    HackerNewsAgenticFunction.HackerNewsAgenticFunctionInput,
-    HackerNewsAgenticFunction.HackerNewsAgenticFunctionOutput,
+        HackerNewsAgenticFunction.HackerNewsAgenticFunctionInput,
+        HackerNewsAgenticFunction.HackerNewsAgenticFunctionOutput,
     >(
-    agentConfiguration,
-) {
+        agentConfiguration,
+    ) {
     @Serializable
     data class HackerNewsAgenticFunctionInput(
         @field:Description("News topic")
@@ -42,9 +42,10 @@ internal class HackerNewsAgenticFunction(
     ) : Instructible.WithInstruction {
         override fun instructionId() = "ExampleId"
 
-        override fun instruction() = """
+        override fun instruction() =
+            """
             Find the latest news on this topic: '$value'
-        """.trimIndent()
+            """.trimIndent()
 
         override fun systemInstruction(): String? = null
     }
@@ -56,6 +57,7 @@ internal class HackerNewsAgenticFunction(
     )
 
     override fun getInputKClass() = HackerNewsAgenticFunctionInput::class
+
     override fun getOutputKClass() = HackerNewsAgenticFunctionOutput::class
 }
 
@@ -71,46 +73,54 @@ internal object HackerNewsAgenticFunctionProvider {
         mcpServerProcess: String,
     ): HackerNewsAgenticFunction {
         val mcpClient = Client(clientInfo = Implementation(name = "mcp_client", version = "1.0.0"))
-        val process = withContext(Dispatchers.IO) {
-            ProcessBuilder(mcpServerProcess).start()
-        }
-        val transport = StdioClientTransport(
-            input = process.inputStream.asSource().buffered(),
-            output = process.outputStream.asSink().buffered(),
-        )
+        val process =
+            withContext(Dispatchers.IO) {
+                ProcessBuilder(mcpServerProcess).start()
+            }
+        val transport =
+            StdioClientTransport(
+                input = process.inputStream.asSource().buffered(),
+                output = process.outputStream.asSink().buffered(),
+            )
         mcpClient.connect(transport)
 
         return HackerNewsAgenticFunction(
             AgentConfiguration(
                 agentId = agentId,
-                languageModelParameters = LanguageModelParameters(
-                    llm = LLM.ANTHROPIC_CLAUDE_OPUS_4_5_V1_CROSS_REGION_INFERENCE,
-                    temperature = Temperature(TEMPERATURE),
-                ),
-                bedrockRuntimeClient = BedrockRuntimeClient {
-                    this.region = "us-west-2"
-                    this.httpClient {
-                        // Converse API takes more than default timeout of 60s
-                        socketReadTimeout = 15.minutes
-                    }
-                },
-                toolsProvider = McpClients(
-                    set = setOf(
-                        NamedClient(
-                            name = "mcp1",
-                            client = mcpClient,
-                            deniedTools = emptySet(),
-                        ),
+                languageModelParameters =
+                    LanguageModelParameters(
+                        llm = LLM.ANTHROPIC_CLAUDE_OPUS_4_5_V1_CROSS_REGION_INFERENCE,
+                        temperature = Temperature(TEMPERATURE),
                     ),
-                ),
-                systemPrompt = """
+                bedrockRuntimeClient =
+                    BedrockRuntimeClient {
+                        this.region = "us-west-2"
+                        this.httpClient {
+                            // Converse API takes more than default timeout of 60s
+                            socketReadTimeout = 15.minutes
+                        }
+                    },
+                toolsProvider =
+                    McpClients(
+                        set =
+                            setOf(
+                                NamedClient(
+                                    name = "mcp1",
+                                    client = mcpClient,
+                                    deniedTools = emptySet(),
+                                ),
+                            ),
+                    ),
+                systemPrompt =
+                    """
                     Now (in UTC) = '${
-                    Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT)
-                }'
-                """.trimIndent(),
-                contextMemoryManagers = ContextMemoryManagers(
-                    value = listOf(NoOperationContextMemoryManager),
-                ),
+                        Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT)
+                    }'
+                    """.trimIndent(),
+                contextMemoryManagers =
+                    ContextMemoryManagers(
+                        value = listOf(NoOperationContextMemoryManager),
+                    ),
                 delayBetweenTurns = 0.seconds,
                 problemDomain = "Hacker News",
             ),

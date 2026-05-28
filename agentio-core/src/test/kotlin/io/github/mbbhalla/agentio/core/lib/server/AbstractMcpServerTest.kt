@@ -1,46 +1,48 @@
 package io.github.mbbhalla.agentio.core.lib.server
 
+import io.modelcontextprotocol.kotlin.sdk.server.RegisteredTool
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.types.Tool
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
-import io.modelcontextprotocol.kotlin.sdk.server.RegisteredTool
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
 
 internal class AbstractMcpServerTest {
-
     private class TestMcpServer : AbstractMcpServer() {
-        override fun tools(): Set<RegisteredTool> {
-            return setOf(
+        override fun tools(): Set<RegisteredTool> =
+            setOf(
                 RegisteredTool(
-                    tool = Tool(
-                        name = "test_tool",
-                        inputSchema = ToolSchema(
-                            properties = kotlinx.serialization.json.buildJsonObject {},
-                            required = emptyList(),
+                    tool =
+                        Tool(
+                            name = "test_tool",
+                            inputSchema =
+                                ToolSchema(
+                                    properties = kotlinx.serialization.json.buildJsonObject {},
+                                    required = emptyList(),
+                                ),
+                            description = "A test tool",
                         ),
-                        description = "A test tool",
-                    ),
                 ) { _ ->
                     io.modelcontextprotocol.kotlin.sdk.types.CallToolResult(
-                        content = listOf(
-                            io.modelcontextprotocol.kotlin.sdk.types.TextContent("Test response"),
-                        ),
+                        content =
+                            listOf(
+                                io.modelcontextprotocol.kotlin.sdk.types
+                                    .TextContent("Test response"),
+                            ),
                         isError = false,
                     )
                 },
             )
-        }
 
-        override fun capabilities(): ServerCapabilities {
-            return ServerCapabilities(
-                tools = ServerCapabilities.Tools(
-                    listChanged = true,
-                ),
+        override fun capabilities(): ServerCapabilities =
+            ServerCapabilities(
+                tools =
+                    ServerCapabilities.Tools(
+                        listChanged = true,
+                    ),
             )
-        }
 
         override fun name(): String = "TestServer"
 
@@ -50,13 +52,13 @@ internal class AbstractMcpServerTest {
     private class EmptyMcpServer : AbstractMcpServer() {
         override fun tools(): Set<RegisteredTool> = emptySet()
 
-        override fun capabilities(): ServerCapabilities {
-            return ServerCapabilities(
-                tools = ServerCapabilities.Tools(
-                    listChanged = true,
-                ),
+        override fun capabilities(): ServerCapabilities =
+            ServerCapabilities(
+                tools =
+                    ServerCapabilities.Tools(
+                        listChanged = true,
+                    ),
             )
-        }
 
         override fun name(): String = "EmptyServer"
 
@@ -64,106 +66,117 @@ internal class AbstractMcpServerTest {
     }
 
     @Test
-    fun `should create server with tools and capabilities`() = runBlocking {
-        // Given
-        val server = TestMcpServer()
+    fun `should create server with tools and capabilities`() =
+        runBlocking {
+            // Given
+            val server = TestMcpServer()
 
-        // When
-        val pipedStreamsExchange = server.pipedStreamsExchange()
+            // When
+            val pipedStreamsExchange = server.pipedStreamsExchange()
 
-        // Then
-        assertNotNull(pipedStreamsExchange)
-        assertNotNull(pipedStreamsExchange.stdioServerTransport())
-        assertNotNull(pipedStreamsExchange.stdioClientTransport())
+            // Then
+            assertNotNull(pipedStreamsExchange)
+            assertNotNull(pipedStreamsExchange.stdioServerTransport())
+            assertNotNull(pipedStreamsExchange.stdioClientTransport())
 
-        // Verify server properties
-        assertEquals("TestServer", server.name())
-        assertEquals("1.0.0", server.version())
-        assertEquals(1, server.tools().size)
+            // Verify server properties
+            assertEquals("TestServer", server.name())
+            assertEquals("1.0.0", server.version())
+            assertEquals(1, server.tools().size)
 
-        val tool = server.tools().first()
-        assertEquals("test_tool", tool.tool.name)
-        assertEquals("A test tool", tool.tool.description)
+            val tool = server.tools().first()
+            assertEquals("test_tool", tool.tool.name)
+            assertEquals("A test tool", tool.tool.description)
 
-        val capabilities = server.capabilities()
-        assertNotNull(capabilities.tools)
-        assertEquals(true, capabilities.tools?.listChanged)
-    }
+            val capabilities = server.capabilities()
+            assertNotNull(capabilities.tools)
+            assertEquals(true, capabilities.tools?.listChanged)
+        }
 
     @Test
-    fun `should create server with empty tools`() = runBlocking {
-        // Given
-        val server = EmptyMcpServer()
+    fun `should create server with empty tools`() =
+        runBlocking {
+            // Given
+            val server = EmptyMcpServer()
 
-        // When
-        val pipedStreamsExchange = server.pipedStreamsExchange()
+            // When
+            val pipedStreamsExchange = server.pipedStreamsExchange()
 
-        // Then
-        assertNotNull(pipedStreamsExchange)
+            // Then
+            assertNotNull(pipedStreamsExchange)
 
-        // Verify server properties
-        assertEquals("EmptyServer", server.name())
-        assertEquals("0.1.0", server.version())
-        assertEquals(0, server.tools().size)
+            // Verify server properties
+            assertEquals("EmptyServer", server.name())
+            assertEquals("0.1.0", server.version())
+            assertEquals(0, server.tools().size)
 
-        val capabilities = server.capabilities()
-        assertNotNull(capabilities)
-    }
+            val capabilities = server.capabilities()
+            assertNotNull(capabilities)
+        }
 
     @Test
     fun `should handle multiple tools`() {
         // Given
-        val multiToolServer = object : AbstractMcpServer() {
-            override fun tools(): Set<RegisteredTool> {
-                return setOf(
-                    RegisteredTool(
-                        tool = Tool(
-                            name = "tool1",
-                            inputSchema = ToolSchema(
-                                properties = kotlinx.serialization.json.buildJsonObject {},
-                                required = emptyList(),
-                            ),
-                            description = "First tool",
-                        ),
-                    ) { _ ->
-                        io.modelcontextprotocol.kotlin.sdk.types.CallToolResult(
-                            content = listOf(
-                                io.modelcontextprotocol.kotlin.sdk.types.TextContent("Tool1 response"),
-                            ),
-                            isError = false,
-                        )
-                    },
-                    RegisteredTool(
-                        tool = Tool(
-                            name = "tool2",
-                            inputSchema = ToolSchema(
-                                properties = kotlinx.serialization.json.buildJsonObject {},
-                                required = emptyList(),
-                            ),
-                            description = "Second tool",
-                        ),
-                    ) { _ ->
-                        io.modelcontextprotocol.kotlin.sdk.types.CallToolResult(
-                            content = listOf(
-                                io.modelcontextprotocol.kotlin.sdk.types.TextContent("Tool2 response"),
-                            ),
-                            isError = false,
-                        )
-                    },
-                )
-            }
+        val multiToolServer =
+            object : AbstractMcpServer() {
+                override fun tools(): Set<RegisteredTool> =
+                    setOf(
+                        RegisteredTool(
+                            tool =
+                                Tool(
+                                    name = "tool1",
+                                    inputSchema =
+                                        ToolSchema(
+                                            properties = kotlinx.serialization.json.buildJsonObject {},
+                                            required = emptyList(),
+                                        ),
+                                    description = "First tool",
+                                ),
+                        ) { _ ->
+                            io.modelcontextprotocol.kotlin.sdk.types.CallToolResult(
+                                content =
+                                    listOf(
+                                        io.modelcontextprotocol.kotlin.sdk.types
+                                            .TextContent("Tool1 response"),
+                                    ),
+                                isError = false,
+                            )
+                        },
+                        RegisteredTool(
+                            tool =
+                                Tool(
+                                    name = "tool2",
+                                    inputSchema =
+                                        ToolSchema(
+                                            properties = kotlinx.serialization.json.buildJsonObject {},
+                                            required = emptyList(),
+                                        ),
+                                    description = "Second tool",
+                                ),
+                        ) { _ ->
+                            io.modelcontextprotocol.kotlin.sdk.types.CallToolResult(
+                                content =
+                                    listOf(
+                                        io.modelcontextprotocol.kotlin.sdk.types
+                                            .TextContent("Tool2 response"),
+                                    ),
+                                isError = false,
+                            )
+                        },
+                    )
 
-            override fun capabilities(): ServerCapabilities {
-                return ServerCapabilities(
-                    tools = ServerCapabilities.Tools(
-                        listChanged = false,
-                    ),
-                )
-            }
+                override fun capabilities(): ServerCapabilities =
+                    ServerCapabilities(
+                        tools =
+                            ServerCapabilities.Tools(
+                                listChanged = false,
+                            ),
+                    )
 
-            override fun name(): String = "MultiToolServer"
-            override fun version(): String = "2.0.0"
-        }
+                override fun name(): String = "MultiToolServer"
+
+                override fun version(): String = "2.0.0"
+            }
 
         // When & Then
         assertEquals(2, multiToolServer.tools().size)
@@ -180,24 +193,27 @@ internal class AbstractMcpServerTest {
     @Test
     fun `should handle different server capabilities`() {
         // Given
-        val advancedServer = object : AbstractMcpServer() {
-            override fun tools(): Set<RegisteredTool> = emptySet()
+        val advancedServer =
+            object : AbstractMcpServer() {
+                override fun tools(): Set<RegisteredTool> = emptySet()
 
-            override fun capabilities(): ServerCapabilities {
-                return ServerCapabilities(
-                    tools = ServerCapabilities.Tools(
-                        listChanged = true,
-                    ),
-                    resources = ServerCapabilities.Resources(
-                        subscribe = true,
-                        listChanged = false,
-                    ),
-                )
+                override fun capabilities(): ServerCapabilities =
+                    ServerCapabilities(
+                        tools =
+                            ServerCapabilities.Tools(
+                                listChanged = true,
+                            ),
+                        resources =
+                            ServerCapabilities.Resources(
+                                subscribe = true,
+                                listChanged = false,
+                            ),
+                    )
+
+                override fun name(): String = "AdvancedServer"
+
+                override fun version(): String = "3.0.0"
             }
-
-            override fun name(): String = "AdvancedServer"
-            override fun version(): String = "3.0.0"
-        }
 
         // When
         val capabilities = advancedServer.capabilities()

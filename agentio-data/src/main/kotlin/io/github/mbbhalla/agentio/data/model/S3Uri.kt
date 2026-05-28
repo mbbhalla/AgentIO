@@ -1,6 +1,8 @@
 package io.github.mbbhalla.agentio.data.model
 
-data class S3Uri(val value: String) {
+data class S3Uri(
+    val value: String,
+) {
     val bucket: String
     val prefix: String
 

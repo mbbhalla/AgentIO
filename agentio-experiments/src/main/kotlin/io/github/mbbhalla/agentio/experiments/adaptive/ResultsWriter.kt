@@ -1,8 +1,8 @@
 package io.github.mbbhalla.agentio.experiments.adaptive
 
-import io.github.mbbhalla.agentio.experiments.adaptive.function.NeedleRetrievalAgenticFunction.NeedleRetrievalOutput
 import io.github.mbbhalla.agentio.core.lib.eval.AgenticFunctionEvaluator
 import io.github.mbbhalla.agentio.core.model.LLM
+import io.github.mbbhalla.agentio.experiments.adaptive.function.NeedleRetrievalAgenticFunction.NeedleRetrievalOutput
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.Instant
@@ -34,7 +34,6 @@ data class CellResult(
  *    (model confused by the appended probe query). Should be equal or lower.
  */
 object ResultsWriter {
-
     private val LOG = LoggerFactory.getLogger(ResultsWriter::class.java)
 
     fun write(
@@ -80,7 +79,10 @@ object ResultsWriter {
         LOG.info("Results written to {}", outputFile.absolutePath)
     }
 
-    private fun writeConfiguration(sb: StringBuilder, suiteConfig: ExperimentSuiteConfig) {
+    private fun writeConfiguration(
+        sb: StringBuilder,
+        suiteConfig: ExperimentSuiteConfig,
+    ) {
         sb.appendLine("## Configuration")
         sb.appendLine()
         sb.appendLine("| Parameter | Value |")
@@ -113,8 +115,12 @@ object ResultsWriter {
 
             sb.appendLine("### ${experimentType.displayName}")
             sb.appendLine()
-            sb.appendLine("| Model | Window | CMM OFF Accuracy | CMM ON Accuracy | Accuracy Δ | Token Overhead | Failure Rate OFF | Failure Rate ON |")
-            sb.appendLine("|-------|--------|-----------------|----------------|------------|---------------|-----------------|----------------|")
+            sb.appendLine(
+                "| Model | Window | CMM OFF Accuracy | CMM ON Accuracy | Accuracy Δ | Token Overhead | Failure Rate OFF | Failure Rate ON |",
+            )
+            sb.appendLine(
+                "|-------|--------|-----------------|----------------|------------|---------------|-----------------|----------------|",
+            )
 
             for (llm in suiteConfig.models) {
                 val offResult = experimentResults.find { it.llm == llm && !it.adaptiveCmmEnabled }
@@ -215,24 +221,27 @@ object ResultsWriter {
 
         for (experimentType in suiteConfig.experimentTypes) {
             for (llm in suiteConfig.models) {
-                val offResult = results.find {
-                    it.experimentType == experimentType && it.llm == llm && !it.adaptiveCmmEnabled
-                }
-                val onResult = results.find {
-                    it.experimentType == experimentType && it.llm == llm && it.adaptiveCmmEnabled
-                }
+                val offResult =
+                    results.find {
+                        it.experimentType == experimentType && it.llm == llm && !it.adaptiveCmmEnabled
+                    }
+                val onResult =
+                    results.find {
+                        it.experimentType == experimentType && it.llm == llm && it.adaptiveCmmEnabled
+                    }
 
                 val offAvgInput = offResult?.avgInputTokens() ?: 0
                 val onAvgInput = onResult?.avgInputTokens() ?: 0
                 val offAvgOutput = offResult?.avgOutputTokens() ?: 0
                 val onAvgOutput = onResult?.avgOutputTokens() ?: 0
 
-                val overhead = if (offAvgInput > 0) {
-                    val pct = ((onAvgInput - offAvgInput).toDouble() / offAvgInput * 100)
-                    "${if (pct >= 0) "+" else ""}${"%.1f".format(pct)}%"
-                } else {
-                    "N/A"
-                }
+                val overhead =
+                    if (offAvgInput > 0) {
+                        val pct = ((onAvgInput - offAvgInput).toDouble() / offAvgInput * 100)
+                        "${if (pct >= 0) "+" else ""}${"%.1f".format(pct)}%"
+                    } else {
+                        "N/A"
+                    }
 
                 sb.appendLine(
                     "| ${llm.name} | ${experimentType.displayName} | " +
@@ -244,7 +253,10 @@ object ResultsWriter {
         sb.appendLine()
     }
 
-    private fun writePerTrialDetails(sb: StringBuilder, results: List<CellResult>) {
+    private fun writePerTrialDetails(
+        sb: StringBuilder,
+        results: List<CellResult>,
+    ) {
         sb.appendLine("## Per-Trial Raw Data")
         sb.appendLine()
         sb.appendLine("| Experiment | Model | CMM | Iteration | Correct | Input Tokens | Output Tokens | Answer (truncated) |")
@@ -289,12 +301,14 @@ object ResultsWriter {
         val allDeltas = mutableListOf<Double>()
         for (experimentType in suiteConfig.experimentTypes) {
             for (llm in suiteConfig.models) {
-                val offResult = results.find {
-                    it.experimentType == experimentType && it.llm == llm && !it.adaptiveCmmEnabled
-                }
-                val onResult = results.find {
-                    it.experimentType == experimentType && it.llm == llm && it.adaptiveCmmEnabled
-                }
+                val offResult =
+                    results.find {
+                        it.experimentType == experimentType && it.llm == llm && !it.adaptiveCmmEnabled
+                    }
+                val onResult =
+                    results.find {
+                        it.experimentType == experimentType && it.llm == llm && it.adaptiveCmmEnabled
+                    }
                 val delta = computeAccuracyDeltaNumeric(offResult, onResult)
                 if (delta != null) allDeltas.add(delta)
             }
@@ -309,24 +323,32 @@ object ResultsWriter {
 
             when {
                 allPositive && avgDelta >= 10 -> {
-                    sb.appendLine("**Hypothesis SUPPORTED.** Adaptive CMM consistently improves needle retrieval " +
-                        "accuracy across all tested models, with an average improvement of +${"%.0f".format(avgDelta)}%. " +
-                        "The probe-recall mechanism successfully identifies and exploits positional attention patterns.")
+                    sb.appendLine(
+                        "**Hypothesis SUPPORTED.** Adaptive CMM consistently improves needle retrieval " +
+                            "accuracy across all tested models, with an average improvement of +${"%.0f".format(avgDelta)}%. " +
+                            "The probe-recall mechanism successfully identifies and exploits positional attention patterns.",
+                    )
                 }
                 allNonNegative && avgDelta > 0 -> {
-                    sb.appendLine("**Hypothesis PARTIALLY SUPPORTED.** Adaptive CMM shows a positive trend " +
-                        "(average Δ = +${"%.0f".format(avgDelta)}%) but the effect is modest. " +
-                        "More iterations or harder test conditions may be needed to establish significance.")
+                    sb.appendLine(
+                        "**Hypothesis PARTIALLY SUPPORTED.** Adaptive CMM shows a positive trend " +
+                            "(average Δ = +${"%.0f".format(avgDelta)}%) but the effect is modest. " +
+                            "More iterations or harder test conditions may be needed to establish significance.",
+                    )
                 }
                 avgDelta <= 0 -> {
-                    sb.appendLine("**Hypothesis NOT SUPPORTED.** Adaptive CMM does not improve needle retrieval " +
-                        "accuracy in this experiment (average Δ = ${"%.0f".format(avgDelta)}%). " +
-                        "Possible causes: insufficient warm-up turns, probe recall not informative for these models, " +
-                        "or the filler content does not trigger sufficient positional bias.")
+                    sb.appendLine(
+                        "**Hypothesis NOT SUPPORTED.** Adaptive CMM does not improve needle retrieval " +
+                            "accuracy in this experiment (average Δ = ${"%.0f".format(avgDelta)}%). " +
+                            "Possible causes: insufficient warm-up turns, probe recall not informative for these models, " +
+                            "or the filler content does not trigger sufficient positional bias.",
+                    )
                 }
                 else -> {
-                    sb.appendLine("**MIXED RESULTS.** Adaptive CMM improves accuracy on some models but not others " +
-                        "(average Δ = ${"%.0f".format(avgDelta)}%). Model-specific analysis is needed.")
+                    sb.appendLine(
+                        "**MIXED RESULTS.** Adaptive CMM improves accuracy on some models but not others " +
+                            "(average Δ = ${"%.0f".format(avgDelta)}%). Model-specific analysis is needed.",
+                    )
                 }
             }
         }
@@ -351,22 +373,30 @@ object ResultsWriter {
         sb.appendLine()
 
         for (llm in suiteConfig.models) {
-            val offResult = results.find {
-                it.experimentType == ExperimentType.DISTRIBUTED_COUNTING &&
-                    it.llm == llm && !it.adaptiveCmmEnabled
-            }
-            val onResult = results.find {
-                it.experimentType == ExperimentType.DISTRIBUTED_COUNTING &&
-                    it.llm == llm && it.adaptiveCmmEnabled
-            }
+            val offResult =
+                results.find {
+                    it.experimentType == ExperimentType.DISTRIBUTED_COUNTING &&
+                        it.llm == llm &&
+                        !it.adaptiveCmmEnabled
+                }
+            val onResult =
+                results.find {
+                    it.experimentType == ExperimentType.DISTRIBUTED_COUNTING &&
+                        it.llm == llm &&
+                        it.adaptiveCmmEnabled
+                }
 
-            val groundTruth = NeedleContextBuilder.build(ExperimentType.DISTRIBUTED_COUNTING, llm)
-                .groundTruthVotes ?: continue
+            val groundTruth =
+                NeedleContextBuilder
+                    .build(ExperimentType.DISTRIBUTED_COUNTING, llm)
+                    .groundTruthVotes ?: continue
 
             sb.appendLine("### ${llm.name}")
             sb.appendLine()
-            sb.appendLine("**Ground truth:** Proposal A = ${groundTruth.proposalA}, " +
-                "Proposal B = ${groundTruth.proposalB}, Total = ${groundTruth.total}")
+            sb.appendLine(
+                "**Ground truth:** Proposal A = ${groundTruth.proposalA}, " +
+                    "Proposal B = ${groundTruth.proposalB}, Total = ${groundTruth.total}",
+            )
             sb.appendLine()
 
             // Per-trial deviation table
@@ -440,17 +470,18 @@ object ResultsWriter {
             sb.appendLine()
 
             // Interpretation
-            sb.appendLine("**Interpretation:** Lower deviation = more accurate vote counting. " +
-                "If CMM ON has lower average/P90/max deviations than CMM OFF, the adaptive " +
-                "reshuffling is improving the model's ability to aggregate information from " +
-                "across the context.")
+            sb.appendLine(
+                "**Interpretation:** Lower deviation = more accurate vote counting. " +
+                    "If CMM ON has lower average/P90/max deviations than CMM OFF, the adaptive " +
+                    "reshuffling is improving the model's ability to aggregate information from " +
+                    "across the context.",
+            )
             sb.appendLine()
         }
     }
 
     /** Average of a sorted int list, formatted to 1 decimal. */
-    private fun List<Int>.avg(): String =
-        if (isEmpty()) "-" else "%.1f".format(average())
+    private fun List<Int>.avg(): String = if (isEmpty()) "-" else "%.1f".format(average())
 
     /** Percentile of a sorted int list. */
     private fun List<Int>.percentile(p: Int): String {
@@ -470,8 +501,9 @@ object ResultsWriter {
         output: NeedleRetrievalOutput,
     ): Boolean {
         return if (experimentType == ExperimentType.DISTRIBUTED_COUNTING) {
-            val groundTruth = NeedleContextBuilder.build(experimentType, llm).groundTruthVotes
-                ?: return false
+            val groundTruth =
+                NeedleContextBuilder.build(experimentType, llm).groundTruthVotes
+                    ?: return false
             if (output.proposalACount <= 0 && output.proposalBCount <= 0) return false
             val modelWinnerIsA = output.proposalACount > output.proposalBCount
             val trueWinnerIsA = groundTruth.proposalA > groundTruth.proposalB
@@ -499,22 +531,36 @@ object ResultsWriter {
     private fun CellResult.avgInputTokens(): Int {
         val successOutputs = evaluationResult.rawOutputs.filter { it.isSuccess }
         if (successOutputs.isEmpty()) return 0
-        return successOutputs.sumOf { it.get().conversation.tokenUsage.totalInputTokens } / successOutputs.size
+        return successOutputs.sumOf {
+            it
+                .get()
+                .conversation.tokenUsage.totalInputTokens
+        } / successOutputs.size
     }
 
     private fun CellResult.avgOutputTokens(): Int {
         val successOutputs = evaluationResult.rawOutputs.filter { it.isSuccess }
         if (successOutputs.isEmpty()) return 0
-        return successOutputs.sumOf { it.get().conversation.tokenUsage.totalOutputTokens } / successOutputs.size
+        return successOutputs.sumOf {
+            it
+                .get()
+                .conversation.tokenUsage.totalOutputTokens
+        } / successOutputs.size
     }
 
-    private fun computeAccuracyDelta(offResult: CellResult?, onResult: CellResult?): String {
+    private fun computeAccuracyDelta(
+        offResult: CellResult?,
+        onResult: CellResult?,
+    ): String {
         val delta = computeAccuracyDeltaNumeric(offResult, onResult) ?: return "N/A"
         val sign = if (delta >= 0) "+" else ""
         return "**$sign${delta.toInt()}%**"
     }
 
-    private fun computeAccuracyDeltaNumeric(offResult: CellResult?, onResult: CellResult?): Double? {
+    private fun computeAccuracyDeltaNumeric(
+        offResult: CellResult?,
+        onResult: CellResult?,
+    ): Double? {
         if (offResult == null || onResult == null) return null
         val offN = offResult.evaluationResult.totalIterations
         val onN = onResult.evaluationResult.totalIterations
@@ -524,7 +570,10 @@ object ResultsWriter {
         return onPct - offPct
     }
 
-    private fun computeTokenOverhead(offResult: CellResult?, onResult: CellResult?): String {
+    private fun computeTokenOverhead(
+        offResult: CellResult?,
+        onResult: CellResult?,
+    ): String {
         if (offResult == null || onResult == null) return "N/A"
         val offAvg = offResult.avgInputTokens()
         val onAvg = onResult.avgInputTokens()
@@ -533,9 +582,10 @@ object ResultsWriter {
         return "${if (pct >= 0) "+" else ""}${"%.1f".format(pct)}%"
     }
 
-    private fun formatTokenCount(tokens: Int): String = when {
-        tokens >= 1_000_000 -> "${tokens / 1_000_000}M"
-        tokens >= 1_000 -> "${tokens / 1_000}K"
-        else -> tokens.toString()
-    }
+    private fun formatTokenCount(tokens: Int): String =
+        when {
+            tokens >= 1_000_000 -> "${tokens / 1_000_000}M"
+            tokens >= 1_000 -> "${tokens / 1_000}K"
+            else -> tokens.toString()
+        }
 }

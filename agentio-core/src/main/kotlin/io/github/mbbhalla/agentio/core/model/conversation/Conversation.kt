@@ -23,10 +23,8 @@ data class MessageEnvelope(
 data class Conversation(
     // Messages accumulated in this conversation
     val messages: List<MessageEnvelope>,
-
     // Token usage accumulated in this conversation
     val tokenUsage: AgentTokenUsage,
-
     /*
         This is an attribute in Converse response
         included here to track model stop reason as the
@@ -36,7 +34,6 @@ data class Conversation(
         from User role, then StopReason does not make sense
      */
     val stopReason: StopReason?,
-
     /*
         Thinking mode counter
         how many times thinking have been done
@@ -44,26 +41,25 @@ data class Conversation(
     val thinkingModeCounter: Int,
 ) {
     companion object {
-
         /**
          * The content block types the framework understands and can process.
          * This is the single source of truth — [isSupportedContentBlock] and
          * [supportedContentBlockTypeNames] both derive from this set.
          */
-        val SUPPORTED_CONTENT_BLOCK_TYPES: Set<kotlin.reflect.KClass<out ContentBlock>> = setOf(
-            ContentBlock.Text::class,
-            ContentBlock.ToolUse::class,
-            ContentBlock.ToolResult::class,
-            ContentBlock.ReasoningContent::class,
-            // Add new supported types here
-        )
+        val SUPPORTED_CONTENT_BLOCK_TYPES: Set<kotlin.reflect.KClass<out ContentBlock>> =
+            setOf(
+                ContentBlock.Text::class,
+                ContentBlock.ToolUse::class,
+                ContentBlock.ToolResult::class,
+                ContentBlock.ReasoningContent::class,
+                // Add new supported types here
+            )
 
         /**
          * Whether a [ContentBlock] is a type the framework understands and can process.
          * Use this to filter raw Bedrock responses before adding to a Conversation.
          */
-        fun isSupportedContentBlock(contentBlock: ContentBlock): Boolean =
-            SUPPORTED_CONTENT_BLOCK_TYPES.any { it.isInstance(contentBlock) }
+        fun isSupportedContentBlock(contentBlock: ContentBlock): Boolean = SUPPORTED_CONTENT_BLOCK_TYPES.any { it.isInstance(contentBlock) }
 
         /**
          * Human-readable names of supported content block types. Used in error messages.
@@ -71,48 +67,50 @@ data class Conversation(
         val supportedContentBlockTypeNames: String =
             SUPPORTED_CONTENT_BLOCK_TYPES.joinToString(", ") { it.simpleName ?: "Unknown" }
 
-        val TOKEN_USAGE_ZERO = TokenUsage {
-            // initialized values
-            this.inputTokens = 0
-            this.outputTokens = 0
-            this.totalTokens = 0
-        }
+        val TOKEN_USAGE_ZERO =
+            TokenUsage {
+                // initialized values
+                this.inputTokens = 0
+                this.outputTokens = 0
+                this.totalTokens = 0
+            }
 
-        private val AGENT_TOKEN_USAGE_ZERO = AgentTokenUsage(
-            // initialized values
-            totalInputTokens = 0,
-            totalOutputTokens = 0,
-            lastTurnInputTokens = 0,
-            lastTurnOutputTokens = 0,
-            lastTurnTotalTokens = 0,
-        )
+        private val AGENT_TOKEN_USAGE_ZERO =
+            AgentTokenUsage(
+                // initialized values
+                totalInputTokens = 0,
+                totalOutputTokens = 0,
+                lastTurnInputTokens = 0,
+                lastTurnOutputTokens = 0,
+                lastTurnTotalTokens = 0,
+            )
 
         /*
             Initializes with a User content
             which is the start of the Conversation
          */
-        fun initialize(
-            texts: List<String>,
-        ): Conversation {
-            return Conversation(
-                messages = listOf(
-                    MessageEnvelope(
-                        message = Message {
-                            this.role = ConversationRole.User
-                            this.content = texts.map { text ->
-                                ContentBlock.Text(
-                                    value = text,
-                                )
-                            }
-                        },
-                        timestamp = Instant.now(),
+        fun initialize(texts: List<String>): Conversation =
+            Conversation(
+                messages =
+                    listOf(
+                        MessageEnvelope(
+                            message =
+                                Message {
+                                    this.role = ConversationRole.User
+                                    this.content =
+                                        texts.map { text ->
+                                            ContentBlock.Text(
+                                                value = text,
+                                            )
+                                        }
+                                },
+                            timestamp = Instant.now(),
+                        ),
                     ),
-                ),
                 tokenUsage = AGENT_TOKEN_USAGE_ZERO,
                 stopReason = null,
                 thinkingModeCounter = 0,
             )
-        }
     }
 
     private fun appendRoleContent(
@@ -121,26 +119,29 @@ data class Conversation(
         additionalTokenUsage: TokenUsage,
         stopReason: StopReason?,
         incrementThinkingModeCounter: Int,
-    ): Conversation {
-        return Conversation(
-            messages = this.messages + MessageEnvelope(
-                message = Message {
-                    this.role = role
-                    this.content = contentBlocks
-                },
-                timestamp = Instant.now(),
-            ),
-            tokenUsage = AgentTokenUsage(
-                totalInputTokens = tokenUsage.totalInputTokens + additionalTokenUsage.inputTokens,
-                totalOutputTokens = tokenUsage.totalOutputTokens + additionalTokenUsage.outputTokens,
-                lastTurnInputTokens = additionalTokenUsage.inputTokens,
-                lastTurnOutputTokens = additionalTokenUsage.outputTokens,
-                lastTurnTotalTokens = additionalTokenUsage.totalTokens,
-            ),
+    ): Conversation =
+        Conversation(
+            messages =
+                this.messages +
+                    MessageEnvelope(
+                        message =
+                            Message {
+                                this.role = role
+                                this.content = contentBlocks
+                            },
+                        timestamp = Instant.now(),
+                    ),
+            tokenUsage =
+                AgentTokenUsage(
+                    totalInputTokens = tokenUsage.totalInputTokens + additionalTokenUsage.inputTokens,
+                    totalOutputTokens = tokenUsage.totalOutputTokens + additionalTokenUsage.outputTokens,
+                    lastTurnInputTokens = additionalTokenUsage.inputTokens,
+                    lastTurnOutputTokens = additionalTokenUsage.outputTokens,
+                    lastTurnTotalTokens = additionalTokenUsage.totalTokens,
+                ),
             stopReason = stopReason,
             thinkingModeCounter = this.thinkingModeCounter + incrementThinkingModeCounter,
         )
-    }
 
     fun appendUserRoleContent(
         contentBlock: ContentBlock,

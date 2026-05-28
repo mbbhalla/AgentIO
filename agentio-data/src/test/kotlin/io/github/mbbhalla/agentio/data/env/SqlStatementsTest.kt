@@ -11,28 +11,31 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SqlStatementsTest {
-
     companion object {
         @BeforeAll
         @JvmStatic
         fun setup() {
             DuckDbDatabaseEnvironment.fromStatements(
-                ddl = listOf(
-                    "CREATE TABLE orders (order_id VARCHAR PRIMARY KEY, amount DOUBLE NOT NULL)",
-                ),
-                dml = listOf(
-                    "INSERT INTO orders VALUES ('O-1', 42.0)",
-                ),
-                tableMetadata = setOf(
-                    TableInfo(
-                        name = TableName("orders"),
-                        description = "Orders",
-                        columns = listOf(
-                            ColumnInfo(ColumnName("order_id"), ColumnType.VARCHAR, false, true, null, "Order ID"),
-                            ColumnInfo(ColumnName("amount"), ColumnType.DOUBLE, false, false, null, "Amount"),
+                ddl =
+                    listOf(
+                        "CREATE TABLE orders (order_id VARCHAR PRIMARY KEY, amount DOUBLE NOT NULL)",
+                    ),
+                dml =
+                    listOf(
+                        "INSERT INTO orders VALUES ('O-1', 42.0)",
+                    ),
+                tableMetadata =
+                    setOf(
+                        TableInfo(
+                            name = TableName("orders"),
+                            description = "Orders",
+                            columns =
+                                listOf(
+                                    ColumnInfo(ColumnName("order_id"), ColumnType.VARCHAR, false, true, null, "Order ID"),
+                                    ColumnInfo(ColumnName("amount"), ColumnType.DOUBLE, false, false, null, "Amount"),
+                                ),
                         ),
                     ),
-                ),
             )
         }
     }

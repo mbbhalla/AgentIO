@@ -3,7 +3,9 @@ package io.github.mbbhalla.agentio.data.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ColumnName(val value: String) {
+data class ColumnName(
+    val value: String,
+) {
     init {
         require(value.matches(VALID_PATTERN)) { "Invalid column name: '$value'" }
     }

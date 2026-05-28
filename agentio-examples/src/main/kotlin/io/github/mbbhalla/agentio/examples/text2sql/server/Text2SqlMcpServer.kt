@@ -8,12 +8,12 @@ import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 internal class Text2SqlMcpServer(
     private val env: DatabaseEnvironment,
 ) : AbstractMcpServer() {
-
-    override fun tools(): Set<RegisteredTool> = setOf(
-        ListTablesTool(env)(),
-        GetTablesTool(env)(),
-        ExecuteSqlTool(env)(),
-    )
+    override fun tools(): Set<RegisteredTool> =
+        setOf(
+            ListTablesTool(env)(),
+            GetTablesTool(env)(),
+            ExecuteSqlTool(env)(),
+        )
 
     override fun capabilities() = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = false))
 

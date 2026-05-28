@@ -1,7 +1,6 @@
 dependencies {
     implementation(project(":agentio-core"))
     implementation(project(":agentio-data"))
-    implementation(project(":agentio-eventlistener-impl"))
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -18,7 +17,6 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-
 }
 
 tasks.register<JavaExec>("RunHackerNewsAgenticFunction") {
@@ -31,9 +29,10 @@ tasks.register<JavaExec>("RunHackerNewsAgenticFunction") {
         host = "localhost"
         port = 5010
     }
-    args = listOf(
-        "${project.projectDir}/src/main/kotlin/io/github/mbbhalla/agentio/examples/hackernews/server/server_hacker_news.sh",
-    )
+    args =
+        listOf(
+            "${project.projectDir}/src/main/kotlin/io/github/mbbhalla/agentio/examples/hackernews/server/server_hacker_news.sh",
+        )
 }
 
 tasks.register<JavaExec>("RunFetchAgenticFunction") {
@@ -46,9 +45,10 @@ tasks.register<JavaExec>("RunFetchAgenticFunction") {
         host = "localhost"
         port = 5012
     }
-    args = listOf(
-        "${project.projectDir}/src/main/kotlin/io/github/mbbhalla/agentio/examples/fetch/server/server_fetch.sh",
-    )
+    args =
+        listOf(
+            "${project.projectDir}/src/main/kotlin/io/github/mbbhalla/agentio/examples/fetch/server/server_fetch.sh",
+        )
 }
 
 tasks.register<JavaExec>("RunGitAnalyzerAgenticFunction") {
@@ -61,9 +61,10 @@ tasks.register<JavaExec>("RunGitAnalyzerAgenticFunction") {
         host = "localhost"
         port = 5013
     }
-    args = listOf(
-        rootProject.projectDir.absolutePath,
-    )
+    args =
+        listOf(
+            rootProject.projectDir.absolutePath,
+        )
 }
 
 tasks.register<JavaExec>("RunCodeMetricsAgenticFunction") {
@@ -76,11 +77,12 @@ tasks.register<JavaExec>("RunCodeMetricsAgenticFunction") {
         host = "localhost"
         port = 5014
     }
-    args = listOf(
-        rootProject.projectDir.absolutePath,
-        project.findProperty("checkpointDir")?.toString()
-            ?: "${rootProject.projectDir}/build/checkpoints",
-    )
+    args =
+        listOf(
+            rootProject.projectDir.absolutePath,
+            project.findProperty("checkpointDir")?.toString()
+                ?: "${rootProject.projectDir}/build/checkpoints",
+        )
 }
 
 tasks.register<JavaExec>("RunAdversarialAgenticFunction") {
@@ -93,10 +95,15 @@ tasks.register<JavaExec>("RunAdversarialAgenticFunction") {
         host = "localhost"
         port = 5015
     }
-    args = listOf(
-        project.findProperty("requirements")?.toString()
-            ?: "Build a task management API with users, projects, tasks, and comments. Users authenticate via OAuth2. Tasks have priorities and due dates. Support filtering and pagination.",
-    )
+    args =
+        listOf(
+            project.findProperty("requirements")?.toString()
+                ?: """
+                    |Build a task management API with users, projects, tasks, and comments.
+                    | Users authenticate via OAuth2. Tasks have priorities and due dates.
+                    | Support filtering and pagination.
+                """.trimMargin(),
+        )
 }
 
 tasks.register<JavaExec>("RunOrchestrationAgenticFunction") {
@@ -109,10 +116,11 @@ tasks.register<JavaExec>("RunOrchestrationAgenticFunction") {
         host = "localhost"
         port = 5016
     }
-    args = listOf(
-        rootProject.projectDir.absolutePath,
-        "kt",
-    )
+    args =
+        listOf(
+            rootProject.projectDir.absolutePath,
+            "kt",
+        )
 }
 
 tasks.register<JavaExec>("RunText2SqlAgenticFunction-RetailDB") {
@@ -126,10 +134,11 @@ tasks.register<JavaExec>("RunText2SqlAgenticFunction-RetailDB") {
         port = 5017
     }
     jvmArgs = listOf("-Dagentio.text2sql.entrypoint=retail")
-    args = listOf(
-        project.findProperty("query")?.toString()
-            ?: "What products have inventory below safety stock levels?",
-    )
+    args =
+        listOf(
+            project.findProperty("query")?.toString()
+                ?: "What products have inventory below safety stock levels?",
+        )
 }
 
 tasks.register<JavaExec>("RunText2SqlAgenticFunction-EmployeeDB") {
@@ -143,8 +152,9 @@ tasks.register<JavaExec>("RunText2SqlAgenticFunction-EmployeeDB") {
         port = 5018
     }
     jvmArgs = listOf("-Dagentio.text2sql.entrypoint=employee")
-    args = listOf(
-        project.findProperty("query")?.toString()
-            ?: "Who are the top-rated employees and what projects are they working on?",
-    )
+    args =
+        listOf(
+            project.findProperty("query")?.toString()
+                ?: "Who are the top-rated employees and what projects are they working on?",
+        )
 }

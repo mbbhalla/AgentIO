@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test
 import kotlin.reflect.KClass
 
 class AbstractMcpToolTest {
-
     @Serializable
     data class TestInput(
         val query: String,
@@ -37,13 +36,12 @@ class AbstractMcpToolTest {
 
         override fun description(): String = "A test tool for searching"
 
-        override fun invoke(input: TestInput): TestOutput {
-            return TestOutput(
+        override fun invoke(input: TestInput): TestOutput =
+            TestOutput(
                 results = listOf("result1", "result2", "result3").take(input.maxResults),
                 count = minOf(3, input.maxResults),
                 success = true,
             )
-        }
 
         override fun buildInput(callToolRequest: CallToolRequest): TestInput {
             val args = callToolRequest.arguments ?: JsonObject(emptyMap())
@@ -57,9 +55,10 @@ class AbstractMcpToolTest {
 
         override fun getOutputKClass(): KClass<TestOutput> = TestOutput::class
 
-        override fun getToolConfig(): ToolConfig = ToolConfig(
-            emitSchemaAndRequiredAttributesForAllToolCalls = false,
-        )
+        override fun getToolConfig(): ToolConfig =
+            ToolConfig(
+                emitSchemaAndRequiredAttributesForAllToolCalls = false,
+            )
     }
 
     @Test
@@ -78,135 +77,163 @@ class AbstractMcpToolTest {
     }
 
     @Test
-    fun `should handle successful tool invocation`() = runBlocking {
-        // Given
-        val tool = TestMcpTool()
-        val registeredTool = tool()
+    fun `should handle successful tool invocation`() =
+        runBlocking {
+            // Given
+            val tool = TestMcpTool()
+            val registeredTool = tool()
 
-        val request = CallToolRequest(
-            params = CallToolRequestParams(
-                name = "test_search_tool",
-                arguments = buildJsonObject {
-                    put("query", "test search")
-                    put("maxResults", 2)
-                },
-            ),
-        )
+            val request =
+                CallToolRequest(
+                    params =
+                        CallToolRequestParams(
+                            name = "test_search_tool",
+                            arguments =
+                                buildJsonObject {
+                                    put("query", "test search")
+                                    put("maxResults", 2)
+                                },
+                        ),
+                )
 
-        // When
-        val result = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
+            // When
+            val result = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
 
-        // Then
-        assertEquals(false, result.isError)
-        assertTrue(result.content.isNotEmpty())
+            // Then
+            assertEquals(false, result.isError)
+            assertTrue(result.content.isNotEmpty())
 
-        // Should contain schema, required attributes, and response
-        val contentTexts = result.content.filterIsInstance<TextContent>().mapNotNull { it.text }
-        assertTrue(contentTexts.any { it.contains("JSON Schema") })
-        assertTrue(contentTexts.any { it.contains("Required Attributes") })
-        assertTrue(contentTexts.any { it.contains("Response") })
-        assertTrue(contentTexts.any { it.contains("\"count\":2") })
-    }
-
-    @Test
-    fun `should handle tool invocation with default parameters`() = runBlocking {
-        // Given
-        val tool = TestMcpTool()
-        val registeredTool = tool()
-
-        val request = CallToolRequest(
-            params = CallToolRequestParams(
-                name = "test_search_tool",
-                arguments = buildJsonObject {
-                    put("query", "default test")
-                },
-            ),
-        )
-
-        // When
-        val result = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
-
-        // Then
-        assertEquals(false, result.isError)
-        val responseContent = result.content.filterIsInstance<TextContent>()
-            .find { it.text?.contains("Response") == true }?.text
-        assertNotNull(responseContent)
-        assertTrue(responseContent?.contains("\"count\":3") == true) // Default maxResults should give 3 results
-    }
-
-    @Test
-    fun `should handle tool invocation errors gracefully`() = runBlocking {
-        // Given
-        val errorTool = object : AbstractMcpTool<TestInput, TestOutput>() {
-            override fun name(): String = "error_tool"
-            override fun description(): String = "A tool that throws errors"
-            override fun invoke(input: TestInput): TestOutput {
-                throw RuntimeException("Tool execution failed")
-            }
-            override fun buildInput(callToolRequest: CallToolRequest): TestInput {
-                return TestInput("error", 1)
-            }
-            override fun getInputKClass(): KClass<TestInput> = TestInput::class
-            override fun getOutputKClass(): KClass<TestOutput> = TestOutput::class
-            override fun getToolConfig(): ToolConfig = ToolConfig()
+            // Should contain schema, required attributes, and response
+            val contentTexts = result.content.filterIsInstance<TextContent>().mapNotNull { it.text }
+            assertTrue(contentTexts.any { it.contains("JSON Schema") })
+            assertTrue(contentTexts.any { it.contains("Required Attributes") })
+            assertTrue(contentTexts.any { it.contains("Response") })
+            assertTrue(contentTexts.any { it.contains("\"count\":2") })
         }
 
-        val registeredTool = errorTool()
-        val request = CallToolRequest(
-            params = CallToolRequestParams(
-                name = "error_tool",
-                arguments = JsonObject(emptyMap()),
-            ),
-        )
-
-        // When
-        val result = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
-
-        // Then
-        assertEquals(true, result.isError)
-        assertTrue(result.content.isNotEmpty())
-        val firstContent = result.content.first() as TextContent
-        assertTrue(firstContent.text?.contains("Error:") == true)
-    }
-
     @Test
-    fun `should respect tool config for schema emission`() = runBlocking {
-        // Given
-        val configTool = object : AbstractMcpTool<TestInput, TestOutput>() {
-            override fun name(): String = "config_tool"
-            override fun description(): String = "Tool with custom config"
-            override fun invoke(input: TestInput): TestOutput = TestOutput(emptyList(), 0, true)
-            override fun buildInput(callToolRequest: CallToolRequest): TestInput = TestInput("", 0)
-            override fun getInputKClass(): KClass<TestInput> = TestInput::class
-            override fun getOutputKClass(): KClass<TestOutput> = TestOutput::class
-            override fun getToolConfig(): ToolConfig = ToolConfig(
-                emitSchemaAndRequiredAttributesForAllToolCalls = true,
-            )
+    fun `should handle tool invocation with default parameters`() =
+        runBlocking {
+            // Given
+            val tool = TestMcpTool()
+            val registeredTool = tool()
+
+            val request =
+                CallToolRequest(
+                    params =
+                        CallToolRequestParams(
+                            name = "test_search_tool",
+                            arguments =
+                                buildJsonObject {
+                                    put("query", "default test")
+                                },
+                        ),
+                )
+
+            // When
+            val result = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
+
+            // Then
+            assertEquals(false, result.isError)
+            val responseContent =
+                result.content
+                    .filterIsInstance<TextContent>()
+                    .find { it.text?.contains("Response") == true }
+                    ?.text
+            assertNotNull(responseContent)
+            assertTrue(responseContent?.contains("\"count\":3") == true) // Default maxResults should give 3 results
         }
 
-        val registeredTool = configTool()
-        val request = CallToolRequest(
-            params = CallToolRequestParams(
-                name = "config_tool",
-                arguments = JsonObject(emptyMap()),
-            ),
-        )
+    @Test
+    fun `should handle tool invocation errors gracefully`() =
+        runBlocking {
+            // Given
+            val errorTool =
+                object : AbstractMcpTool<TestInput, TestOutput>() {
+                    override fun name(): String = "error_tool"
 
-        // When - First call
-        val result1 = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
-        // When - Second call
-        val result2 = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
+                    override fun description(): String = "A tool that throws errors"
 
-        // Then - Both calls should include schema due to config
-        assertEquals(false, result1.isError)
-        assertEquals(false, result2.isError)
+                    override fun invoke(input: TestInput): TestOutput = throw RuntimeException("Tool execution failed")
 
-        val result1Texts = result1.content.filterIsInstance<TextContent>().mapNotNull { it.text }
-        val result2Texts = result2.content.filterIsInstance<TextContent>().mapNotNull { it.text }
+                    override fun buildInput(callToolRequest: CallToolRequest): TestInput = TestInput("error", 1)
 
-        assertTrue(result1Texts.any { it.contains("JSON Schema") })
-        assertTrue(result2Texts.any { it.contains("JSON Schema") })
-    }
+                    override fun getInputKClass(): KClass<TestInput> = TestInput::class
+
+                    override fun getOutputKClass(): KClass<TestOutput> = TestOutput::class
+
+                    override fun getToolConfig(): ToolConfig = ToolConfig()
+                }
+
+            val registeredTool = errorTool()
+            val request =
+                CallToolRequest(
+                    params =
+                        CallToolRequestParams(
+                            name = "error_tool",
+                            arguments = JsonObject(emptyMap()),
+                        ),
+                )
+
+            // When
+            val result = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
+
+            // Then
+            assertEquals(true, result.isError)
+            assertTrue(result.content.isNotEmpty())
+            val firstContent = result.content.first() as TextContent
+            assertTrue(firstContent.text?.contains("Error:") == true)
+        }
+
+    @Test
+    fun `should respect tool config for schema emission`() =
+        runBlocking {
+            // Given
+            val configTool =
+                object : AbstractMcpTool<TestInput, TestOutput>() {
+                    override fun name(): String = "config_tool"
+
+                    override fun description(): String = "Tool with custom config"
+
+                    override fun invoke(input: TestInput): TestOutput = TestOutput(emptyList(), 0, true)
+
+                    override fun buildInput(callToolRequest: CallToolRequest): TestInput = TestInput("", 0)
+
+                    override fun getInputKClass(): KClass<TestInput> = TestInput::class
+
+                    override fun getOutputKClass(): KClass<TestOutput> = TestOutput::class
+
+                    override fun getToolConfig(): ToolConfig =
+                        ToolConfig(
+                            emitSchemaAndRequiredAttributesForAllToolCalls = true,
+                        )
+                }
+
+            val registeredTool = configTool()
+            val request =
+                CallToolRequest(
+                    params =
+                        CallToolRequestParams(
+                            name = "config_tool",
+                            arguments = JsonObject(emptyMap()),
+                        ),
+                )
+
+            // When - First call
+            val result1 = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
+            // When - Second call
+            val result2 = registeredTool.handler.invoke(mockk<ClientConnection>(relaxed = true), request)
+
+            // Then - Both calls should include schema due to config
+            assertEquals(false, result1.isError)
+            assertEquals(false, result2.isError)
+
+            val result1Texts = result1.content.filterIsInstance<TextContent>().mapNotNull { it.text }
+            val result2Texts = result2.content.filterIsInstance<TextContent>().mapNotNull { it.text }
+
+            assertTrue(result1Texts.any { it.contains("JSON Schema") })
+            assertTrue(result2Texts.any { it.contains("JSON Schema") })
+        }
 
     @Test
     fun `ToolConfig should have correct default values`() {

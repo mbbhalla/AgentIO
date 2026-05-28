@@ -16,11 +16,16 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
 // Test data classes
-data class AnotherObject(val value: String) {
+data class AnotherObject(
+    val value: String,
+) {
     override fun toString() = "AnotherObject($value)"
 }
 
-data class YetAnotherObject(val id: Int, val name: String) {
+data class YetAnotherObject(
+    val id: Int,
+    val name: String,
+) {
     override fun toString() = "YetAnotherObject($id, '$name')"
 }
 
@@ -32,19 +37,27 @@ data class DT(
     override fun toString() = "DT(x=$x, y=$y, z='$z')"
 }
 
-data class SimpleData(val name: String, val count: Int)
-data class NullableData(val name: String?, val value: Int)
+data class SimpleData(
+    val name: String,
+    val count: Int,
+)
+
+data class NullableData(
+    val name: String?,
+    val value: Int,
+)
 
 internal class ExtensionsTest {
     // Tests for JsonObject.toDocument() method
     @Test
     @DisplayName("Should convert JsonPrimitive int to Document.Number")
     fun testJsonPrimitiveIntToDocument() {
-        val jsonObject = JsonObject(
-            mapOf(
-                "intValue" to JsonPrimitive(42),
-            ),
-        )
+        val jsonObject =
+            JsonObject(
+                mapOf(
+                    "intValue" to JsonPrimitive(42),
+                ),
+            )
 
         val result = jsonObject.toDocument()
 
@@ -58,11 +71,12 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert JsonPrimitive long to Document.Number")
     fun testJsonPrimitiveLongToDocument() {
-        val jsonObject = JsonObject(
-            mapOf(
-                "longValue" to JsonPrimitive(9223372036854775807L), // Long.MAX_VALUE
-            ),
-        )
+        val jsonObject =
+            JsonObject(
+                mapOf(
+                    "longValue" to JsonPrimitive(9223372036854775807L), // Long.MAX_VALUE
+                ),
+            )
 
         val result = jsonObject.toDocument()
 
@@ -76,11 +90,12 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert JsonPrimitive double to Document.Number")
     fun testJsonPrimitiveDoubleToDocument() {
-        val jsonObject = JsonObject(
-            mapOf(
-                "doubleValue" to JsonPrimitive(3.14159),
-            ),
-        )
+        val jsonObject =
+            JsonObject(
+                mapOf(
+                    "doubleValue" to JsonPrimitive(3.14159),
+                ),
+            )
 
         val result = jsonObject.toDocument()
 
@@ -94,11 +109,12 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert JsonPrimitive float to Document.Number")
     fun testJsonPrimitiveFloatToDocument() {
-        val jsonObject = JsonObject(
-            mapOf(
-                "floatValue" to JsonPrimitive(2.718f),
-            ),
-        )
+        val jsonObject =
+            JsonObject(
+                mapOf(
+                    "floatValue" to JsonPrimitive(2.718f),
+                ),
+            )
 
         val result = jsonObject.toDocument()
 
@@ -114,11 +130,12 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert JsonPrimitive boolean to Document.Boolean")
     fun testJsonPrimitiveBooleanToDocument() {
-        val jsonObject = JsonObject(
-            mapOf(
-                "boolValue" to JsonPrimitive(true),
-            ),
-        )
+        val jsonObject =
+            JsonObject(
+                mapOf(
+                    "boolValue" to JsonPrimitive(true),
+                ),
+            )
 
         val result = jsonObject.toDocument()
 
@@ -134,11 +151,12 @@ internal class ExtensionsTest {
     fun testJsonPrimitiveFallbackToString() {
         // Create a custom JsonPrimitive that doesn't match any specific type
         // This is tricky since JsonPrimitive is sealed, but we can create one that falls through
-        val jsonObject = JsonObject(
-            mapOf(
-                "fallbackValue" to JsonPrimitive("not-a-number-or-boolean"),
-            ),
-        )
+        val jsonObject =
+            JsonObject(
+                mapOf(
+                    "fallbackValue" to JsonPrimitive("not-a-number-or-boolean"),
+                ),
+            )
 
         val result = jsonObject.toDocument()
 
@@ -152,22 +170,24 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert JsonArray to Document.List recursively")
     fun testJsonArrayToDocumentList() {
-        val jsonObject = JsonObject(
-            mapOf(
-                "arrayValue" to JsonArray(
-                    listOf(
-                        JsonPrimitive(1),
-                        JsonPrimitive("string"),
-                        JsonPrimitive(true),
-                        JsonObject(
-                            mapOf(
-                                "nested" to JsonPrimitive("value"),
+        val jsonObject =
+            JsonObject(
+                mapOf(
+                    "arrayValue" to
+                        JsonArray(
+                            listOf(
+                                JsonPrimitive(1),
+                                JsonPrimitive("string"),
+                                JsonPrimitive(true),
+                                JsonObject(
+                                    mapOf(
+                                        "nested" to JsonPrimitive("value"),
+                                    ),
+                                ),
                             ),
                         ),
-                    ),
                 ),
-            ),
-        )
+            )
 
         val result = jsonObject.toDocument()
 
@@ -198,35 +218,39 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should handle complex nested structures with arrays and objects")
     fun testComplexNestedStructure() {
-        val jsonObject = JsonObject(
-            mapOf(
-                "numbers" to JsonArray(
-                    listOf(
-                        JsonPrimitive(1),
-                        JsonPrimitive(2L),
-                        JsonPrimitive(3.14),
-                        JsonPrimitive(4.5f),
-                    ),
-                ),
-                "booleans" to JsonArray(
-                    listOf(
-                        JsonPrimitive(true),
-                        JsonPrimitive(false),
-                    ),
-                ),
-                "mixed" to JsonArray(
-                    listOf(
-                        JsonPrimitive("text"),
-                        JsonPrimitive(42),
-                        JsonObject(
-                            mapOf(
-                                "inner" to JsonPrimitive("value"),
+        val jsonObject =
+            JsonObject(
+                mapOf(
+                    "numbers" to
+                        JsonArray(
+                            listOf(
+                                JsonPrimitive(1),
+                                JsonPrimitive(2L),
+                                JsonPrimitive(3.14),
+                                JsonPrimitive(4.5f),
                             ),
                         ),
-                    ),
+                    "booleans" to
+                        JsonArray(
+                            listOf(
+                                JsonPrimitive(true),
+                                JsonPrimitive(false),
+                            ),
+                        ),
+                    "mixed" to
+                        JsonArray(
+                            listOf(
+                                JsonPrimitive("text"),
+                                JsonPrimitive(42),
+                                JsonObject(
+                                    mapOf(
+                                        "inner" to JsonPrimitive("value"),
+                                    ),
+                                ),
+                            ),
+                        ),
                 ),
-            ),
-        )
+            )
 
         val result = jsonObject.toDocument()
 
@@ -254,11 +278,12 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should handle empty JsonArray")
     fun testEmptyJsonArray() {
-        val jsonObject = JsonObject(
-            mapOf(
-                "emptyArray" to JsonArray(emptyList()),
-            ),
-        )
+        val jsonObject =
+            JsonObject(
+                mapOf(
+                    "emptyArray" to JsonArray(emptyList()),
+                ),
+            )
 
         val result = jsonObject.toDocument()
 
@@ -273,11 +298,12 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert Document.Number with Float to JsonPrimitive")
     fun testDocumentNumberFloatToJson() {
-        val document = Document.Map(
-            mapOf(
-                "floatValue" to Document.Number(3.14f),
-            ),
-        )
+        val document =
+            Document.Map(
+                mapOf(
+                    "floatValue" to Document.Number(3.14f),
+                ),
+            )
 
         val result = document.toJsonObject()
 
@@ -289,11 +315,12 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert Document.Number with Double to JsonPrimitive")
     fun testDocumentNumberDoubleToJson() {
-        val document = Document.Map(
-            mapOf(
-                "doubleValue" to Document.Number(2.71828),
-            ),
-        )
+        val document =
+            Document.Map(
+                mapOf(
+                    "doubleValue" to Document.Number(2.71828),
+                ),
+            )
 
         val result = document.toJsonObject()
 
@@ -305,11 +332,12 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert Document.Number with Int to JsonPrimitive")
     fun testDocumentNumberIntToJson() {
-        val document = Document.Map(
-            mapOf(
-                "intValue" to Document.Number(42),
-            ),
-        )
+        val document =
+            Document.Map(
+                mapOf(
+                    "intValue" to Document.Number(42),
+                ),
+            )
 
         val result = document.toJsonObject()
 
@@ -321,11 +349,12 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert Document.Number with Long to JsonPrimitive")
     fun testDocumentNumberLongToJson() {
-        val document = Document.Map(
-            mapOf(
-                "longValue" to Document.Number(9223372036854775807L),
-            ),
-        )
+        val document =
+            Document.Map(
+                mapOf(
+                    "longValue" to Document.Number(9223372036854775807L),
+                ),
+            )
 
         val result = document.toJsonObject()
 
@@ -337,19 +366,21 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert Document.List with null elements to JsonArray with JsonNull")
     fun testDocumentListWithNullElements() {
-        val document = Document.Map(
-            mapOf(
-                "listWithNulls" to Document.List(
-                    listOf(
-                        Document.String("value1"),
-                        null,
-                        Document.Number(42),
-                        null,
-                        Document.Boolean(true),
-                    ),
+        val document =
+            Document.Map(
+                mapOf(
+                    "listWithNulls" to
+                        Document.List(
+                            listOf(
+                                Document.String("value1"),
+                                null,
+                                Document.Number(42),
+                                null,
+                                Document.Boolean(true),
+                            ),
+                        ),
                 ),
-            ),
-        )
+            )
 
         val result = document.toJsonObject()
 
@@ -375,14 +406,15 @@ internal class ExtensionsTest {
     @Test
     @DisplayName("Should convert all numeric types in Document.Number correctly")
     fun testAllNumericTypesInDocumentNumber() {
-        val document = Document.Map(
-            mapOf(
-                "float" to Document.Number(1.5f),
-                "double" to Document.Number(2.5),
-                "int" to Document.Number(100),
-                "long" to Document.Number(1000L),
-            ),
-        )
+        val document =
+            Document.Map(
+                mapOf(
+                    "float" to Document.Number(1.5f),
+                    "double" to Document.Number(2.5),
+                    "int" to Document.Number(100),
+                    "long" to Document.Number(1000L),
+                ),
+            )
 
         val result = document.toJsonObject()
 

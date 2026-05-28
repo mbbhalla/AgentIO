@@ -7,12 +7,12 @@ import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 internal class CodeMetricsMcpServer(
     private val rootPath: String,
 ) : AbstractMcpServer() {
-
-    override fun tools(): Set<RegisteredTool> = setOf(
-        ListSourceFilesTool(rootPath)(),
-        FileComplexityTool(rootPath)(),
-        DependencyGraphTool(rootPath)(),
-    )
+    override fun tools(): Set<RegisteredTool> =
+        setOf(
+            ListSourceFilesTool(rootPath)(),
+            FileComplexityTool(rootPath)(),
+            DependencyGraphTool(rootPath)(),
+        )
 
     override fun capabilities() = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = false))
 

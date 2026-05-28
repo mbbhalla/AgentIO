@@ -28,13 +28,10 @@ value class TopP(
 
 enum class LLM(
     val id: String,
-
     // Max Context window token length
     val maxContextTokens: Int,
-
     // Max Model response token length
     val maxOutputTokens: Int,
-
     // model specific config
     val additionalModelRequestFields: Map<String, JsonElement>,
 ) {
@@ -55,11 +52,13 @@ enum class LLM(
         id = "us.anthropic.claude-sonnet-4-20250514-v1:0",
         maxContextTokens = 1_000_000, // with below beta headers, else default is 200_000
         maxOutputTokens = 64_000,
-        additionalModelRequestFields = mapOf(
-            "anthropic_beta" to buildJsonArray {
-                add(JsonPrimitive("context-1m-2025-08-07"))
-            },
-        ),
+        additionalModelRequestFields =
+            mapOf(
+                "anthropic_beta" to
+                    buildJsonArray {
+                        add(JsonPrimitive("context-1m-2025-08-07"))
+                    },
+            ),
     ),
 
     ANTHROPIC_CLAUDE_OPUS_4_5_V1_CROSS_REGION_INFERENCE(

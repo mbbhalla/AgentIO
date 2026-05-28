@@ -5,12 +5,12 @@ import io.modelcontextprotocol.kotlin.sdk.server.RegisteredTool
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 
 internal class ApiDesignMcpServer : AbstractMcpServer() {
-
-    override fun tools(): Set<RegisteredTool> = setOf(
-        ParseRequirementsTool()(),
-        ValidateSchemaConsistencyTool()(),
-        CheckSecurityPatternsTool()(),
-    )
+    override fun tools(): Set<RegisteredTool> =
+        setOf(
+            ParseRequirementsTool()(),
+            ValidateSchemaConsistencyTool()(),
+            CheckSecurityPatternsTool()(),
+        )
 
     override fun capabilities() = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = false))
 

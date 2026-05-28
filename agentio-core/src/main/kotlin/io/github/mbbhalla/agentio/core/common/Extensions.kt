@@ -1,8 +1,8 @@
 package io.github.mbbhalla.agentio.core.common
 
 import aws.smithy.kotlin.runtime.content.Document
-import io.modelcontextprotocol.kotlin.sdk.types.Tool
 import io.modelcontextprotocol.kotlin.sdk.client.Client
+import io.modelcontextprotocol.kotlin.sdk.types.Tool
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -25,8 +25,8 @@ import kotlinx.serialization.json.longOrNull
     https://docs.aws.amazon.com/smithy-kotlin/api/latest/runtime-core/aws.smithy.kotlin.runtime.content/-document/
  */
 internal fun JsonObject.toDocument(): Document {
-    fun JsonElement.toDocument(): Document {
-        return when (this) {
+    fun JsonElement.toDocument(): Document =
+        when (this) {
             // Handle primitive types
             is JsonPrimitive -> {
                 when {
@@ -43,9 +43,10 @@ internal fun JsonObject.toDocument(): Document {
             // Handle JSON objects recursively
             is JsonObject -> {
                 Document.Map(
-                    value = this.entries.associate {
-                        it.key to it.value.toDocument()
-                    },
+                    value =
+                        this.entries.associate {
+                            it.key to it.value.toDocument()
+                        },
                 )
             }
 
@@ -55,7 +56,6 @@ internal fun JsonObject.toDocument(): Document {
                 Document.List(value = documentList)
             }
         }
-    }
     return (this as JsonElement).toDocument()
 }
 
@@ -65,35 +65,37 @@ internal fun JsonObject.toDocument(): Document {
  */
 @Suppress("CyclomaticComplexMethod")
 internal fun Document.toJsonObject(): JsonObject {
-    fun Document.toJsonElement(): JsonElement {
-        return when (this) {
+    fun Document.toJsonElement(): JsonElement =
+        when (this) {
             is Document.String -> this.asStringOrNull()?.let { JsonPrimitive(it) } ?: JsonNull
-            is Document.Number -> when (this.value) {
-                is Float -> JsonPrimitive(this.value.toFloat())
-                is Double -> JsonPrimitive(this.value.toDouble())
-                is Int -> JsonPrimitive(this.value.toInt())
-                is Long -> JsonPrimitive(this.value.toLong())
-                else -> JsonNull
-            }
+            is Document.Number ->
+                when (this.value) {
+                    is Float -> JsonPrimitive(this.value.toFloat())
+                    is Double -> JsonPrimitive(this.value.toDouble())
+                    is Int -> JsonPrimitive(this.value.toInt())
+                    is Long -> JsonPrimitive(this.value.toLong())
+                    else -> JsonNull
+                }
             is Document.Boolean -> this.asBooleanOrNull()?.let { JsonPrimitive(it) } ?: JsonNull
-            is Document.List -> JsonArray(
-                this.value.map {
-                    it?.toJsonElement() ?: JsonNull
-                },
-            )
-            is Document.Map -> JsonObject(
-                content = this.value.entries.associate {
-                    it.key to (it.value?.toJsonElement() ?: JsonNull)
-                },
-            )
+            is Document.List ->
+                JsonArray(
+                    this.value.map {
+                        it?.toJsonElement() ?: JsonNull
+                    },
+                )
+            is Document.Map ->
+                JsonObject(
+                    content =
+                        this.value.entries.associate {
+                            it.key to (it.value?.toJsonElement() ?: JsonNull)
+                        },
+                )
         }
-    }
     return this.toJsonElement().jsonObject
 }
 
-suspend fun Client.listToolsAndSkipDenyList(
-    deniedTools: Set<String>,
-): List<Tool> {
-    return this.listTools().tools
+suspend fun Client.listToolsAndSkipDenyList(deniedTools: Set<String>): List<Tool> =
+    this
+        .listTools()
+        .tools
         .filterNot { deniedTools.contains(it.name) }
-}

@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger
 class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
     private val evaluationInput: EvaluationInput<I, O>,
 ) {
-
     companion object {
         private val LOG = LoggerFactory.getLogger(AgenticFunctionEvaluator::class.java)
     }
@@ -42,26 +41,20 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
          * When using [withFactory], this produces a fresh instance per iteration.
          */
         val agenticFunctionFactory: () -> AbstractAgenticFunction<I, O>,
-
         /** The input to evaluate with. */
         val input: I,
-
         /** Number of iterations to run. */
         val numIterations: Int,
-
         /** Maximum concurrent iterations. */
         val maxParallelism: Int,
-
         /** Predicate that determines whether an output is a "match" (success criterion). */
         val outputMatcher: (O) -> Boolean,
-
         /**
          * Optional callback invoked after each iteration completes.
          * Receives the iteration index (0-based), total iterations, and the trial result.
          * Called from a coroutine context — must be thread-safe.
          */
         val onIterationComplete: ((IterationProgress<O>) -> Unit)? = null,
-
         /**
          * Delay in milliseconds between iterations to avoid API throttling.
          * Default is 0 (no delay). Set to e.g., 2000 for 2 seconds between calls.
@@ -81,15 +74,16 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
                 outputMatcher: (O) -> Boolean,
                 onIterationComplete: ((IterationProgress<O>) -> Unit)? = null,
                 delayBetweenIterationsMs: Long = 0,
-            ): EvaluationInput<I, O> = EvaluationInput(
-                agenticFunctionFactory = { agenticFunction },
-                input = input,
-                numIterations = numIterations,
-                maxParallelism = maxParallelism,
-                outputMatcher = outputMatcher,
-                onIterationComplete = onIterationComplete,
-                delayBetweenIterationsMs = delayBetweenIterationsMs,
-            )
+            ): EvaluationInput<I, O> =
+                EvaluationInput(
+                    agenticFunctionFactory = { agenticFunction },
+                    input = input,
+                    numIterations = numIterations,
+                    maxParallelism = maxParallelism,
+                    outputMatcher = outputMatcher,
+                    onIterationComplete = onIterationComplete,
+                    delayBetweenIterationsMs = delayBetweenIterationsMs,
+                )
 
             /**
              * Create an [EvaluationInput] that produces a fresh [AbstractAgenticFunction]
@@ -104,15 +98,16 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
                 outputMatcher: (O) -> Boolean,
                 onIterationComplete: ((IterationProgress<O>) -> Unit)? = null,
                 delayBetweenIterationsMs: Long = 0,
-            ): EvaluationInput<I, O> = EvaluationInput(
-                agenticFunctionFactory = agenticFunctionFactory,
-                input = input,
-                numIterations = numIterations,
-                maxParallelism = maxParallelism,
-                outputMatcher = outputMatcher,
-                onIterationComplete = onIterationComplete,
-                delayBetweenIterationsMs = delayBetweenIterationsMs,
-            )
+            ): EvaluationInput<I, O> =
+                EvaluationInput(
+                    agenticFunctionFactory = agenticFunctionFactory,
+                    input = input,
+                    numIterations = numIterations,
+                    maxParallelism = maxParallelism,
+                    outputMatcher = outputMatcher,
+                    onIterationComplete = onIterationComplete,
+                    delayBetweenIterationsMs = delayBetweenIterationsMs,
+                )
         }
     }
 
@@ -122,19 +117,14 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
     data class IterationProgress<O : Any>(
         /** 1-based index of the completed iteration. */
         val completedCount: Int,
-
         /** Total iterations in this evaluation. */
         val totalIterations: Int,
-
         /** The result of this iteration. */
         val result: Try<AgentOutput<O>>,
-
         /** Whether the output matched (false if the iteration failed). */
         val matched: Boolean,
-
         /** Running count of matches so far. */
         val matchesSoFar: Int,
-
         /** Running count of failures so far. */
         val failuresSoFar: Int,
     )
@@ -144,7 +134,6 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
         val failures: List<Throwable>,
         val successResults: List<O>,
         val successAndMatchIterations: Int,
-
         /**
          * Raw per-trial outputs preserving the full [AgentOutput] (including [Conversation]
          * with token usage) for trials that succeeded, and the failure cause for trials
@@ -160,66 +149,74 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
         val matchCount = AtomicInteger(0)
         val failureCount = AtomicInteger(0)
 
-        val outputs = withContext(Dispatchers.IO.limitedParallelism(evaluationInput.maxParallelism)) {
-            (0..<evaluationInput.numIterations).map { iterationIndex ->
-                async {
-                    // Stagger requests to avoid API throttling
-                    if (evaluationInput.delayBetweenIterationsMs > 0 && iterationIndex > 0) {
-                        delay(evaluationInput.delayBetweenIterationsMs * iterationIndex)
-                    }
+        val outputs =
+            withContext(Dispatchers.IO.limitedParallelism(evaluationInput.maxParallelism)) {
+                (0..<evaluationInput.numIterations)
+                    .map { iterationIndex ->
+                        async {
+                            // Stagger requests to avoid API throttling
+                            if (evaluationInput.delayBetweenIterationsMs > 0 && iterationIndex > 0) {
+                                delay(evaluationInput.delayBetweenIterationsMs * iterationIndex)
+                            }
 
-                    val result = evaluationInput.agenticFunctionFactory()
-                        .invoke(input = evaluationInput.input)
+                            val result =
+                                evaluationInput
+                                    .agenticFunctionFactory()
+                                    .invoke(input = evaluationInput.input)
 
-                    // Compute match status
-                    val matched = result.isSuccess &&
-                        evaluationInput.outputMatcher.invoke(result.get().output)
+                            // Compute match status
+                            val matched =
+                                result.isSuccess &&
+                                    evaluationInput.outputMatcher.invoke(result.get().output)
 
-                    // Update counters atomically
-                    val completed = completedCount.incrementAndGet()
-                    if (matched) matchCount.incrementAndGet()
-                    if (result.isFailure) failureCount.incrementAndGet()
+                            // Update counters atomically
+                            val completed = completedCount.incrementAndGet()
+                            if (matched) matchCount.incrementAndGet()
+                            if (result.isFailure) failureCount.incrementAndGet()
 
-                    // Report progress
-                    if (evaluationInput.onIterationComplete != null) {
-                        evaluationInput.onIterationComplete.invoke(
-                            IterationProgress(
-                                completedCount = completed,
-                                totalIterations = evaluationInput.numIterations,
-                                result = result,
-                                matched = matched,
-                                matchesSoFar = matchCount.get(),
-                                failuresSoFar = failureCount.get(),
-                            ),
-                        )
-                    } else {
-                        // Default progress logging when no callback is provided
-                        val status = when {
-                            result.isFailure -> "FAILED: ${result.cause.message}"
-                            matched -> "MATCHED"
-                            else -> "NO MATCH"
+                            // Report progress
+                            if (evaluationInput.onIterationComplete != null) {
+                                evaluationInput.onIterationComplete.invoke(
+                                    IterationProgress(
+                                        completedCount = completed,
+                                        totalIterations = evaluationInput.numIterations,
+                                        result = result,
+                                        matched = matched,
+                                        matchesSoFar = matchCount.get(),
+                                        failuresSoFar = failureCount.get(),
+                                    ),
+                                )
+                            } else {
+                                // Default progress logging when no callback is provided
+                                val status =
+                                    when {
+                                        result.isFailure -> "FAILED: ${result.cause.message}"
+                                        matched -> "MATCHED"
+                                        else -> "NO MATCH"
+                                    }
+                                LOG.debug(
+                                    "[Iteration {}/{}] {} | matches so far: {}/{}",
+                                    completed,
+                                    evaluationInput.numIterations,
+                                    status,
+                                    matchCount.get(),
+                                    completed,
+                                )
+                            }
+
+                            result
                         }
-                        LOG.debug(
-                            "[Iteration {}/{}] {} | matches so far: {}/{}",
-                            completed,
-                            evaluationInput.numIterations,
-                            status,
-                            matchCount.get(),
-                            completed,
-                        )
-                    }
-
-                    result
-                }
-            }.awaitAll()
-        }
+                    }.awaitAll()
+            }
         return EvaluationResult(
             totalIterations = evaluationInput.numIterations,
             failures = outputs.filter { it.isFailure }.map { it.cause },
             successResults = outputs.filter { it.isSuccess }.map { it.get().output },
-            successAndMatchIterations = outputs.filter {
-                it.isSuccess && evaluationInput.outputMatcher.invoke(it.get().output)
-            }.size,
+            successAndMatchIterations =
+                outputs
+                    .filter {
+                        it.isSuccess && evaluationInput.outputMatcher.invoke(it.get().output)
+                    }.size,
             rawOutputs = outputs,
         )
     }

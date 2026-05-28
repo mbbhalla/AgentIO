@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ColumnNameTest {
-
     @Test
     fun `valid column names construct successfully`() {
         assertEquals("site_id", ColumnName("site_id").value)

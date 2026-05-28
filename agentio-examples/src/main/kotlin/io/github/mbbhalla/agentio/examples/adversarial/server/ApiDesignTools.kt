@@ -7,7 +7,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonPrimitive
 
 internal class ParseRequirementsTool : AbstractMcpTool<ParseRequirementsTool.Input, ParseRequirementsTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("Raw requirements text to parse into structured elements")
@@ -25,13 +24,21 @@ internal class ParseRequirementsTool : AbstractMcpTool<ParseRequirementsTool.Inp
     )
 
     override fun name() = "parse_requirements"
+
     override fun description() = "Parse natural language requirements into structured entities, operations, and constraints"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig()
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val text = callToolRequest.params.arguments?.get("requirementsText")?.jsonPrimitive?.content ?: ""
+        val text =
+            callToolRequest.params.arguments
+                ?.get("requirementsText")
+                ?.jsonPrimitive
+                ?.content ?: ""
         return Input(requirementsText = text)
     }
 
@@ -44,16 +51,17 @@ internal class ParseRequirementsTool : AbstractMcpTool<ParseRequirementsTool.Inp
         return Output(
             entities = entityPatterns.filter { text.contains(it) },
             operations = operationPatterns.filter { text.contains(it) },
-            constraints = constraintPatterns.filter { text.contains(it) }.map { keyword ->
-                val idx = text.indexOf(keyword)
-                text.substring(idx, minOf(idx + 80, text.length)).trim()
-            },
+            constraints =
+                constraintPatterns.filter { text.contains(it) }.map { keyword ->
+                    val idx = text.indexOf(keyword)
+                    text.substring(idx, minOf(idx + 80, text.length)).trim()
+                },
         )
     }
 }
 
-internal class ValidateSchemaConsistencyTool : AbstractMcpTool<ValidateSchemaConsistencyTool.Input, ValidateSchemaConsistencyTool.Output>() {
-
+internal class ValidateSchemaConsistencyTool :
+    AbstractMcpTool<ValidateSchemaConsistencyTool.Input, ValidateSchemaConsistencyTool.Output>() {
     @Serializable
     data class Input(
         @field:Description("JSON schema definition to validate for internal consistency")
@@ -71,13 +79,21 @@ internal class ValidateSchemaConsistencyTool : AbstractMcpTool<ValidateSchemaCon
     )
 
     override fun name() = "validate_schema_consistency"
+
     override fun description() = "Check a JSON API schema for internal consistency, naming conventions, and REST best practices"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig()
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val schema = callToolRequest.params.arguments?.get("schemaJson")?.jsonPrimitive?.content ?: ""
+        val schema =
+            callToolRequest.params.arguments
+                ?.get("schemaJson")
+                ?.jsonPrimitive
+                ?.content ?: ""
         return Input(schemaJson = schema)
     }
 
@@ -114,7 +130,6 @@ internal class ValidateSchemaConsistencyTool : AbstractMcpTool<ValidateSchemaCon
 }
 
 internal class CheckSecurityPatternsTool : AbstractMcpTool<CheckSecurityPatternsTool.Input, CheckSecurityPatternsTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("API design text or schema to check for security concerns")
@@ -132,13 +147,21 @@ internal class CheckSecurityPatternsTool : AbstractMcpTool<CheckSecurityPatterns
     )
 
     override fun name() = "check_security_patterns"
+
     override fun description() = "Analyze an API design for security anti-patterns and recommend mitigations"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig()
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val text = callToolRequest.params.arguments?.get("designText")?.jsonPrimitive?.content ?: ""
+        val text =
+            callToolRequest.params.arguments
+                ?.get("designText")
+                ?.jsonPrimitive
+                ?.content ?: ""
         return Input(designText = text)
     }
 
@@ -167,11 +190,12 @@ internal class CheckSecurityPatternsTool : AbstractMcpTool<CheckSecurityPatterns
             recommendations.add("Specify TLS requirement for all endpoints")
         }
 
-        val riskLevel = when {
-            concerns.size >= 3 -> "HIGH"
-            concerns.size >= 1 -> "MEDIUM"
-            else -> "LOW"
-        }
+        val riskLevel =
+            when {
+                concerns.size >= 3 -> "HIGH"
+                concerns.size >= 1 -> "MEDIUM"
+                else -> "LOW"
+            }
 
         return Output(
             concerns = concerns,

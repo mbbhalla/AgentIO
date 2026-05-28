@@ -14,7 +14,6 @@ import java.io.PipedOutputStream
 data class PipedStreamsExchange(
     val outServerToClient: PipedOutputStream,
     val inClientFromServer: PipedInputStream,
-
     val outClientToServer: PipedOutputStream,
     val inServerFromClient: PipedInputStream,
 ) {
@@ -35,17 +34,15 @@ data class PipedStreamsExchange(
         }
     }
 
-    fun stdioClientTransport(): StdioClientTransport {
-        return StdioClientTransport(
+    fun stdioClientTransport(): StdioClientTransport =
+        StdioClientTransport(
             input = this.inClientFromServer.asSource().buffered(),
             output = this.outClientToServer.asSink().buffered(),
         )
-    }
 
-    fun stdioServerTransport(): StdioServerTransport {
-        return StdioServerTransport(
+    fun stdioServerTransport(): StdioServerTransport =
+        StdioServerTransport(
             inputStream = this.inServerFromClient.asSource().buffered(),
             outputStream = this.outServerToClient.asSink().buffered(),
         )
-    }
 }

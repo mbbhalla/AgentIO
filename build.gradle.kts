@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm") version "2.2.0" apply false
     kotlin("plugin.serialization") version "2.2.0" apply false
     id("org.owasp.dependencycheck") version "12.1.1"
+    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
 }
 
 allprojects {
@@ -19,6 +20,7 @@ allprojects {
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
+    apply(plugin = "org.jlleitschuh.gradle.ktlint")
 
     configure<JavaPluginExtension> {
         toolchain {

@@ -24,34 +24,38 @@ class DuckDbDatabaseEnvironment private constructor(
     private val connection: Connection,
     private val tableMetadata: Map<TableName, TableInfo>,
 ) : DatabaseEnvironment() {
-
     override fun listTables(): Set<TableName> = tableMetadata.keys
 
     override fun getTableInfo(tableName: TableName): TableInfo =
         tableMetadata[tableName]
             ?: throw IllegalArgumentException("Table '${tableName.value}' not found")
 
-    override fun explain(sql: String): ExplainResult = try {
-        connection.createStatement().use { stmt ->
-            stmt.executeQuery("EXPLAIN $sql").close()
-        }
-        ExplainResult.Success
-    } catch (e: Exception) {
-        ExplainResult.Failure(e.message ?: "Unknown SQL error")
-    }
-
-    override fun statementType(sql: String): StatementType = try {
-        connection.createStatement().use { stmt ->
-            val rs = stmt.executeQuery("EXPLAIN $sql")
-            val plan = buildString {
-                while (rs.next()) { append(rs.getString("explain_value")) }
+    override fun explain(sql: String): ExplainResult =
+        try {
+            connection.createStatement().use { stmt ->
+                stmt.executeQuery("EXPLAIN $sql").close()
             }
-            rs.close()
-            extractStatementType(plan)
+            ExplainResult.Success
+        } catch (e: Exception) {
+            ExplainResult.Failure(e.message ?: "Unknown SQL error")
         }
-    } catch (_: Exception) {
-        StatementType.UNKNOWN
-    }
+
+    override fun statementType(sql: String): StatementType =
+        try {
+            connection.createStatement().use { stmt ->
+                val rs = stmt.executeQuery("EXPLAIN $sql")
+                val plan =
+                    buildString {
+                        while (rs.next()) {
+                            append(rs.getString("explain_value"))
+                        }
+                    }
+                rs.close()
+                extractStatementType(plan)
+            }
+        } catch (_: Exception) {
+            StatementType.UNKNOWN
+        }
 
     override fun executeQuery(sql: SelectSqlStatement): Dataset =
         connection.createStatement().use { stmt ->
@@ -59,7 +63,6 @@ class DuckDbDatabaseEnvironment private constructor(
         }
 
     companion object {
-
         fun fromStatements(
             ddl: List<String>,
             dml: List<String>,
@@ -80,8 +83,9 @@ class DuckDbDatabaseEnvironment private constructor(
             Class.forName("org.duckdb.DuckDBDriver")
             val connection = DriverManager.getConnection("jdbc:duckdb:")
 
-            val parquetFiles = directory.toFile().listFiles { f -> f.extension == "parquet" }
-                ?: throw IllegalArgumentException("Directory does not exist: $directory")
+            val parquetFiles =
+                directory.toFile().listFiles { f -> f.extension == "parquet" }
+                    ?: throw IllegalArgumentException("Directory does not exist: $directory")
             require(parquetFiles.isNotEmpty()) { "No .parquet files found in: $directory" }
 
             val tableMetadata = mutableMapOf<TableName, TableInfo>()
@@ -93,11 +97,12 @@ class DuckDbDatabaseEnvironment private constructor(
                         "CREATE VIEW ${tableName.value} AS SELECT * FROM read_parquet('${file.absolutePath}')",
                     )
                     val columns = inferColumns(connection, tableName)
-                    tableMetadata[tableName] = TableInfo(
-                        name = tableName,
-                        description = "Table loaded from ${file.name}",
-                        columns = columns,
-                    )
+                    tableMetadata[tableName] =
+                        TableInfo(
+                            name = tableName,
+                            description = "Table loaded from ${file.name}",
+                            columns = columns,
+                        )
                 }
             }
 
@@ -110,29 +115,38 @@ class DuckDbDatabaseEnvironment private constructor(
             s3Uri: S3Uri,
             s3Client: S3Client,
         ): DuckDbDatabaseEnvironment {
-            val tempDir = withContext(Dispatchers.IO) {
-                Files.createTempDirectory("agentio-parquet-${java.util.UUID.randomUUID()}")
-            }
+            val tempDir =
+                withContext(Dispatchers.IO) {
+                    Files.createTempDirectory("agentio-parquet-${java.util.UUID.randomUUID()}")
+                }
 
-            val parquetKeys = generateList(
-                seed = s3Client.listObjectsV2(ListObjectsV2Request {
-                    bucket = s3Uri.bucket
-                    prefix = s3Uri.prefix
-                }),
-            ) { prev ->
-                if (prev.isTruncated == true)
-                    s3Client.listObjectsV2(ListObjectsV2Request {
-                        bucket = s3Uri.bucket
-                        prefix = s3Uri.prefix
-                        continuationToken = prev.nextContinuationToken
-                    })
-                else null
-            }.flatMap { response ->
-                response.contents
-                    ?.filter { it.key?.endsWith(".parquet") == true }
-                    ?.mapNotNull { it.key }
-                    ?: emptyList()
-            }
+            val parquetKeys =
+                generateList(
+                    seed =
+                        s3Client.listObjectsV2(
+                            ListObjectsV2Request {
+                                bucket = s3Uri.bucket
+                                prefix = s3Uri.prefix
+                            },
+                        ),
+                ) { prev ->
+                    if (prev.isTruncated == true) {
+                        s3Client.listObjectsV2(
+                            ListObjectsV2Request {
+                                bucket = s3Uri.bucket
+                                prefix = s3Uri.prefix
+                                continuationToken = prev.nextContinuationToken
+                            },
+                        )
+                    } else {
+                        null
+                    }
+                }.flatMap { response ->
+                    response.contents
+                        ?.filter { it.key?.endsWith(".parquet") == true }
+                        ?.mapNotNull { it.key }
+                        ?: emptyList()
+                }
 
             require(parquetKeys.isNotEmpty()) { "No .parquet files found at: ${s3Uri.value}" }
 
@@ -186,10 +200,17 @@ class DuckDbDatabaseEnvironment private constructor(
         }
 
         private fun extractStatementType(plan: String): StatementType {
-            val firstBoxContent = plan.lines()
-                .map { it.trim().removePrefix("│").removeSuffix("│").trim() }
-                .firstOrNull { it.isNotBlank() && !it.startsWith("┌") && !it.startsWith("└") && !it.startsWith("─") }
-                ?: return StatementType.UNKNOWN
+            val firstBoxContent =
+                plan
+                    .lines()
+                    .map {
+                        it
+                            .trim()
+                            .removePrefix("│")
+                            .removeSuffix("│")
+                            .trim()
+                    }.firstOrNull { it.isNotBlank() && !it.startsWith("┌") && !it.startsWith("└") && !it.startsWith("─") }
+                    ?: return StatementType.UNKNOWN
 
             return when (firstBoxContent) {
                 "INSERT" -> StatementType.INSERT
@@ -198,6 +219,5 @@ class DuckDbDatabaseEnvironment private constructor(
                 else -> StatementType.SELECT
             }
         }
-
     }
 }

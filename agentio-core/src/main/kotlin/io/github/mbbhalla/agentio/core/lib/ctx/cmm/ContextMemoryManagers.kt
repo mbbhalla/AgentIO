@@ -23,13 +23,14 @@ data class ContextMemoryManagers(
         var conversation = input.conversation
         for (cmm in value) {
             if (cmm.shouldExecuteOnTurn(input.turnNumber)) {
-                conversation = cmm.getContext(
-                    ContextMemoryManager.ContextMemoryManagerInput(
-                        conversation = conversation,
-                        llm = input.llm,
-                        turnNumber = input.turnNumber,
-                    ),
-                )
+                conversation =
+                    cmm.getContext(
+                        ContextMemoryManager.ContextMemoryManagerInput(
+                            conversation = conversation,
+                            llm = input.llm,
+                            turnNumber = input.turnNumber,
+                        ),
+                    )
             }
         }
         return conversation

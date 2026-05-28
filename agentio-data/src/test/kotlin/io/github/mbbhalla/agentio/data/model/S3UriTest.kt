@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class S3UriTest {
-
     @Test
     fun `valid S3 URI parses bucket and prefix`() {
         val uri = S3Uri("s3://my-bucket/path/to/data")

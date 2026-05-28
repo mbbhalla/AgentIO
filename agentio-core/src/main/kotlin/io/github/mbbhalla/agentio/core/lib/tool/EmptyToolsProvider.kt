@@ -11,11 +11,8 @@ import aws.sdk.kotlin.services.bedrockruntime.model.Tool
 object EmptyToolsProvider : ToolsProvider {
     override suspend fun listTools(): List<Tool.ToolSpec> = emptyList()
 
-    override suspend fun callTool(
-        contentBlock: ContentBlock.ToolUse,
-    ): ContentBlock.ToolResult {
+    override suspend fun callTool(contentBlock: ContentBlock.ToolUse): ContentBlock.ToolResult =
         throw UnsupportedOperationException(
             "EmptyToolsProvider does not support tool calls",
         )
-    }
 }

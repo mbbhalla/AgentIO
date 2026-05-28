@@ -10,7 +10,6 @@ import java.io.File
 internal class ListSourceFilesTool(
     private val rootPath: String,
 ) : AbstractMcpTool<ListSourceFilesTool.Input, ListSourceFilesTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("File extension to filter by, e.g. kt, java, ts")
@@ -33,30 +32,39 @@ internal class ListSourceFilesTool(
     )
 
     override fun name() = "list_source_files"
+
     override fun description() = "List source files by extension with line counts and file sizes"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig()
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val extension = callToolRequest.params.arguments?.get("extension")?.jsonPrimitive?.content ?: "kt"
+        val extension =
+            callToolRequest.params.arguments
+                ?.get("extension")
+                ?.jsonPrimitive
+                ?.content ?: "kt"
         return Input(extension = extension)
     }
 
     override fun invoke(input: Input): Output {
         val root = File(rootPath)
-        val files = root.walkTopDown()
-            .filter { it.isFile && it.extension == input.extension }
-            .filter { !it.path.contains("/build/") && !it.path.contains("/bin/") }
-            .map { file ->
-                FileInfo(
-                    path = file.relativeTo(root).path,
-                    lines = file.readLines().size,
-                    sizeBytes = file.length(),
-                )
-            }
-            .sortedByDescending { it.lines }
-            .toList()
+        val files =
+            root
+                .walkTopDown()
+                .filter { it.isFile && it.extension == input.extension }
+                .filter { !it.path.contains("/build/") && !it.path.contains("/bin/") }
+                .map { file ->
+                    FileInfo(
+                        path = file.relativeTo(root).path,
+                        lines = file.readLines().size,
+                        sizeBytes = file.length(),
+                    )
+                }.sortedByDescending { it.lines }
+                .toList()
         return Output(files = files, totalCount = files.size)
     }
 }
@@ -64,7 +72,6 @@ internal class ListSourceFilesTool(
 internal class FileComplexityTool(
     private val rootPath: String,
 ) : AbstractMcpTool<FileComplexityTool.Input, FileComplexityTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("File path relative to the root directory")
@@ -89,13 +96,22 @@ internal class FileComplexityTool(
     )
 
     override fun name() = "file_complexity"
-    override fun description() = "Analyze complexity metrics for a single source file including line counts, function count, class count, and nesting depth"
+
+    override fun description() =
+        "Analyze complexity metrics for a single source file including line counts, function count, class count, and nesting depth"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig()
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val filePath = callToolRequest.params.arguments?.get("filePath")?.jsonPrimitive?.content ?: ""
+        val filePath =
+            callToolRequest.params.arguments
+                ?.get("filePath")
+                ?.jsonPrimitive
+                ?.content ?: ""
         return Input(filePath = filePath)
     }
 
@@ -106,24 +122,31 @@ internal class FileComplexityTool(
         }
         val lines = file.readLines()
         val blankLines = lines.count { it.isBlank() }
-        val commentLines = lines.count { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") || it.trimStart().startsWith("/*") }
+        val commentLines =
+            lines.count {
+                it.trimStart().startsWith("//") ||
+                    it.trimStart().startsWith("*") ||
+                    it.trimStart().startsWith("/*")
+            }
         val codeLines = lines.size - blankLines - commentLines
         val functionCount = lines.count { it.contains("fun ") }
         val classCount = lines.count { it.contains("class ") && !it.trimStart().startsWith("//") }
-        val maxIndentDepth = lines.maxOfOrNull { line ->
-            line.takeWhile { it == ' ' }.length / 4
-        } ?: 0
+        val maxIndentDepth =
+            lines.maxOfOrNull { line ->
+                line.takeWhile { it == ' ' }.length / 4
+            } ?: 0
 
         return Output(
-            metrics = FileMetrics(
-                totalLines = lines.size,
-                codeLines = codeLines,
-                blankLines = blankLines,
-                commentLines = commentLines,
-                functionCount = functionCount,
-                classCount = classCount,
-                maxIndentDepth = maxIndentDepth,
-            ),
+            metrics =
+                FileMetrics(
+                    totalLines = lines.size,
+                    codeLines = codeLines,
+                    blankLines = blankLines,
+                    commentLines = commentLines,
+                    functionCount = functionCount,
+                    classCount = classCount,
+                    maxIndentDepth = maxIndentDepth,
+                ),
         )
     }
 }
@@ -131,7 +154,6 @@ internal class FileComplexityTool(
 internal class DependencyGraphTool(
     private val rootPath: String,
 ) : AbstractMcpTool<DependencyGraphTool.Input, DependencyGraphTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("File extension to scan for import analysis, e.g. kt, java")
@@ -154,13 +176,21 @@ internal class DependencyGraphTool(
     )
 
     override fun name() = "dependency_graph"
+
     override fun description() = "Analyze import statements across source files to build a package-level dependency graph"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig()
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val extension = callToolRequest.params.arguments?.get("extension")?.jsonPrimitive?.content ?: "kt"
+        val extension =
+            callToolRequest.params.arguments
+                ?.get("extension")
+                ?.jsonPrimitive
+                ?.content ?: "kt"
         return Input(extension = extension)
     }
 
@@ -171,30 +201,40 @@ internal class DependencyGraphTool(
 
         val filesByPackage = mutableMapOf<String, MutableList<Set<String>>>()
 
-        root.walkTopDown()
+        root
+            .walkTopDown()
             .filter { it.isFile && it.extension == input.extension }
             .filter { !it.path.contains("/build/") && !it.path.contains("/bin/") }
             .forEach { file ->
                 val lines = file.readLines()
-                val pkg = lines.firstNotNullOfOrNull { line ->
-                    packageRegex.find(line.trim())?.groupValues?.get(1)
-                } ?: "default"
-                val imports = lines.mapNotNull { line ->
-                    importRegex.find(line.trim())?.groupValues?.get(1)
-                }.map { it.substringBeforeLast('.') }.toSet()
+                val pkg =
+                    lines.firstNotNullOfOrNull { line ->
+                        packageRegex.find(line.trim())?.groupValues?.get(1)
+                    } ?: "default"
+                val imports =
+                    lines
+                        .mapNotNull { line ->
+                            importRegex.find(line.trim())?.groupValues?.get(1)
+                        }.map { it.substringBeforeLast('.') }
+                        .toSet()
 
                 filesByPackage.getOrPut(pkg) { mutableListOf() }.add(imports)
             }
 
-        val packages = filesByPackage.map { (pkg, importSets) ->
-            PackageDeps(
-                packageName = pkg,
-                fileCount = importSets.size,
-                importedPackages = importSets.flatten().distinct()
-                    .filter { it != pkg }
-                    .sorted(),
-            )
-        }.sortedByDescending { it.fileCount }
+        val packages =
+            filesByPackage
+                .map { (pkg, importSets) ->
+                    PackageDeps(
+                        packageName = pkg,
+                        fileCount = importSets.size,
+                        importedPackages =
+                            importSets
+                                .flatten()
+                                .distinct()
+                                .filter { it != pkg }
+                                .sorted(),
+                    )
+                }.sortedByDescending { it.fileCount }
 
         return Output(packages = packages, totalPackages = packages.size)
     }

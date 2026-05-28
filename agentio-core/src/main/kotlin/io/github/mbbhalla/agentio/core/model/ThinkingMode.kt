@@ -17,9 +17,10 @@ value class ThinkingMode(
         /*
             The text given to LLM to think or reason
          */
-        val THINKING_MODE_PROMPT = """
+        val THINKING_MODE_PROMPT =
+            """
             It is critically important to produce correct output.
             Reanalyze your work again to ensure 100% correctness in your response.
-        """.trimIndent()
+            """.trimIndent()
     }
 }

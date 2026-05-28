@@ -4,7 +4,9 @@ package io.github.mbbhalla.agentio.core.common
     AnnotationTarget.CLASS,
 )
 @Retention(AnnotationRetention.RUNTIME)
-annotation class Title(val value: String)
+annotation class Title(
+    val value: String,
+)
 
 @Target(
     AnnotationTarget.CLASS,
@@ -12,4 +14,6 @@ annotation class Title(val value: String)
     AnnotationTarget.PROPERTY,
 )
 @Retention(AnnotationRetention.RUNTIME)
-annotation class Description(val value: String)
+annotation class Description(
+    val value: String,
+)

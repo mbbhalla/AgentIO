@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class TableNameTest {
-
     @Test
     fun `valid table names construct successfully`() {
         assertEquals("site", TableName("site").value)

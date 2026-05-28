@@ -11,33 +11,37 @@ import kotlin.test.assertEquals
 
 class
 StatementTypeTest {
-
     companion object {
         private lateinit var env: DuckDbDatabaseEnvironment
 
         @BeforeAll
         @JvmStatic
         fun setup() {
-            env = DuckDbDatabaseEnvironment.fromStatements(
-                ddl = listOf(
-                    "CREATE TABLE items (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL, price DOUBLE NOT NULL)",
-                ),
-                dml = listOf(
-                    "INSERT INTO items VALUES (1, 'Widget', 9.99)",
-                    "INSERT INTO items VALUES (2, 'Gadget', 19.99)",
-                ),
-                tableMetadata = setOf(
-                    TableInfo(
-                        name = TableName("items"),
-                        description = "Items",
-                        columns = listOf(
-                            ColumnInfo(ColumnName("id"), ColumnType.INTEGER, false, true, null, "ID"),
-                            ColumnInfo(ColumnName("name"), ColumnType.VARCHAR, false, false, null, "Name"),
-                            ColumnInfo(ColumnName("price"), ColumnType.DOUBLE, false, false, null, "Price"),
+            env =
+                DuckDbDatabaseEnvironment.fromStatements(
+                    ddl =
+                        listOf(
+                            "CREATE TABLE items (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL, price DOUBLE NOT NULL)",
                         ),
-                    ),
-                ),
-            )
+                    dml =
+                        listOf(
+                            "INSERT INTO items VALUES (1, 'Widget', 9.99)",
+                            "INSERT INTO items VALUES (2, 'Gadget', 19.99)",
+                        ),
+                    tableMetadata =
+                        setOf(
+                            TableInfo(
+                                name = TableName("items"),
+                                description = "Items",
+                                columns =
+                                    listOf(
+                                        ColumnInfo(ColumnName("id"), ColumnType.INTEGER, false, true, null, "ID"),
+                                        ColumnInfo(ColumnName("name"), ColumnType.VARCHAR, false, false, null, "Name"),
+                                        ColumnInfo(ColumnName("price"), ColumnType.DOUBLE, false, false, null, "Price"),
+                                    ),
+                            ),
+                        ),
+                )
         }
     }
 

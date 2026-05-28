@@ -25,25 +25,24 @@ import kotlin.time.Duration.Companion.seconds
 internal class GitAnalyzerAgenticFunction(
     agentConfiguration: AgentConfiguration,
 ) : AbstractAgenticFunction<
-    GitAnalyzerAgenticFunction.Input,
-    GitAnalyzerAgenticFunction.Output,
+        GitAnalyzerAgenticFunction.Input,
+        GitAnalyzerAgenticFunction.Output,
     >(agentConfiguration) {
-
     @Serializable
     data class Input(
         @field:Description("Path to the git repository to analyze")
         val repoPath: String,
-
         @field:Description("What to analyze: activity, hotspots, or contributors")
         val analysisType: String = "activity",
     ) : Instructible.WithInstruction {
         override fun instructionId() = "git-analyzer-$analysisType"
 
-        override fun instruction() = """
+        override fun instruction() =
+            """
             Analyze the git repository at '$repoPath' focusing on '$analysisType'.
             Use the available tools to gather commit history, diff statistics, and author information.
             Produce a development activity summary with insights about the codebase health and team dynamics.
-        """.trimIndent()
+            """.trimIndent()
 
         override fun systemInstruction(): String? = null
     }
@@ -52,15 +51,14 @@ internal class GitAnalyzerAgenticFunction(
     data class Output(
         @field:Description("Summary of repository development activity")
         val summary: String,
-
         @field:Description("Key insights about the codebase")
         val insights: List<String>,
-
         @field:Description("Most active areas of the codebase")
         val hotspots: List<String>,
     )
 
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
 }
 
@@ -80,35 +78,41 @@ internal object GitAnalyzerAgenticFunctionProvider {
         return GitAnalyzerAgenticFunction(
             AgentConfiguration(
                 agentId = agentId,
-                languageModelParameters = LanguageModelParameters(
-                    llm = LLM.ANTHROPIC_CLAUDE_OPUS_4_5_V1_CROSS_REGION_INFERENCE,
-                    temperature = Temperature(TEMPERATURE),
-                ),
-                bedrockRuntimeClient = BedrockRuntimeClient {
-                    this.region = "us-west-2"
-                    this.httpClient {
-                        socketReadTimeout = 15.minutes
-                    }
-                },
-                toolsProvider = McpClients(
-                    set = setOf(
-                        NamedClient(
-                            name = "gitops",
-                            client = mcpClient,
-                            deniedTools = emptySet(),
-                        ),
+                languageModelParameters =
+                    LanguageModelParameters(
+                        llm = LLM.ANTHROPIC_CLAUDE_OPUS_4_5_V1_CROSS_REGION_INFERENCE,
+                        temperature = Temperature(TEMPERATURE),
                     ),
-                ),
-                systemPrompt = """
+                bedrockRuntimeClient =
+                    BedrockRuntimeClient {
+                        this.region = "us-west-2"
+                        this.httpClient {
+                            socketReadTimeout = 15.minutes
+                        }
+                    },
+                toolsProvider =
+                    McpClients(
+                        set =
+                            setOf(
+                                NamedClient(
+                                    name = "gitops",
+                                    client = mcpClient,
+                                    deniedTools = emptySet(),
+                                ),
+                            ),
+                    ),
+                systemPrompt =
+                    """
                     You are a software engineering analyst that examines git repositories
                     to produce insights about development patterns, code health, and team dynamics.
                     Now (in UTC) = '${
-                    Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT)
-                }'
-                """.trimIndent(),
-                contextMemoryManagers = ContextMemoryManagers(
-                    value = listOf(NoOperationContextMemoryManager),
-                ),
+                        Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT)
+                    }'
+                    """.trimIndent(),
+                contextMemoryManagers =
+                    ContextMemoryManagers(
+                        value = listOf(NoOperationContextMemoryManager),
+                    ),
                 delayBetweenTurns = 0.seconds,
                 problemDomain = "Git Repository Analysis",
             ),

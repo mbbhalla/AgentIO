@@ -2,10 +2,13 @@ package io.github.mbbhalla.agentio.data.env
 
 import io.github.mbbhalla.agentio.data.model.ExplainResult
 
-data class SelectSqlStatement(val value: String) {
+data class SelectSqlStatement(
+    val value: String,
+) {
     init {
-        val env = DatabaseEnvironment.current
-            ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
+        val env =
+            DatabaseEnvironment.current
+                ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
         val result = env.explain(value)
         require(result.isSuccess) {
             "Invalid SELECT SQL: ${(result as ExplainResult.Failure).error}"
@@ -20,10 +23,13 @@ data class SelectSqlStatement(val value: String) {
     }
 }
 
-data class InsertSqlStatement(val value: String) {
+data class InsertSqlStatement(
+    val value: String,
+) {
     init {
-        val env = DatabaseEnvironment.current
-            ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
+        val env =
+            DatabaseEnvironment.current
+                ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
         val result = env.explain(value)
         require(result.isSuccess) {
             "Invalid INSERT SQL: ${(result as ExplainResult.Failure).error}"
@@ -34,10 +40,13 @@ data class InsertSqlStatement(val value: String) {
     }
 }
 
-data class UpdateSqlStatement(val value: String) {
+data class UpdateSqlStatement(
+    val value: String,
+) {
     init {
-        val env = DatabaseEnvironment.current
-            ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
+        val env =
+            DatabaseEnvironment.current
+                ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
         val result = env.explain(value)
         require(result.isSuccess) {
             "Invalid UPDATE SQL: ${(result as ExplainResult.Failure).error}"
@@ -48,10 +57,13 @@ data class UpdateSqlStatement(val value: String) {
     }
 }
 
-data class DeleteSqlStatement(val value: String) {
+data class DeleteSqlStatement(
+    val value: String,
+) {
     init {
-        val env = DatabaseEnvironment.current
-            ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
+        val env =
+            DatabaseEnvironment.current
+                ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
         val result = env.explain(value)
         require(result.isSuccess) {
             "Invalid DELETE SQL: ${(result as ExplainResult.Failure).error}"

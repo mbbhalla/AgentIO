@@ -5,7 +5,6 @@ import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import kotlin.time.Duration
 
 sealed class EventPayload {
-
     data class AgentInvocationStart(
         val agentId: String,
         val instructionId: String,

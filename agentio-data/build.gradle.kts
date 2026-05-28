@@ -18,7 +18,6 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
-
     // MVEL2 expression engine
     implementation("org.mvel:mvel2:2.5.2.Final")
 

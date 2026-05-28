@@ -1,7 +1,7 @@
 package io.github.mbbhalla.agentio.core.lib.ctx.cmm
 
-import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import io.github.mbbhalla.agentio.core.model.LLM
+import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 
 /**
  * Context Memory Manager (CMM) interface.
@@ -15,7 +15,6 @@ import io.github.mbbhalla.agentio.core.model.LLM
  * This allows chaining multiple CMMs where not all need to run every turn.
  */
 interface ContextMemoryManager {
-
     data class ContextMemoryManagerInput(
         val conversation: Conversation,
         val llm: LLM,
@@ -44,7 +43,5 @@ interface ContextMemoryManager {
  * No-op CMM that passes through the conversation unchanged.
  */
 object NoOperationContextMemoryManager : ContextMemoryManager {
-    override suspend fun getContext(
-        input: ContextMemoryManager.ContextMemoryManagerInput,
-    ) = input.conversation
+    override suspend fun getContext(input: ContextMemoryManager.ContextMemoryManagerInput) = input.conversation
 }

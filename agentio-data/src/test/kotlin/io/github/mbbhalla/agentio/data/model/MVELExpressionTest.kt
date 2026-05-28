@@ -6,14 +6,21 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MVELExpressionTest {
+    private fun dataset(vararg rows: Map<String, DataValue>) =
+        Dataset(
+            columns =
+                if (rows.isEmpty()) {
+                    emptyList()
+                } else {
+                    rows.first().map { Dataset.ColumnMeta(ColumnName(it.key), ColumnType.VARCHAR) }
+                },
+            records = rows.map { Dataset.Record(it.mapKeys { e -> e.key }) },
+        )
 
-    private fun dataset(vararg rows: Map<String, DataValue>) = Dataset(
-        columns = if (rows.isEmpty()) emptyList()
-        else rows.first().map { Dataset.ColumnMeta(ColumnName(it.key), ColumnType.VARCHAR) },
-        records = rows.map { Dataset.Record(it.mapKeys { e -> e.key }) },
-    )
-
-    private fun numericDataset(columnName: String, vararg values: Long) = Dataset(
+    private fun numericDataset(
+        columnName: String,
+        vararg values: Long,
+    ) = Dataset(
         columns = listOf(Dataset.ColumnMeta(ColumnName(columnName), ColumnType.BIGINT)),
         records = values.map { Dataset.Record(mapOf(columnName to DataValue.LongValue(it))) },
     )
@@ -91,21 +98,29 @@ class MVELExpressionTest {
 
     @Test
     fun `access first record value for scalar comparison`() {
-        val ds = Dataset(
-            columns = listOf(Dataset.ColumnMeta(ColumnName("quantity"), ColumnType.BIGINT)),
-            records = listOf(Dataset.Record(mapOf("quantity" to DataValue.LongValue(150L)))),
-        )
-        val expr = MVELExpression($$"((io.github.mbbhalla.agentio.data.model.DataValue$LongValue) this.records[0].values[\"quantity\"]).value < 500")
+        val ds =
+            Dataset(
+                columns = listOf(Dataset.ColumnMeta(ColumnName("quantity"), ColumnType.BIGINT)),
+                records = listOf(Dataset.Record(mapOf("quantity" to DataValue.LongValue(150L)))),
+            )
+        val expr =
+            MVELExpression(
+                $$"((io.github.mbbhalla.agentio.data.model.DataValue$LongValue) this.records[0].values[\"quantity\"]).value < 500",
+            )
         assertTrue(ds.evaluate(expr))
     }
 
     @Test
     fun `scalar comparison false when value exceeds threshold`() {
-        val ds = Dataset(
-            columns = listOf(Dataset.ColumnMeta(ColumnName("quantity"), ColumnType.BIGINT)),
-            records = listOf(Dataset.Record(mapOf("quantity" to DataValue.LongValue(600L)))),
-        )
-        val expr = MVELExpression($$"((io.github.mbbhalla.agentio.data.model.DataValue$LongValue) this.records[0].values[\"quantity\"]).value < 500")
+        val ds =
+            Dataset(
+                columns = listOf(Dataset.ColumnMeta(ColumnName("quantity"), ColumnType.BIGINT)),
+                records = listOf(Dataset.Record(mapOf("quantity" to DataValue.LongValue(600L)))),
+            )
+        val expr =
+            MVELExpression(
+                $$"((io.github.mbbhalla.agentio.data.model.DataValue$LongValue) this.records[0].values[\"quantity\"]).value < 500",
+            )
         assertFalse(ds.evaluate(expr))
     }
 
@@ -143,16 +158,19 @@ class MVELExpressionTest {
 
     @Test
     fun `multiple columns dataset`() {
-        val ds = Dataset(
-            columns = listOf(
-                Dataset.ColumnMeta(ColumnName("site"), ColumnType.VARCHAR),
-                Dataset.ColumnMeta(ColumnName("qty"), ColumnType.BIGINT),
-            ),
-            records = listOf(
-                Dataset.Record(mapOf("site" to DataValue.StringValue("WH-01"), "qty" to DataValue.LongValue(100L))),
-                Dataset.Record(mapOf("site" to DataValue.StringValue("WH-02"), "qty" to DataValue.LongValue(200L))),
-            ),
-        )
+        val ds =
+            Dataset(
+                columns =
+                    listOf(
+                        Dataset.ColumnMeta(ColumnName("site"), ColumnType.VARCHAR),
+                        Dataset.ColumnMeta(ColumnName("qty"), ColumnType.BIGINT),
+                    ),
+                records =
+                    listOf(
+                        Dataset.Record(mapOf("site" to DataValue.StringValue("WH-01"), "qty" to DataValue.LongValue(100L))),
+                        Dataset.Record(mapOf("site" to DataValue.StringValue("WH-02"), "qty" to DataValue.LongValue(200L))),
+                    ),
+            )
         val expr = MVELExpression("this.records.size() == 2")
         assertTrue(ds.evaluate(expr))
     }

@@ -3,7 +3,6 @@ package io.github.mbbhalla.agentio.data.env
 import aws.sdk.kotlin.services.s3.S3Client
 import aws.sdk.kotlin.services.s3.model.GetObjectResponse
 import aws.sdk.kotlin.services.s3.model.ListObjectsV2Response
-import aws.sdk.kotlin.services.s3.model.Object as S3Object
 import aws.smithy.kotlin.runtime.content.ByteStream
 import io.github.mbbhalla.agentio.data.model.ColumnInfo
 import io.github.mbbhalla.agentio.data.model.ColumnName
@@ -27,62 +26,66 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import aws.sdk.kotlin.services.s3.model.Object as S3Object
 
 class DuckDbDatabaseEnvironmentTest {
-
     @Nested
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     inner class FromStatements {
-
         private lateinit var env: DuckDbDatabaseEnvironment
 
         @BeforeAll
         fun setup() {
-                env = DuckDbDatabaseEnvironment.fromStatements(
-                    ddl = listOf(
-                        """
-                        CREATE TABLE product (
-                            product_id VARCHAR NOT NULL PRIMARY KEY,
-                            product_name VARCHAR NOT NULL,
-                            unit_price DOUBLE NOT NULL
-                        )
-                        """.trimIndent(),
-                        """
-                        CREATE TABLE inventory (
-                            product_id VARCHAR NOT NULL REFERENCES product(product_id),
-                            quantity INTEGER NOT NULL,
-                            PRIMARY KEY (product_id)
-                        )
-                        """.trimIndent(),
-                    ),
-                    dml = listOf(
-                        "INSERT INTO product VALUES ('SKU-001', 'Widget', 9.99)",
-                        "INSERT INTO product VALUES ('SKU-002', 'Gadget', 19.99)",
-                        "INSERT INTO inventory VALUES ('SKU-001', 100)",
-                        "INSERT INTO inventory VALUES ('SKU-002', 50)",
-                    ),
-                    tableMetadata = setOf(
-                        TableInfo(
-                            name = TableName("product"),
-                            description = "Products",
-                            columns = listOf(
-                                ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, true, null, "Product ID"),
-                                ColumnInfo(ColumnName("product_name"), ColumnType.VARCHAR, false, false, null, "Product name"),
-                                ColumnInfo(ColumnName("unit_price"), ColumnType.DOUBLE, false, false, null, "Price"),
+            env =
+                DuckDbDatabaseEnvironment.fromStatements(
+                    ddl =
+                        listOf(
+                            """
+                            CREATE TABLE product (
+                                product_id VARCHAR NOT NULL PRIMARY KEY,
+                                product_name VARCHAR NOT NULL,
+                                unit_price DOUBLE NOT NULL
+                            )
+                            """.trimIndent(),
+                            """
+                            CREATE TABLE inventory (
+                                product_id VARCHAR NOT NULL REFERENCES product(product_id),
+                                quantity INTEGER NOT NULL,
+                                PRIMARY KEY (product_id)
+                            )
+                            """.trimIndent(),
+                        ),
+                    dml =
+                        listOf(
+                            "INSERT INTO product VALUES ('SKU-001', 'Widget', 9.99)",
+                            "INSERT INTO product VALUES ('SKU-002', 'Gadget', 19.99)",
+                            "INSERT INTO inventory VALUES ('SKU-001', 100)",
+                            "INSERT INTO inventory VALUES ('SKU-002', 50)",
+                        ),
+                    tableMetadata =
+                        setOf(
+                            TableInfo(
+                                name = TableName("product"),
+                                description = "Products",
+                                columns =
+                                    listOf(
+                                        ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, true, null, "Product ID"),
+                                        ColumnInfo(ColumnName("product_name"), ColumnType.VARCHAR, false, false, null, "Product name"),
+                                        ColumnInfo(ColumnName("unit_price"), ColumnType.DOUBLE, false, false, null, "Price"),
+                                    ),
+                            ),
+                            TableInfo(
+                                name = TableName("inventory"),
+                                description = "Inventory levels",
+                                columns =
+                                    listOf(
+                                        ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, true, null, "Product ID"),
+                                        ColumnInfo(ColumnName("quantity"), ColumnType.INTEGER, false, false, null, "Qty on hand"),
+                                    ),
                             ),
                         ),
-                        TableInfo(
-                            name = TableName("inventory"),
-                            description = "Inventory levels",
-                            columns = listOf(
-                                ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, true, null, "Product ID"),
-                                ColumnInfo(ColumnName("quantity"), ColumnType.INTEGER, false, false, null, "Qty on hand"),
-                            ),
-                        ),
-                    ),
                 )
-            }
-
+        }
 
         @Test
         fun `listTables returns all tables`() {
@@ -129,9 +132,10 @@ class DuckDbDatabaseEnvironmentTest {
 
         @Test
         fun `executeQuery with join`() {
-            val sql = SelectSqlStatement(
-                "SELECT p.product_name, i.quantity FROM product p JOIN inventory i ON p.product_id = i.product_id ORDER BY p.product_id",
-            )
+            val sql =
+                SelectSqlStatement(
+                    "SELECT p.product_name, i.quantity FROM product p JOIN inventory i ON p.product_id = i.product_id ORDER BY p.product_id",
+                )
             val dataset = env.executeQuery(sql)
             assertEquals(2, dataset.records.size)
             assertEquals(DataValue.StringValue("Widget"), dataset.records[0][ColumnName("product_name")])
@@ -168,7 +172,6 @@ class DuckDbDatabaseEnvironmentTest {
 
     @Nested
     inner class FromParquet {
-
         @TempDir
         lateinit var tempDir: Path
 
@@ -236,94 +239,108 @@ class DuckDbDatabaseEnvironmentTest {
 
     @Nested
     inner class FromS3 {
-
         @TempDir
         lateinit var tempDir: Path
 
         @Test
-        fun `loads parquet files from mocked S3`() = runBlocking {
-            val parquetBytes = createParquetBytes("orders")
-            val s3Client = mockS3Client(
-                files = mapOf("data/orders.parquet" to parquetBytes),
-            )
+        fun `loads parquet files from mocked S3`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockS3Client(
+                        files = mapOf("data/orders.parquet" to parquetBytes),
+                    )
 
-            val env = DuckDbDatabaseEnvironment.fromS3(
-                s3Uri = S3Uri("s3://my-bucket/data"),
-                s3Client = s3Client,
-            )
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
 
-            val tables = env.listTables()
-            assertEquals(setOf(TableName("orders")), tables)
-        }
-
-        @Test
-        fun `loads multiple parquet files from mocked S3`() = runBlocking {
-            val ordersBytes = createParquetBytes("orders")
-            val productsBytes = createParquetBytes("products")
-            val s3Client = mockS3Client(
-                files = mapOf(
-                    "data/orders.parquet" to ordersBytes,
-                    "data/products.parquet" to productsBytes,
-                ),
-            )
-
-            val env = DuckDbDatabaseEnvironment.fromS3(
-                s3Uri = S3Uri("s3://my-bucket/data"),
-                s3Client = s3Client,
-            )
-
-            assertEquals(setOf(TableName("orders"), TableName("products")), env.listTables())
-        }
-
-        @Test
-        fun `queries data loaded from mocked S3`() = runBlocking {
-            val parquetBytes = createParquetBytes("orders")
-            val s3Client = mockS3Client(
-                files = mapOf("data/orders.parquet" to parquetBytes),
-            )
-
-            val env = DuckDbDatabaseEnvironment.fromS3(
-                s3Uri = S3Uri("s3://my-bucket/data"),
-                s3Client = s3Client,
-            )
-            DatabaseEnvironment.activate(env)
-
-            val sql = SelectSqlStatement("SELECT name, price FROM orders WHERE price > 15")
-            val dataset = env.executeQuery(sql)
-
-            assertEquals(1, dataset.records.size)
-            assertEquals(DataValue.StringValue("Gadget"), dataset.records[0][ColumnName("name")])
-        }
-
-        @Test
-        fun `rejects when no parquet files at prefix`() = runBlocking {
-            val s3Client = mockS3Client(files = emptyMap())
-
-            assertThrows<IllegalArgumentException> {
-                DuckDbDatabaseEnvironment.fromS3(
-                    s3Uri = S3Uri("s3://my-bucket/empty-prefix"),
-                    s3Client = s3Client,
-                )
+                val tables = env.listTables()
+                assertEquals(setOf(TableName("orders")), tables)
             }
-        }
 
         @Test
-        fun `ignores non-parquet files at prefix`() = runBlocking {
-            val parquetBytes = createParquetBytes("orders")
-            val s3Client = mockS3Client(
-                files = mapOf(
-                    "data/orders.parquet" to parquetBytes,
-                    "data/readme.txt" to "not parquet".toByteArray(),
-                ),
-            )
+        fun `loads multiple parquet files from mocked S3`() =
+            runBlocking {
+                val ordersBytes = createParquetBytes("orders")
+                val productsBytes = createParquetBytes("products")
+                val s3Client =
+                    mockS3Client(
+                        files =
+                            mapOf(
+                                "data/orders.parquet" to ordersBytes,
+                                "data/products.parquet" to productsBytes,
+                            ),
+                    )
 
-            val env = DuckDbDatabaseEnvironment.fromS3(
-                s3Uri = S3Uri("s3://my-bucket/data"),
-                s3Client = s3Client,
-            )
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
 
-            assertEquals(setOf(TableName("orders")), env.listTables())
-        }
+                assertEquals(setOf(TableName("orders"), TableName("products")), env.listTables())
+            }
+
+        @Test
+        fun `queries data loaded from mocked S3`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockS3Client(
+                        files = mapOf("data/orders.parquet" to parquetBytes),
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+                DatabaseEnvironment.activate(env)
+
+                val sql = SelectSqlStatement("SELECT name, price FROM orders WHERE price > 15")
+                val dataset = env.executeQuery(sql)
+
+                assertEquals(1, dataset.records.size)
+                assertEquals(DataValue.StringValue("Gadget"), dataset.records[0][ColumnName("name")])
+            }
+
+        @Test
+        fun `rejects when no parquet files at prefix`() =
+            runBlocking {
+                val s3Client = mockS3Client(files = emptyMap())
+
+                assertThrows<IllegalArgumentException> {
+                    DuckDbDatabaseEnvironment.fromS3(
+                        s3Uri = S3Uri("s3://my-bucket/empty-prefix"),
+                        s3Client = s3Client,
+                    )
+                }
+            }
+
+        @Test
+        fun `ignores non-parquet files at prefix`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockS3Client(
+                        files =
+                            mapOf(
+                                "data/orders.parquet" to parquetBytes,
+                                "data/readme.txt" to "not parquet".toByteArray(),
+                            ),
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                assertEquals(setOf(TableName("orders")), env.listTables())
+            }
 
         private fun mockS3Client(files: Map<String, ByteArray>): S3Client {
             val s3Client = mockk<S3Client>()
@@ -361,7 +378,8 @@ class DuckDbDatabaseEnvironmentTest {
                     stmt.execute("COPY $tableName TO '${parquetFile.toAbsolutePath()}'")
                 }
             }
-            return java.nio.file.Files.readAllBytes(parquetFile)
+            return java.nio.file.Files
+                .readAllBytes(parquetFile)
         }
     }
 }

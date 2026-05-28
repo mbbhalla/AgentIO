@@ -23,16 +23,21 @@ abstract class AbstractMcpTool<I : Any, O : Any> {
             Emit Response always
          */
         val emitSchemaAndRequiredAttributesForAllToolCalls: Boolean = false,
-
         // .. add more configs if/when needed...
     )
 
     abstract fun name(): String
+
     abstract fun description(): String
+
     abstract fun invoke(input: I): O
+
     abstract fun buildInput(callToolRequest: CallToolRequest): I
+
     abstract fun getInputKClass(): KClass<I>
+
     abstract fun getOutputKClass(): KClass<O>
+
     abstract fun getToolConfig(): ToolConfig
 
     private val invokeCounter = AtomicInteger(0)
@@ -44,65 +49,77 @@ abstract class AbstractMcpTool<I : Any, O : Any> {
         val tool = this
 
         return RegisteredTool(
-            tool = Tool(
-                name = tool.name(),
-                inputSchema = ToolSchema(
-                    properties = inputSchema,
-                    required = inputRequired.toList(),
+            tool =
+                Tool(
+                    name = tool.name(),
+                    inputSchema =
+                        ToolSchema(
+                            properties = inputSchema,
+                            required = inputRequired.toList(),
+                        ),
+                    description = tool.description(),
                 ),
-                description = tool.description(),
-            ),
         ) { request ->
             Try {
                 val input = tool.buildInput(request)
 
                 val output = tool.invoke(input)
-                val outputAsJson = JsonString(
-                    value = JsonSchemaUtil.jacksonObjectMapper.writeValueAsString(output),
-                )
+                val outputAsJson =
+                    JsonString(
+                        value = JsonSchemaUtil.jacksonObjectMapper.writeValueAsString(output),
+                    )
 
                 val outputSchema = JsonSchemaUtil.generateJsonSchema(tool.getOutputKClass())
-                val outputSchemaJson = JsonString(
-                    value = JsonSchemaUtil.json.encodeToString(JsonObject.serializer(), outputSchema),
-                )
-                val errors = JsonSchemaUtil.validateJsonWithSchema(
-                    json = outputAsJson,
-                    schema = outputSchemaJson,
-                ).map { it.error }
+                val outputSchemaJson =
+                    JsonString(
+                        value = JsonSchemaUtil.json.encodeToString(JsonObject.serializer(), outputSchema),
+                    )
+                val errors =
+                    JsonSchemaUtil
+                        .validateJsonWithSchema(
+                            json = outputAsJson,
+                            schema = outputSchemaJson,
+                        ).map { it.error }
                 check(errors.isEmpty()) { errors.joinToString { ", " } }
 
-                val outputRequired = outputSchema["required"]?.jsonArray
-                    ?.map { it.jsonPrimitive.content } ?: emptyList()
+                val outputRequired =
+                    outputSchema["required"]
+                        ?.jsonArray
+                        ?.map { it.jsonPrimitive.content } ?: emptyList()
 
                 CallToolResult(
-                    content = mutableListOf<TextContent>().apply {
-                        if (invokeCounter.getAndIncrement() == 0 || getToolConfig().emitSchemaAndRequiredAttributesForAllToolCalls) {
-                            add(
-                                TextContent(
-                                    "Tool '${tool.name()}' JSON Schema: ${
-                                        JsonSchemaUtil.json.encodeToString(
-                                            JsonObject.serializer(),
-                                            outputSchema,
-                                        )
-                                    }",
-                                ),
-                            )
-                            add(
-                                TextContent(
-                                    "Tool '${tool.name()}' Required Attributes: ${
-                                        JsonSchemaUtil.jacksonObjectMapper.writeValueAsString(outputRequired)
-                                    }",
-                                ),
-                            )
-                        }
-                        add(
-                            TextContent(
-                                "Tool '${tool.name()}' Response: ${
-                                    JsonSchemaUtil.jacksonObjectMapper.writeValueAsString(output)
-                                }",
-                            ),
-                        )
-                    }.toList(),
+                    content =
+                        mutableListOf<TextContent>()
+                            .apply {
+                                if (invokeCounter.getAndIncrement() == 0 ||
+                                    getToolConfig().emitSchemaAndRequiredAttributesForAllToolCalls
+                                ) {
+                                    add(
+                                        TextContent(
+                                            "Tool '${tool.name()}' JSON Schema: ${
+                                                JsonSchemaUtil.json.encodeToString(
+                                                    JsonObject.serializer(),
+                                                    outputSchema,
+                                                )
+                                            }",
+                                        ),
+                                    )
+                                    add(
+                                        TextContent(
+                                            "Tool '${tool.name()}' Required Attributes: ${
+                                                JsonSchemaUtil.jacksonObjectMapper.writeValueAsString(outputRequired)
+                                            }",
+                                        ),
+                                    )
+                                }
+                                add(
+                                    TextContent(
+                                        "Tool '${tool.name()}' Response: ${
+                                            JsonSchemaUtil.jacksonObjectMapper.writeValueAsString(output)
+                                        }",
+                                    ),
+                                )
+                            }.toList(),
                     isError = false,
                 )
             }.getOrElseGet { t ->

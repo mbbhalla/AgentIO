@@ -1,6 +1,5 @@
 package io.github.mbbhalla.agentio.core.common
 
-import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil.json
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.github.victools.jsonschema.generator.Option
@@ -14,6 +13,7 @@ import com.networknt.schema.InputFormat
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
 import com.networknt.schema.ValidationMessage
+import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil.json
 import io.vavr.kotlin.Try
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -44,33 +44,39 @@ object JsonSchemaUtil {
     }
 
     private val jsonSchemaGenerator by lazy {
-        val configBuilder = SchemaGeneratorConfigBuilder(
-            SchemaVersion.DRAFT_2020_12,
-            OptionPreset.PLAIN_JSON,
-        ).with(Option.DEFINITIONS_FOR_ALL_OBJECTS)
-            .with(JakartaValidationModule(
-                JakartaValidationOption.INCLUDE_PATTERN_EXPRESSIONS,
-            ))
+        val configBuilder =
+            SchemaGeneratorConfigBuilder(
+                SchemaVersion.DRAFT_2020_12,
+                OptionPreset.PLAIN_JSON,
+            ).with(Option.DEFINITIONS_FOR_ALL_OBJECTS)
+                .with(
+                    JakartaValidationModule(
+                        JakartaValidationOption.INCLUDE_PATTERN_EXPRESSIONS,
+                    ),
+                )
 
         configBuilder
             .forFields()
             .withTitleResolver {
                 it.getAnnotation(Title::class.java)?.value
-            }
-            .withDescriptionResolver {
+            }.withDescriptionResolver {
                 it.getAnnotation(Description::class.java)?.value
-            }
-            .withRequiredCheck { fs ->
+            }.withRequiredCheck { fs ->
                 fs.declaringType.erasedType.kotlin.memberProperties
-                    .single { it.name == fs.name }.returnType.isMarkedNullable.not()
+                    .single { it.name == fs.name }
+                    .returnType.isMarkedNullable
+                    .not()
             }
         configBuilder
             .forTypesInGeneral()
             .withTitleResolver {
-                it.type.erasedType.getAnnotation(Title::class.java)?.value
-            }
-            .withDescriptionResolver {
-                it.type.erasedType.getAnnotation(Description::class.java)?.value
+                it.type.erasedType
+                    .getAnnotation(Title::class.java)
+                    ?.value
+            }.withDescriptionResolver {
+                it.type.erasedType
+                    .getAnnotation(Description::class.java)
+                    ?.value
             }
 
         SchemaGenerator(configBuilder.build())
@@ -80,22 +86,21 @@ object JsonSchemaUtil {
      * Generates a standard JSON Schema for a given KClass
      * https://json-schema.org/draft/2020-12/schema
      */
-    fun <T : Any> generateJsonSchema(
-        kClass: KClass<T>,
-    ): JsonObject {
-        return json
+    fun <T : Any> generateJsonSchema(kClass: KClass<T>): JsonObject =
+        json
             .parseToJsonElement(
                 jsonSchemaGenerator.generateSchema(kClass.java).toString(),
             ).jsonObject
-    }
 
     fun validateJsonWithSchema(
         json: JsonString,
         schema: JsonString,
     ): Set<ValidationMessage> {
-        val errors = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012)
-            .getSchema(schema.value)
-            .validate(json.value, InputFormat.JSON)
+        val errors =
+            JsonSchemaFactory
+                .getInstance(SpecVersion.VersionFlag.V202012)
+                .getSchema(schema.value)
+                .validate(json.value, InputFormat.JSON)
         return errors
     }
 
@@ -133,18 +138,21 @@ object JsonSchemaUtil {
             when {
                 isPrimitiveType(typeClass) -> {
                     // For primitive types (String, Int, etc.)
-                    val typeName = when (typeClass) {
-                        String::class -> "string"
-                        Int::class, Long::class -> "integer"
-                        Float::class, Double::class -> "number"
-                        Boolean::class -> "boolean"
-                        else -> typeClass.simpleName?.lowercase() ?: "unknown"
-                    }
+                    val typeName =
+                        when (typeClass) {
+                            String::class -> "string"
+                            Int::class, Long::class -> "integer"
+                            Float::class, Double::class -> "number"
+                            Boolean::class -> "boolean"
+                            else -> typeClass.simpleName?.lowercase() ?: "unknown"
+                        }
                     propertyMap["type"] = JsonPrimitive(typeName)
                 }
 
-                typeClass == List::class || typeClass == MutableList::class ||
-                    typeClass == Set::class || typeClass == MutableSet::class ||
+                typeClass == List::class ||
+                    typeClass == MutableList::class ||
+                    typeClass == Set::class ||
+                    typeClass == MutableSet::class ||
                     Collection::class.isSuperclassOf(typeClass) -> {
                     // Handle collection types
                     propertyMap["type"] = JsonPrimitive("array")
@@ -160,13 +168,14 @@ object JsonSchemaUtil {
 
                             when {
                                 isPrimitiveType(itemClass) -> {
-                                    val itemTypeName = when (itemClass) {
-                                        String::class -> "string"
-                                        Int::class, Long::class -> "integer"
-                                        Float::class, Double::class -> "number"
-                                        Boolean::class -> "boolean"
-                                        else -> itemClass.simpleName?.lowercase() ?: "unknown"
-                                    }
+                                    val itemTypeName =
+                                        when (itemClass) {
+                                            String::class -> "string"
+                                            Int::class, Long::class -> "integer"
+                                            Float::class, Double::class -> "number"
+                                            Boolean::class -> "boolean"
+                                            else -> itemClass.simpleName?.lowercase() ?: "unknown"
+                                        }
                                     propertyMap["items"] = JsonObject(mapOf("type" to JsonPrimitive(itemTypeName)))
                                 }
 
@@ -184,12 +193,13 @@ object JsonSchemaUtil {
                                 else -> {
                                     // For custom data classes in the collection
                                     val itemSchema = generateSchemaJsonObject(itemClass, nonNullables)
-                                    propertyMap["items"] = JsonObject(
-                                        mapOf(
-                                            "type" to JsonPrimitive("object"),
-                                            "properties" to itemSchema,
-                                        ),
-                                    )
+                                    propertyMap["items"] =
+                                        JsonObject(
+                                            mapOf(
+                                                "type" to JsonPrimitive("object"),
+                                                "properties" to itemSchema,
+                                            ),
+                                        )
                                 }
                             }
                         }
@@ -222,14 +232,13 @@ object JsonSchemaUtil {
     /**
      * Determines if a class is a primitive type
      */
-    private fun isPrimitiveType(kClass: KClass<*>): Boolean {
-        return kClass == Boolean::class ||
+    private fun isPrimitiveType(kClass: KClass<*>): Boolean =
+        kClass == Boolean::class ||
             kClass == Int::class ||
             kClass == Long::class ||
             kClass == Double::class ||
             kClass == Float::class ||
             kClass == String::class
-    }
 }
 
 @Serializable

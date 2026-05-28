@@ -1,6 +1,5 @@
 dependencies {
     implementation(project(":agentio-core"))
-    implementation(project(":agentio-cmm-impl"))
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

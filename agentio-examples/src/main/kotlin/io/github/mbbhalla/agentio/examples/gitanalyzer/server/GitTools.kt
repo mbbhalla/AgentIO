@@ -12,10 +12,11 @@ private fun runGitCommand(
     repoPath: String,
     vararg args: String,
 ): String {
-    val process = ProcessBuilder("git", *args)
-        .directory(File(repoPath))
-        .redirectErrorStream(true)
-        .start()
+    val process =
+        ProcessBuilder("git", *args)
+            .directory(File(repoPath))
+            .redirectErrorStream(true)
+            .start()
     val output = process.inputStream.bufferedReader().readText()
     process.waitFor(30, TimeUnit.SECONDS)
     return output.trim()
@@ -24,7 +25,6 @@ private fun runGitCommand(
 internal class GitLogTool(
     private val repoPath: String,
 ) : AbstractMcpTool<GitLogTool.Input, GitLogTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("Number of recent commits to retrieve")
@@ -46,30 +46,44 @@ internal class GitLogTool(
     )
 
     override fun name() = "git_log"
+
     override fun description() = "Retrieve recent git commit history with author, date, and message"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig()
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val count = callToolRequest.params.arguments?.get("count")?.jsonPrimitive?.content?.toIntOrNull() ?: 10
+        val count =
+            callToolRequest.params.arguments
+                ?.get("count")
+                ?.jsonPrimitive
+                ?.content
+                ?.toIntOrNull() ?: 10
         return Input(count = count)
     }
 
     override fun invoke(input: Input): Output {
-        val raw = runGitCommand(
-            repoPath,
-            "log", "--format=%H|%an|%aI|%s", "-n", input.count.toString(),
-        )
-        val commits = raw.lines().filter { it.isNotBlank() }.map { line ->
-            val parts = line.split("|", limit = 4)
-            CommitEntry(
-                hash = parts.getOrElse(0) { "" }.take(8),
-                author = parts.getOrElse(1) { "unknown" },
-                date = parts.getOrElse(2) { "" },
-                message = parts.getOrElse(3) { "" },
+        val raw =
+            runGitCommand(
+                repoPath,
+                "log",
+                "--format=%H|%an|%aI|%s",
+                "-n",
+                input.count.toString(),
             )
-        }
+        val commits =
+            raw.lines().filter { it.isNotBlank() }.map { line ->
+                val parts = line.split("|", limit = 4)
+                CommitEntry(
+                    hash = parts.getOrElse(0) { "" }.take(8),
+                    author = parts.getOrElse(1) { "unknown" },
+                    date = parts.getOrElse(2) { "" },
+                    message = parts.getOrElse(3) { "" },
+                )
+            }
         return Output(commits = commits)
     }
 }
@@ -77,7 +91,6 @@ internal class GitLogTool(
 internal class GitDiffStatTool(
     private val repoPath: String,
 ) : AbstractMcpTool<GitDiffStatTool.Input, GitDiffStatTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("Number of recent commits to analyze for diff stats")
@@ -102,33 +115,46 @@ internal class GitDiffStatTool(
     )
 
     override fun name() = "git_diff_stat"
+
     override fun description() = "Get diff statistics (files changed, lines added/removed) for recent commits"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig()
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val count = callToolRequest.params.arguments?.get("count")?.jsonPrimitive?.content?.toIntOrNull() ?: 5
+        val count =
+            callToolRequest.params.arguments
+                ?.get("count")
+                ?.jsonPrimitive
+                ?.content
+                ?.toIntOrNull() ?: 5
         return Input(count = count)
     }
 
     override fun invoke(input: Input): Output {
-        val raw = runGitCommand(
-            repoPath,
-            "diff", "--numstat", "HEAD~${input.count}..HEAD",
-        )
-        val stats = raw.lines().filter { it.isNotBlank() }.mapNotNull { line ->
-            val parts = line.split("\t")
-            if (parts.size >= 3) {
-                FileStat(
-                    file = parts[2],
-                    added = parts[0].toIntOrNull() ?: 0,
-                    removed = parts[1].toIntOrNull() ?: 0,
-                )
-            } else {
-                null
+        val raw =
+            runGitCommand(
+                repoPath,
+                "diff",
+                "--numstat",
+                "HEAD~${input.count}..HEAD",
+            )
+        val stats =
+            raw.lines().filter { it.isNotBlank() }.mapNotNull { line ->
+                val parts = line.split("\t")
+                if (parts.size >= 3) {
+                    FileStat(
+                        file = parts[2],
+                        added = parts[0].toIntOrNull() ?: 0,
+                        removed = parts[1].toIntOrNull() ?: 0,
+                    )
+                } else {
+                    null
+                }
             }
-        }
         return Output(
             stats = stats,
             totalAdded = stats.sumOf { it.added },
@@ -140,7 +166,6 @@ internal class GitDiffStatTool(
 internal class GitFileAuthorsTool(
     private val repoPath: String,
 ) : AbstractMcpTool<GitFileAuthorsTool.Input, GitFileAuthorsTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("File path relative to repository root")
@@ -160,28 +185,43 @@ internal class GitFileAuthorsTool(
     )
 
     override fun name() = "git_file_authors"
+
     override fun description() = "List authors who contributed to a specific file with commit counts"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig()
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val filePath = callToolRequest.params.arguments?.get("filePath")?.jsonPrimitive?.content ?: ""
+        val filePath =
+            callToolRequest.params.arguments
+                ?.get("filePath")
+                ?.jsonPrimitive
+                ?.content ?: ""
         return Input(filePath = filePath)
     }
 
     override fun invoke(input: Input): Output {
-        val raw = runGitCommand(
-            repoPath,
-            "log", "--format=%an", "--follow", "--", input.filePath,
-        )
-        val authors = raw.lines()
-            .filter { it.isNotBlank() }
-            .groupingBy { it }
-            .eachCount()
-            .entries
-            .sortedByDescending { it.value }
-            .map { AuthorContribution(author = it.key, commits = it.value) }
+        val raw =
+            runGitCommand(
+                repoPath,
+                "log",
+                "--format=%an",
+                "--follow",
+                "--",
+                input.filePath,
+            )
+        val authors =
+            raw
+                .lines()
+                .filter { it.isNotBlank() }
+                .groupingBy { it }
+                .eachCount()
+                .entries
+                .sortedByDescending { it.value }
+                .map { AuthorContribution(author = it.key, commits = it.value) }
         return Output(authors = authors)
     }
 }

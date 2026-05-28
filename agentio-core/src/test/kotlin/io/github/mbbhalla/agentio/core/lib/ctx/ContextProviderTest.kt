@@ -10,14 +10,15 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 internal class ContextProviderTest {
-
     @Serializable
     data class TestInstruction(
         private val id: String,
         private val instruction: String,
     ) : Instructible.WithInstruction {
         override fun instructionId(): String = id
+
         override fun instruction(): String = instruction
+
         override fun systemInstruction(): String? = null
     }
 
@@ -30,12 +31,14 @@ internal class ContextProviderTest {
 
     @Test
     fun `ContextProviders should hold list of providers`() {
-        val provider1 = object : ContextProvider {
-            override fun <I : Instructible.WithInstruction> context(input: I): String = "context1"
-        }
-        val provider2 = object : ContextProvider {
-            override fun <I : Instructible.WithInstruction> context(input: I): String = "context2"
-        }
+        val provider1 =
+            object : ContextProvider {
+                override fun <I : Instructible.WithInstruction> context(input: I): String = "context1"
+            }
+        val provider2 =
+            object : ContextProvider {
+                override fun <I : Instructible.WithInstruction> context(input: I): String = "context2"
+            }
 
         val contextProviders = ContextProviders(listOf(provider1, provider2))
 
@@ -46,11 +49,11 @@ internal class ContextProviderTest {
 
     @Test
     fun `custom ContextProvider should return expected context`() {
-        val customProvider = object : ContextProvider {
-            override fun <I : Instructible.WithInstruction> context(input: I): String {
-                return "Custom context for instruction: ${input.instruction()}"
+        val customProvider =
+            object : ContextProvider {
+                override fun <I : Instructible.WithInstruction> context(input: I): String =
+                    "Custom context for instruction: ${input.instruction()}"
             }
-        }
         val testInput = TestInstruction("test-2", "analyze data")
 
         val context = customProvider.context(testInput)

@@ -7,12 +7,12 @@ import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 internal class GitAnalyzerMcpServer(
     private val repoPath: String,
 ) : AbstractMcpServer() {
-
-    override fun tools(): Set<RegisteredTool> = setOf(
-        GitLogTool(repoPath)(),
-        GitDiffStatTool(repoPath)(),
-        GitFileAuthorsTool(repoPath)(),
-    )
+    override fun tools(): Set<RegisteredTool> =
+        setOf(
+            GitLogTool(repoPath)(),
+            GitDiffStatTool(repoPath)(),
+            GitFileAuthorsTool(repoPath)(),
+        )
 
     override fun capabilities() = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = false))
 

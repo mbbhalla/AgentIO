@@ -39,19 +39,14 @@ data class Needle(
 data class NeedleContext(
     /** Ordered list of text blocks (chunked filler + needle sentences). */
     val contextBlocks: List<String>,
-
     /** The retrieval question to ask the model. */
     val retrievalQuestion: String,
-
     /** The exact code string(s) the model must produce. */
     val expectedCodes: List<String>,
-
     /** All needles embedded in this context. */
     val needles: List<Needle>,
-
     /** Approximate total tokens in the context. */
     val approximateTokens: Int,
-
     /** Ground truth vote counts for Distributed Counting experiment. Null for other experiments. */
     val groundTruthVotes: VoteCounts? = null,
 )
@@ -76,7 +71,6 @@ data class VoteCounts(
  * number of segments regardless of whether the model has a 200K or 1M context window.
  */
 object NeedleContextBuilder {
-
     private val LOG = LoggerFactory.getLogger(NeedleContextBuilder::class.java)
 
     /**
@@ -115,11 +109,12 @@ object NeedleContextBuilder {
     fun build(
         experimentType: ExperimentType,
         llm: LLM,
-    ): NeedleContext = when (experimentType) {
-        ExperimentType.NEEDLE_IN_HAYSTACK -> buildSingleNeedle(llm)
-        ExperimentType.MULTI_NEEDLE -> buildMultiNeedle(llm)
-        ExperimentType.DISTRIBUTED_COUNTING -> buildDistributedCounting(llm)
-    }
+    ): NeedleContext =
+        when (experimentType) {
+            ExperimentType.NEEDLE_IN_HAYSTACK -> buildSingleNeedle(llm)
+            ExperimentType.MULTI_NEEDLE -> buildMultiNeedle(llm)
+            ExperimentType.DISTRIBUTED_COUNTING -> buildDistributedCounting(llm)
+        }
 
     /**
      * Compute the filler token target for a given model.
@@ -144,13 +139,14 @@ object NeedleContextBuilder {
         val targetTokens = computeFillerTarget(llm)
         val fillerParagraphs = FillerCorpus.generate(targetTokens)
 
-        val needle = Needle(
-            text = "The secret code for Project Aurora is ZEPHYR-7742.",
-            code = "ZEPHYR-7742",
-            depth = 0.5,
-            importanceScore = 0.95,
-            isTarget = true,
-        )
+        val needle =
+            Needle(
+                text = "The secret code for Project Aurora is ZEPHYR-7742.",
+                code = "ZEPHYR-7742",
+                depth = 0.5,
+                importanceScore = 0.95,
+                isTarget = true,
+            )
 
         val contextBlocks = buildChunkedContext(fillerParagraphs, listOf(needle))
 
@@ -176,43 +172,44 @@ object NeedleContextBuilder {
         val targetTokens = computeFillerTarget(llm)
         val fillerParagraphs = FillerCorpus.generate(targetTokens)
 
-        val needles = listOf(
-            Needle(
-                text = "The access key for the Berlin laboratory is COBALT-3391.",
-                code = "COBALT-3391",
-                depth = 0.1,
-                importanceScore = 0.5,
-                isTarget = false,
-            ),
-            Needle(
-                text = "The entry code for the Sydney warehouse is MARBLE-5528.",
-                code = "MARBLE-5528",
-                depth = 0.3,
-                importanceScore = 0.5,
-                isTarget = false,
-            ),
-            Needle(
-                text = "The secret code for Project Aurora is ZEPHYR-7742.",
-                code = "ZEPHYR-7742",
-                depth = 0.5,
-                importanceScore = 0.95,
-                isTarget = true,
-            ),
-            Needle(
-                text = "The vault combination for the Montreal office is PRISM-8864.",
-                code = "PRISM-8864",
-                depth = 0.7,
-                importanceScore = 0.5,
-                isTarget = false,
-            ),
-            Needle(
-                text = "The launch sequence for the Cape Town facility is QUARTZ-1107.",
-                code = "QUARTZ-1107",
-                depth = 0.9,
-                importanceScore = 0.5,
-                isTarget = false,
-            ),
-        )
+        val needles =
+            listOf(
+                Needle(
+                    text = "The access key for the Berlin laboratory is COBALT-3391.",
+                    code = "COBALT-3391",
+                    depth = 0.1,
+                    importanceScore = 0.5,
+                    isTarget = false,
+                ),
+                Needle(
+                    text = "The entry code for the Sydney warehouse is MARBLE-5528.",
+                    code = "MARBLE-5528",
+                    depth = 0.3,
+                    importanceScore = 0.5,
+                    isTarget = false,
+                ),
+                Needle(
+                    text = "The secret code for Project Aurora is ZEPHYR-7742.",
+                    code = "ZEPHYR-7742",
+                    depth = 0.5,
+                    importanceScore = 0.95,
+                    isTarget = true,
+                ),
+                Needle(
+                    text = "The vault combination for the Montreal office is PRISM-8864.",
+                    code = "PRISM-8864",
+                    depth = 0.7,
+                    importanceScore = 0.5,
+                    isTarget = false,
+                ),
+                Needle(
+                    text = "The launch sequence for the Cape Town facility is QUARTZ-1107.",
+                    code = "QUARTZ-1107",
+                    depth = 0.9,
+                    importanceScore = 0.5,
+                    isTarget = false,
+                ),
+            )
 
         val contextBlocks = buildChunkedContext(fillerParagraphs, needles)
 
@@ -252,20 +249,21 @@ object NeedleContextBuilder {
         var countA = 0
         var countB = 0
 
-        val paragraphsWithVotes = fillerParagraphs.mapIndexed { index, paragraph ->
-            val voteForA = voteRng.nextDouble() < 0.55
-            if (voteForA) countA++ else countB++
+        val paragraphsWithVotes =
+            fillerParagraphs.mapIndexed { index, paragraph ->
+                val voteForA = voteRng.nextDouble() < 0.55
+                if (voteForA) countA++ else countB++
 
-            // Extract the domain from the paragraph (it's in the opening sentence)
-            val domain = extractDomain(paragraph)
-            val voteSentence = FillerCorpus.generateVoteSentence(index, domain, voteForA)
+                // Extract the domain from the paragraph (it's in the opening sentence)
+                val domain = extractDomain(paragraph)
+                val voteSentence = FillerCorpus.generateVoteSentence(index, domain, voteForA)
 
-            // Weave the vote into the middle of the paragraph
-            val sentences = paragraph.split(". ").toMutableList()
-            val insertPos = (sentences.size / 2).coerceAtLeast(1)
-            sentences.add(insertPos, voteSentence)
-            sentences.joinToString(". ")
-        }
+                // Weave the vote into the middle of the paragraph
+                val sentences = paragraph.split(". ").toMutableList()
+                val insertPos = (sentences.size / 2).coerceAtLeast(1)
+                sentences.add(insertPos, voteSentence)
+                sentences.joinToString(". ")
+            }
 
         val groundTruth = VoteCounts(proposalA = countA, proposalB = countB)
 
@@ -286,8 +284,9 @@ object NeedleContextBuilder {
 
         return NeedleContext(
             contextBlocks = contextBlocks,
-            retrievalQuestion = "Count ALL the votes for Proposal A and Proposal B recorded " +
-                "throughout the entire context. Report the exact count for each proposal.",
+            retrievalQuestion =
+                "Count ALL the votes for Proposal A and Proposal B recorded " +
+                    "throughout the entire context. Report the exact count for each proposal.",
             expectedCodes = listOf(groundTruth.winner),
             needles = emptyList(),
             approximateTokens = targetTokens,
@@ -332,11 +331,12 @@ object NeedleContextBuilder {
         var paragraphIndex = 0
 
         for (chunkIndex in 0 until TARGET_SEGMENT_COUNT) {
-            val chunkEnd = if (chunkIndex == TARGET_SEGMENT_COUNT - 1) {
-                totalParagraphs // Last chunk gets all remaining paragraphs
-            } else {
-                ((chunkIndex + 1) * paragraphsPerChunk).coerceAtMost(totalParagraphs)
-            }
+            val chunkEnd =
+                if (chunkIndex == TARGET_SEGMENT_COUNT - 1) {
+                    totalParagraphs // Last chunk gets all remaining paragraphs
+                } else {
+                    ((chunkIndex + 1) * paragraphsPerChunk).coerceAtMost(totalParagraphs)
+                }
 
             val chunkParagraphs = mutableListOf<String>()
 
@@ -378,6 +378,5 @@ object NeedleContextBuilder {
     /**
      * Estimate token count for a text string using character-based estimation.
      */
-    fun estimateTokens(text: String): Int =
-        (text.length / CHARS_PER_TOKEN).toInt()
+    fun estimateTokens(text: String): Int = (text.length / CHARS_PER_TOKEN).toInt()
 }

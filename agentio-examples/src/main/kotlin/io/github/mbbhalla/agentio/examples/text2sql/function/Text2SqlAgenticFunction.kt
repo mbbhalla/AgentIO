@@ -27,10 +27,9 @@ import kotlin.time.Duration.Companion.seconds
 internal class Text2SqlAgenticFunction(
     agentConfiguration: AgentConfiguration,
 ) : AbstractAgenticFunction<
-    Text2SqlAgenticFunction.Input,
-    Text2SqlAgenticFunction.Output,
+        Text2SqlAgenticFunction.Input,
+        Text2SqlAgenticFunction.Output,
     >(agentConfiguration) {
-
     @Serializable
     data class Input(
         @field:Description("Natural language query to convert to SQL")
@@ -54,6 +53,7 @@ internal class Text2SqlAgenticFunction(
     }
 
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
 }
 
@@ -74,24 +74,29 @@ internal object Text2SqlAgenticFunctionProvider {
         return Text2SqlAgenticFunction(
             AgentConfiguration(
                 agentId = agentId,
-                languageModelParameters = LanguageModelParameters(
-                    llm = LLM.ANTHROPIC_CLAUDE_OPUS_4_6_V1_CROSS_REGION_INFERENCE,
-                    temperature = Temperature(TEMPERATURE),
-                ),
-                bedrockRuntimeClient = BedrockRuntimeClient {
-                    this.region = "us-west-2"
-                    this.httpClient { socketReadTimeout = 15.minutes }
-                },
-                toolsProvider = McpClients(
-                    set = setOf(
-                        NamedClient(
-                            name = "dbtools",
-                            client = mcpClient,
-                            deniedTools = emptySet(),
-                        ),
+                languageModelParameters =
+                    LanguageModelParameters(
+                        llm = LLM.ANTHROPIC_CLAUDE_OPUS_4_6_V1_CROSS_REGION_INFERENCE,
+                        temperature = Temperature(TEMPERATURE),
                     ),
-                ),
-                systemPrompt = """
+                bedrockRuntimeClient =
+                    BedrockRuntimeClient {
+                        this.region = "us-west-2"
+                        this.httpClient { socketReadTimeout = 15.minutes }
+                    },
+                toolsProvider =
+                    McpClients(
+                        set =
+                            setOf(
+                                NamedClient(
+                                    name = "dbtools",
+                                    client = mcpClient,
+                                    deniedTools = emptySet(),
+                                ),
+                            ),
+                    ),
+                systemPrompt =
+                    """
                     You are a SQL expert. Convert natural language questions into valid DuckDB SQL.
 
                     RULES:
@@ -101,12 +106,13 @@ internal object Text2SqlAgenticFunctionProvider {
                     - Generate only SELECT statements
                     - Use proper JOINs based on foreign key relationships
                     - Current DateTime (UTC) = '${
-                    Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT)
-                }'
-                """.trimIndent(),
-                contextMemoryManagers = ContextMemoryManagers(
-                    value = listOf(NoOperationContextMemoryManager),
-                ),
+                        Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT)
+                    }'
+                    """.trimIndent(),
+                contextMemoryManagers =
+                    ContextMemoryManagers(
+                        value = listOf(NoOperationContextMemoryManager),
+                    ),
                 delayBetweenTurns = 0.seconds,
                 problemDomain = "Text-to-SQL",
             ),

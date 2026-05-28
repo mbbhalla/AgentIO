@@ -16,7 +16,6 @@ import kotlinx.serialization.json.jsonPrimitive
 internal class ListTablesTool(
     private val env: DatabaseEnvironment,
 ) : AbstractMcpTool<Unit, ListTablesTool.Output>() {
-
     @Serializable
     data class Output(
         @field:Description("Available table names in the database")
@@ -24,22 +23,26 @@ internal class ListTablesTool(
     )
 
     override fun name() = "list_tables"
+
     override fun description() = "List all tables available in the database"
+
     override fun getInputKClass() = Unit::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig(emitSchemaAndRequiredAttributesForAllToolCalls = true)
 
     override fun buildInput(callToolRequest: CallToolRequest) = Unit
 
-    override fun invoke(input: Unit) = Output(
-        tableNames = env.listTables().map { it.value }.toSet(),
-    )
+    override fun invoke(input: Unit) =
+        Output(
+            tableNames = env.listTables().map { it.value }.toSet(),
+        )
 }
 
 internal class GetTablesTool(
     private val env: DatabaseEnvironment,
 ) : AbstractMcpTool<GetTablesTool.Input, GetTablesTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("Table names to retrieve schema information for")
@@ -70,35 +73,44 @@ internal class GetTablesTool(
     }
 
     override fun name() = "get_tables"
+
     override fun description() = "Get schema information (columns, types, keys, descriptions) for specified tables"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig(emitSchemaAndRequiredAttributesForAllToolCalls = false)
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val tableNames = callToolRequest.params.arguments?.get("tableNames")
-            ?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+        val tableNames =
+            callToolRequest.params.arguments
+                ?.get("tableNames")
+                ?.jsonArray
+                ?.map { it.jsonPrimitive.content } ?: emptyList()
         return Input(tableNames = tableNames)
     }
 
     override fun invoke(input: Input): Output {
-        val tables = input.tableNames.map { name ->
-            val info = env.getTableInfo(TableName(name))
-            Output.TableSchema(
-                name = info.name.value,
-                description = info.description,
-                columns = info.columns.map { col ->
-                    Output.Column(
-                        name = col.name.value,
-                        type = col.type,
-                        nullable = col.nullable,
-                        primaryKey = col.primaryKey,
-                        foreignKey = col.foreignKey?.toDisplayString(),
-                        description = col.description,
-                    )
-                },
-            )
-        }
+        val tables =
+            input.tableNames.map { name ->
+                val info = env.getTableInfo(TableName(name))
+                Output.TableSchema(
+                    name = info.name.value,
+                    description = info.description,
+                    columns =
+                        info.columns.map { col ->
+                            Output.Column(
+                                name = col.name.value,
+                                type = col.type,
+                                nullable = col.nullable,
+                                primaryKey = col.primaryKey,
+                                foreignKey = col.foreignKey?.toDisplayString(),
+                                description = col.description,
+                            )
+                        },
+                )
+            }
         require(tables.isNotEmpty()) { "No table names provided" }
         return Output(tables = tables)
     }
@@ -109,7 +121,6 @@ internal class GetTablesTool(
 internal class ExecuteSqlTool(
     private val env: DatabaseEnvironment,
 ) : AbstractMcpTool<ExecuteSqlTool.Input, ExecuteSqlTool.Output>() {
-
     @Serializable
     data class Input(
         @field:Description("DuckDB SQL SELECT statement to execute against the database")
@@ -123,14 +134,22 @@ internal class ExecuteSqlTool(
     )
 
     override fun name() = "execute_sql"
+
     override fun description() = "Execute a SQL SELECT query against the database and return results"
+
     override fun getInputKClass() = Input::class
+
     override fun getOutputKClass() = Output::class
+
     override fun getToolConfig() = ToolConfig(emitSchemaAndRequiredAttributesForAllToolCalls = true)
 
     override fun buildInput(callToolRequest: CallToolRequest): Input {
-        val sql = callToolRequest.params.arguments?.get("sql")?.jsonPrimitive?.content
-            ?: throw IllegalArgumentException("'sql' parameter is required")
+        val sql =
+            callToolRequest.params.arguments
+                ?.get("sql")
+                ?.jsonPrimitive
+                ?.content
+                ?: throw IllegalArgumentException("'sql' parameter is required")
         return Input(sql = sql)
     }
 
