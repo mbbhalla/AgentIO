@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.examples.text2sql.server
+package io.github.mbbhalla.agentio.module.text2sql
 
 import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.lib.tool.AbstractMcpTool

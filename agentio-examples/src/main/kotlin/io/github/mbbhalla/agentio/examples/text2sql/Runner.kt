@@ -6,8 +6,7 @@ import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
 import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.examples.text2sql.data.EmployeeDatabase
 import io.github.mbbhalla.agentio.examples.text2sql.data.RetailDatabase
-import io.github.mbbhalla.agentio.examples.text2sql.function.Text2SqlAgenticFunction
-import io.github.mbbhalla.agentio.examples.text2sql.function.Text2SqlAgenticFunctionProvider
+import io.github.mbbhalla.agentio.module.text2sql.Text2SqlAgenticFunction
 import io.vavr.control.Try
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -23,7 +22,7 @@ internal object Runner {
     ): Try<AgentOutput<Text2SqlAgenticFunction.Output>> =
         runBlocking {
             val agenticFunction =
-                Text2SqlAgenticFunctionProvider.get(
+                Text2SqlAgenticFunction.create(
                     agentId = AGENT_ID,
                     env = env,
                 )

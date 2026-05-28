@@ -1,6 +1,7 @@
 dependencies {
     implementation(project(":agentio-core"))
-    implementation(project(":agentio-data"))
+    implementation(project(":agentio-module-data"))
+    implementation(project(":agentio-module-text2sql"))
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

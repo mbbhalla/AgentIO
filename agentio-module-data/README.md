@@ -1,4 +1,4 @@
-# agentio-data
+# agentio-module-data
 
 Data environment module for AgentIO. Provides typed data models, SQL statement validation, and database environment abstraction backed by DuckDB.
 
@@ -148,6 +148,6 @@ val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
 ## Build & Test
 
 ```bash
-./gradlew :agentio-data:build
-./gradlew :agentio-data:test
+./gradlew :agentio-module-data:build
+./gradlew :agentio-module-data:test
 ```

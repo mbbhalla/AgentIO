@@ -13,8 +13,8 @@ AgentIO.iml
 # Ignore vscode files
 .vscode/
 
-# Kiro files
-.kiro
+# Coding agent discussions
+discussions/
 
 # Docs
 docs
