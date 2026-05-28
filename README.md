@@ -17,9 +17,7 @@ This approach preserves the ergonomic benefits of traditional function compositi
 
 ```
 AgentIO/
-├── agentio-core/                  Core SDK — agents, tools, MCP, context management interfaces
-├── agentio-cmm-impl/              Context Memory Manager implementations (adaptive, compacting)
-├── agentio-eventlistener-impl/    Event listener implementations (checkpointing)
+├── agentio-core/                  Core SDK — agents, tools, MCP, CMMs, event listeners
 ├── agentio-module-data/           Data environment module — DuckDB, typed SQL, Dataset, MVEL
 ├── agentio-module-text2sql/       Text2SQL module — NL-to-SQL agentic function + MCP server
 ├── agentio-examples/              Example agents (Hacker News, Git Analyzer, Text2SQL, etc.)
@@ -30,8 +28,6 @@ AgentIO/
 
 ```
 io.github.mbbhalla:agentio-core
-io.github.mbbhalla:agentio-cmm-impl
-io.github.mbbhalla:agentio-eventlistener-impl
 io.github.mbbhalla:agentio-module-data
 io.github.mbbhalla:agentio-module-text2sql
 io.github.mbbhalla:agentio-examples
@@ -44,9 +40,7 @@ io.github.mbbhalla:agentio-experiments
 agentio-examples ──────────────→ agentio-core + agentio-module-text2sql
 agentio-module-text2sql ──────→ agentio-core + agentio-module-data
 agentio-module-data ──────────→ agentio-core
-agentio-experiments ───────────→ agentio-core + agentio-cmm-impl
-agentio-cmm-impl ─────────────→ agentio-core
-agentio-eventlistener-impl ───→ agentio-core
+agentio-experiments ───────────→ agentio-core
 ```
 
 ## Key Features
@@ -199,7 +193,7 @@ val agentConfiguration = AgentConfiguration(
 
 # Run specific tests
 ./gradlew :agentio-core:test
-./gradlew :agentio-cmm-impl:test
+./gradlew :agentio-module-data:test
 ```
 
 ## Running Examples

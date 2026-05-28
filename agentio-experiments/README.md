@@ -78,8 +78,7 @@ private val SUITE_CONFIG = ExperimentSuiteConfig(
 
 ## Dependencies
 
-- `agentio-core`
-- `agentio-cmm-impl` (for `AdaptiveContextMemoryManager`)
+- `agentio-core` (includes `AdaptiveContextMemoryManager`)
 - AWS SDK for Kotlin (Bedrock Runtime)
 - Vavr
 - Kotlinx Serialization
