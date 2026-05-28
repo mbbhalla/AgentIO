@@ -444,7 +444,7 @@ class DuckDbDatabaseEnvironmentTest {
         private fun mockS3Client(files: Map<String, ByteArray>): S3Client {
             val s3Client = mockk<S3Client>()
 
-            coEvery { s3Client.listObjectVersions(any<aws.sdk.kotlin.services.s3.model.ListObjectVersionsRequest>()) } returns
+            coEvery { s3Client.listObjectVersions(any<ListObjectVersionsRequest>()) } returns
                 ListObjectVersionsResponse {
                     versions =
                         files.keys.map { key ->
