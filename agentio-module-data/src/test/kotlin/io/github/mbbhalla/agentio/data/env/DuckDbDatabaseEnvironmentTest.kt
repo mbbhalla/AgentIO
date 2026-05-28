@@ -1,7 +1,9 @@
 package io.github.mbbhalla.agentio.data.env
 
 import aws.sdk.kotlin.services.s3.S3Client
+import aws.sdk.kotlin.services.s3.model.DeleteMarkerEntry
 import aws.sdk.kotlin.services.s3.model.GetObjectResponse
+import aws.sdk.kotlin.services.s3.model.ListObjectVersionsRequest
 import aws.sdk.kotlin.services.s3.model.ListObjectVersionsResponse
 import aws.sdk.kotlin.services.s3.model.ObjectVersion
 import aws.smithy.kotlin.runtime.content.ByteStream
@@ -29,8 +31,20 @@ import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import aws.smithy.kotlin.runtime.time.Instant as AwsInstant
+
+private data class VersionEntry(
+    val key: String,
+    val versionId: String,
+    val lastModified: Instant,
+)
+
+private data class DeleteMarkerInfo(
+    val key: String,
+    val lastModified: Instant,
+)
 
 class DuckDbDatabaseEnvironmentTest {
     @Nested
@@ -73,9 +87,30 @@ class DuckDbDatabaseEnvironmentTest {
                                 description = "Products",
                                 columns =
                                     listOf(
-                                        ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, true, null, "Product ID"),
-                                        ColumnInfo(ColumnName("product_name"), ColumnType.VARCHAR, false, false, null, "Product name"),
-                                        ColumnInfo(ColumnName("unit_price"), ColumnType.DOUBLE, false, false, null, "Price"),
+                                        ColumnInfo(
+                                            ColumnName("product_id"),
+                                            ColumnType.VARCHAR,
+                                            nullable = false,
+                                            primaryKey = true,
+                                            foreignKey = null,
+                                            description = "Product ID",
+                                        ),
+                                        ColumnInfo(
+                                            ColumnName("product_name"),
+                                            ColumnType.VARCHAR,
+                                            nullable = false,
+                                            primaryKey = false,
+                                            foreignKey = null,
+                                            description = "Product name",
+                                        ),
+                                        ColumnInfo(
+                                            ColumnName("unit_price"),
+                                            ColumnType.DOUBLE,
+                                            nullable = false,
+                                            primaryKey = false,
+                                            foreignKey = null,
+                                            description = "Price",
+                                        ),
                                     ),
                             ),
                             TableInfo(
@@ -83,8 +118,22 @@ class DuckDbDatabaseEnvironmentTest {
                                 description = "Inventory levels",
                                 columns =
                                     listOf(
-                                        ColumnInfo(ColumnName("product_id"), ColumnType.VARCHAR, false, true, null, "Product ID"),
-                                        ColumnInfo(ColumnName("quantity"), ColumnType.INTEGER, false, false, null, "Qty on hand"),
+                                        ColumnInfo(
+                                            ColumnName("product_id"),
+                                            ColumnType.VARCHAR,
+                                            nullable = false,
+                                            primaryKey = true,
+                                            foreignKey = null,
+                                            description = "Product ID",
+                                        ),
+                                        ColumnInfo(
+                                            ColumnName("quantity"),
+                                            ColumnType.INTEGER,
+                                            nullable = false,
+                                            primaryKey = false,
+                                            foreignKey = null,
+                                            description = "Qty on hand",
+                                        ),
                                     ),
                             ),
                         ),
@@ -332,7 +381,7 @@ class DuckDbDatabaseEnvironmentTest {
             }
 
         @Test
-        fun `rejects when no parquet files at prefix`() =
+        fun `rejects when no parquet files at prefix`(): Unit =
             runBlocking {
                 val s3Client = mockS3Client(files = emptyMap())
 
@@ -419,6 +468,566 @@ class DuckDbDatabaseEnvironmentTest {
                     val response = GetObjectResponse { body = ByteStream.fromBytes(bytes) }
                     block(response)
                 }
+            }
+
+            coEvery { s3Client.close() } returns Unit
+
+            return s3Client
+        }
+
+        private fun createParquetBytes(tableName: String): ByteArray {
+            val parquetFile = tempDir.resolve("$tableName.parquet")
+            Class.forName("org.duckdb.DuckDBDriver")
+            DriverManager.getConnection("jdbc:duckdb:").use { conn ->
+                conn.createStatement().use { stmt ->
+                    stmt.execute("CREATE TABLE $tableName (id INTEGER, name VARCHAR, price DOUBLE)")
+                    stmt.execute("INSERT INTO $tableName VALUES (1, 'Widget', 9.99), (2, 'Gadget', 19.99)")
+                    stmt.execute("COPY $tableName TO '${parquetFile.toAbsolutePath()}'")
+                }
+            }
+            return java.nio.file.Files
+                .readAllBytes(parquetFile)
+        }
+    }
+
+    @Nested
+    inner class ResolveVersionsAtTimestamp {
+        @TempDir
+        lateinit var tempDir: Path
+
+        private val t0 = Instant.parse("2026-01-01T00:00:00Z")
+        private val t1 = Instant.parse("2026-01-10T00:00:00Z")
+        private val t2 = Instant.parse("2026-01-20T00:00:00Z")
+        private val t3 = Instant.parse("2026-01-30T00:00:00Z")
+        private val t4 = Instant.parse("2026-02-10T00:00:00Z")
+
+        private fun awsInstant(instant: Instant): AwsInstant = AwsInstant.fromEpochSeconds(instant.epochSecond)
+
+        private fun snapshot(timestamp: Instant) = DatabaseEnvironmentSnapshot(timestamp = timestamp, versionSet = null)
+
+        @Test
+        fun `resolves latest version before timestamp`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                                VersionEntry("data/orders.parquet", "v2", t2),
+                                VersionEntry("data/orders.parquet", "v3", t4),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t3),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                val version =
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.first()
+                assertEquals(S3ObjectKey("data/orders.parquet"), version?.fileReference)
+                assertEquals("v2", version?.versionId)
+            }
+
+        @Test
+        fun `resolves version at exact timestamp boundary`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                                VersionEntry("data/orders.parquet", "v2", t2),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t2),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                val version =
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.first()
+                assertEquals("v2", version?.versionId)
+            }
+
+        @Test
+        fun `excludes files created after timestamp`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                                VersionEntry("data/future.parquet", "v1", t4),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t3),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                assertEquals(
+                    1,
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.size,
+                )
+                assertEquals(
+                    S3ObjectKey("data/orders.parquet"),
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.first()
+                        ?.fileReference,
+                )
+            }
+
+        @Test
+        fun `fails when all files are after timestamp`(): Unit =
+            runBlocking {
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t4),
+                            ),
+                        fileContent = ByteArray(0),
+                    )
+
+                assertThrows<IllegalArgumentException> {
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t1),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+                }
+            }
+
+        @Test
+        fun `excludes file deleted before timestamp`(): Unit =
+            runBlocking {
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                            ),
+                        deleteMarkers =
+                            listOf(
+                                DeleteMarkerInfo("data/orders.parquet", t2),
+                            ),
+                        fileContent = ByteArray(0),
+                    )
+
+                assertThrows<IllegalArgumentException> {
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t3),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+                }
+            }
+
+        @Test
+        fun `includes file re-uploaded after delete`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                                VersionEntry("data/orders.parquet", "v3", t3),
+                            ),
+                        deleteMarkers =
+                            listOf(
+                                DeleteMarkerInfo("data/orders.parquet", t2),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t4),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                val version =
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.first()
+                assertEquals("v3", version?.versionId)
+            }
+
+        @Test
+        fun `delete marker after timestamp does not affect resolution`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                            ),
+                        deleteMarkers =
+                            listOf(
+                                DeleteMarkerInfo("data/orders.parquet", t4),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t2),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                val version =
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.first()
+                assertEquals(S3ObjectKey("data/orders.parquet"), version?.fileReference)
+                assertEquals("v1", version?.versionId)
+            }
+
+        @Test
+        fun `resolves multiple files independently`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                                VersionEntry("data/orders.parquet", "v2", t3),
+                                VersionEntry("data/products.parquet", "v1", t1),
+                                VersionEntry("data/products.parquet", "v2", t2),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t2),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                val versions = env.snapshot?.versionSet?.versions ?: emptySet()
+                assertEquals(2, versions.size)
+
+                val ordersVersion = versions.first { it.fileReference.value == "data/orders.parquet" }
+                assertEquals("v1", ordersVersion.versionId)
+
+                val productsVersion = versions.first { it.fileReference.value == "data/products.parquet" }
+                assertEquals("v2", productsVersion.versionId)
+            }
+
+        @Test
+        fun `pre-versioning object has null versionId`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "null", t1),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t2),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                val version =
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.first()
+                assertNull(version?.versionId)
+            }
+
+        @Test
+        fun `handles paginated version listing`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client = mockk<S3Client>()
+
+                var callCount = 0
+                coEvery { s3Client.listObjectVersions(any<ListObjectVersionsRequest>()) } answers {
+                    callCount++
+                    if (callCount == 1) {
+                        ListObjectVersionsResponse {
+                            versions =
+                                listOf(
+                                    ObjectVersion {
+                                        key = "data/orders.parquet"
+                                        versionId = "v1"
+                                        lastModified = awsInstant(t1)
+                                    },
+                                )
+                            isTruncated = true
+                            nextKeyMarker = "data/orders.parquet"
+                            nextVersionIdMarker = "v1"
+                        }
+                    } else {
+                        ListObjectVersionsResponse {
+                            versions =
+                                listOf(
+                                    ObjectVersion {
+                                        key = "data/products.parquet"
+                                        versionId = "v1"
+                                        lastModified = awsInstant(t1)
+                                    },
+                                )
+                            isTruncated = false
+                        }
+                    }
+                }
+
+                coEvery {
+                    s3Client.getObject(
+                        any<aws.sdk.kotlin.services.s3.model.GetObjectRequest>(),
+                        any<suspend (GetObjectResponse) -> Unit>(),
+                    )
+                } coAnswers {
+                    val block = secondArg<suspend (GetObjectResponse) -> Unit>()
+                    block(GetObjectResponse { body = ByteStream.fromBytes(parquetBytes) })
+                }
+
+                coEvery { s3Client.close() } returns Unit
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t2),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                assertEquals(
+                    2,
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.size,
+                )
+                assertEquals(2, callCount)
+            }
+
+        @Test
+        fun `ignores non-parquet versions`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                                VersionEntry("data/metadata.json", "v1", t1),
+                                VersionEntry("data/readme.txt", "v1", t1),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t2),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                assertEquals(
+                    1,
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.size,
+                )
+                assertEquals(
+                    S3ObjectKey("data/orders.parquet"),
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.first()
+                        ?.fileReference,
+                )
+            }
+
+        @Test
+        fun `delete marker on non-parquet file does not affect parquet resolution`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                                VersionEntry("data/readme.txt", "v1", t1),
+                            ),
+                        deleteMarkers =
+                            listOf(
+                                DeleteMarkerInfo("data/readme.txt", t2),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t3),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                assertEquals(
+                    1,
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.size,
+                )
+            }
+
+        @Test
+        fun `multiple delete markers picks latest before timestamp`(): Unit =
+            runBlocking {
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t0),
+                                VersionEntry("data/orders.parquet", "v2", t2),
+                            ),
+                        deleteMarkers =
+                            listOf(
+                                DeleteMarkerInfo("data/orders.parquet", t1),
+                                DeleteMarkerInfo("data/orders.parquet", t3),
+                            ),
+                        fileContent = ByteArray(0),
+                    )
+
+                assertThrows<IllegalArgumentException> {
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t4),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+                }
+            }
+
+        @Test
+        fun `version at same time as delete marker is not excluded`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions =
+                            listOf(
+                                VersionEntry("data/orders.parquet", "v1", t1),
+                            ),
+                        deleteMarkers =
+                            listOf(
+                                DeleteMarkerInfo("data/orders.parquet", t1),
+                            ),
+                        fileContent = parquetBytes,
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t2),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                val version =
+                    env.snapshot
+                        ?.versionSet
+                        ?.versions
+                        ?.first()
+                assertEquals("v1", version?.versionId)
+            }
+
+        @Test
+        fun `empty version list returns empty set`(): Unit =
+            runBlocking {
+                val s3Client =
+                    mockVersionedS3Client(
+                        versions = emptyList(),
+                        fileContent = ByteArray(0),
+                    )
+
+                assertThrows<IllegalArgumentException> {
+                    DuckDbDatabaseEnvironment.fromS3(
+                        snapshot = snapshot(t2),
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+                }
+            }
+
+        private fun mockVersionedS3Client(
+            versions: List<VersionEntry>,
+            deleteMarkers: List<DeleteMarkerInfo> = emptyList(),
+            fileContent: ByteArray,
+        ): S3Client {
+            val s3Client = mockk<S3Client>()
+
+            coEvery { s3Client.listObjectVersions(any<ListObjectVersionsRequest>()) } returns
+                ListObjectVersionsResponse {
+                    this.versions =
+                        versions.map { entry ->
+                            ObjectVersion {
+                                key = entry.key
+                                versionId = entry.versionId
+                                lastModified = awsInstant(entry.lastModified)
+                            }
+                        }
+                    this.deleteMarkers =
+                        deleteMarkers.map { marker ->
+                            DeleteMarkerEntry {
+                                key = marker.key
+                                lastModified = awsInstant(marker.lastModified)
+                            }
+                        }
+                    isTruncated = false
+                }
+
+            coEvery {
+                s3Client.getObject(
+                    any<aws.sdk.kotlin.services.s3.model.GetObjectRequest>(),
+                    any<suspend (GetObjectResponse) -> Unit>(),
+                )
+            } coAnswers {
+                val block = secondArg<suspend (GetObjectResponse) -> Unit>()
+                block(GetObjectResponse { body = ByteStream.fromBytes(fileContent) })
             }
 
             coEvery { s3Client.close() } returns Unit
