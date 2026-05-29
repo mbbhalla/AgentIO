@@ -11,6 +11,8 @@ Every data type enforces validity in its `init` block. If an object exists, it i
 | `TableName` | Matches `[a-z][a-z0-9_]*` |
 | `ColumnName` | Matches `[a-z][a-z0-9_]*` |
 | `ColumnType` | Enum — only valid DB types |
+| `SchemaMetadata` | Deserialized from valid YAML matching expected structure |
+| `ConstraintStrategies` | Non-nullable with safe defaults (all THROW) |
 | `S3ObjectKey` | Non-blank, no leading `/` |
 | `S3Uri` | Valid `s3://bucket/key` format |
 | `MVELExpression` | Compiles via `MVEL.compileExpression()` — syntactically valid |
@@ -26,6 +28,8 @@ Every data type enforces validity in its `init` block. If an object exists, it i
 io.github.mbbhalla.agentio.data/
 ├── model/
 │   ├── DataModels.kt       — TableName, ColumnName, ColumnType, TableInfo, ColumnInfo, ForeignKeyRef, Dataset, DataValue
+│   ├── SchemaMetadata.kt   — SchemaMetadata (parsed from schemaMetadata.yml, enriches descriptions + constraints)
+│   ├── ConstraintStrategies.kt — ViolationBehavior enum + ConstraintStrategies (THROW/IGNORE per constraint type)
 │   ├── S3Models.kt         — S3ObjectKey, S3Uri, Version, VersionSet, DatabaseEnvironmentSnapshot
 │   ├── ExplainResult.kt    — sealed: Success | Failure
 │   └── MVELExpression.kt   — validated MVEL expression (compiled at construction)
@@ -62,6 +66,7 @@ val env = DuckDbDatabaseEnvironment.fromStatements(
 val env = DuckDbDatabaseEnvironment.fromParquet(Path("/data/2025-05-26/"))
 // Tables inferred from filenames: orders.parquet → table "orders"
 // Schema inferred from Parquet metadata
+// If schemaMetadata.yml exists in directory, table/column descriptions are applied
 ```
 
 ### Create from Parquet files (S3 — point-in-time snapshot)
@@ -75,8 +80,64 @@ val env = DuckDbDatabaseEnvironment.fromS3(
 )
 // Resolves each .parquet file to its version at-or-before timestamp
 // Downloads with explicit versionId for reproducibility
+// Also downloads schemaMetadata.yml if present at the same prefix
 // env.snapshot contains fully-resolved DatabaseEnvironmentSnapshot (timestamp + VersionSet)
 ```
+
+### Schema Metadata (optional)
+
+Place a `schemaMetadata.yml` alongside your parquet files to enrich tables and columns with descriptions and constraints. When present, descriptions are applied as DuckDB `COMMENT ON` statements, constraints are enforced via `ALTER TABLE`, and metadata is populated into `TableInfo`/`ColumnInfo`.
+
+```yaml
+# schemaMetadata.yml
+tables:
+  - name: orders
+    description: "All completed customer orders"
+    columns:
+      - name: order_id
+        description: "Unique order identifier"
+        primaryKey: true
+      - name: customer_id
+        description: "FK to customers table"
+        notNull: true
+        foreignKey: "customer.customer_id"
+      - name: email
+        description: "Contact email"
+        unique: true
+      - name: status
+        description: "One of: pending, shipped, delivered"
+        notNull: true
+```
+
+**Supported constraints:**
+
+| Field | Effect |
+|-------|--------|
+| `primaryKey: true` | `ALTER TABLE ADD PRIMARY KEY` — rejects duplicate values |
+| `unique: true` | `ALTER TABLE ADD UNIQUE` — rejects duplicate values |
+| `notNull: true` | `ALTER TABLE ALTER COLUMN SET NOT NULL` — rejects null values |
+| `foreignKey: "table.column"` | Validates referential integrity via query — rejects orphaned rows |
+
+Without `schemaMetadata.yml`, tables default to `"Table loaded from <filename>"` and columns have empty descriptions with no constraints.
+
+### Constraint Strategies
+
+By default, all constraint violations throw `IllegalStateException`. Override per constraint type:
+
+```kotlin
+val env = DuckDbDatabaseEnvironment.fromParquet(
+    directory = Path("/data/"),
+    constraintStrategies = ConstraintStrategies(
+        onPrimaryKeyViolation = ViolationBehavior.THROW,   // default
+        onUniqueViolation = ViolationBehavior.THROW,       // default
+        onNotNullViolation = ViolationBehavior.IGNORE,     // log warning, continue
+        onForeignKeyViolation = ViolationBehavior.IGNORE,  // log warning, continue
+    ),
+)
+```
+
+- `THROW` — fail environment creation if data violates the constraint
+- `IGNORE` — attempt enforcement, log warning on violation, continue with data loaded
 
 ### Typed SQL — cannot construct invalid SQL
 
@@ -143,6 +204,7 @@ val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
 - MVEL2 2.5.2.Final
 - AWS SDK Kotlin S3 1.6.68
 - Kotlinx Serialization
+- kaml 0.104.0 (YAML parsing via kotlinx-serialization)
 - Kotlinx Coroutines
 
 ## Build & Test

@@ -12,6 +12,9 @@ dependencies {
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
+    // YAML parsing (kaml — kotlinx-serialization backend)
+    implementation("com.charleskorn.kaml:kaml:0.104.0")
+
     // AWS SDK for S3
     implementation("aws.sdk.kotlin:s3:1.6.68")
 

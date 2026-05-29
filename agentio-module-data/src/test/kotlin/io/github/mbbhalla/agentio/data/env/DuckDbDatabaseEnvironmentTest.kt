@@ -10,12 +10,15 @@ import aws.smithy.kotlin.runtime.content.ByteStream
 import io.github.mbbhalla.agentio.data.model.ColumnInfo
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.ColumnType
+import io.github.mbbhalla.agentio.data.model.ConstraintStrategies
 import io.github.mbbhalla.agentio.data.model.DataValue
 import io.github.mbbhalla.agentio.data.model.ExplainResult
+import io.github.mbbhalla.agentio.data.model.ForeignKeyRef
 import io.github.mbbhalla.agentio.data.model.S3ObjectKey
 import io.github.mbbhalla.agentio.data.model.S3Uri
 import io.github.mbbhalla.agentio.data.model.TableInfo
 import io.github.mbbhalla.agentio.data.model.TableName
+import io.github.mbbhalla.agentio.data.model.ViolationBehavior
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -276,6 +279,63 @@ class DuckDbDatabaseEnvironmentTest {
         }
 
         @Test
+        fun `uses schemaMetadata yml for table description`() {
+            createParquetFile("items")
+            writeSchemaMetadata(
+                """
+                tables:
+                  - name: items
+                    description: "Product catalog"
+                    columns:
+                      - name: id
+                        description: "Unique product identifier"
+                      - name: name
+                        description: "Product display name"
+                """.trimIndent(),
+            )
+
+            val env = DuckDbDatabaseEnvironment.fromParquet(tempDir)
+            val info = env.getTableInfo(TableName("items"))
+
+            assertEquals("Product catalog", info.description)
+        }
+
+        @Test
+        fun `uses schemaMetadata yml for column descriptions`() {
+            createParquetFile("items")
+            writeSchemaMetadata(
+                """
+                tables:
+                  - name: items
+                    description: "Product catalog"
+                    columns:
+                      - name: id
+                        description: "Unique product identifier"
+                      - name: name
+                        description: "Product display name"
+                """.trimIndent(),
+            )
+
+            val env = DuckDbDatabaseEnvironment.fromParquet(tempDir)
+            val info = env.getTableInfo(TableName("items"))
+
+            assertEquals("Unique product identifier", info.columns.first { it.name.value == "id" }.description)
+            assertEquals("Product display name", info.columns.first { it.name.value == "name" }.description)
+            assertEquals("", info.columns.first { it.name.value == "price" }.description)
+        }
+
+        @Test
+        fun `falls back to default description without schemaMetadata`() {
+            createParquetFile("items")
+
+            val env = DuckDbDatabaseEnvironment.fromParquet(tempDir)
+            val info = env.getTableInfo(TableName("items"))
+
+            assertEquals("Table loaded from items.parquet", info.description)
+            assertTrue(info.columns.all { it.description == "" })
+        }
+
+        @Test
         fun `rejects empty directory`() {
             assertThrows<IllegalArgumentException> {
                 DuckDbDatabaseEnvironment.fromParquet(tempDir)
@@ -298,6 +358,160 @@ class DuckDbDatabaseEnvironmentTest {
                     stmt.execute("COPY $tableName TO '${tempDir.resolve("$tableName.parquet")}'")
                 }
             }
+        }
+
+        private fun writeSchemaMetadata(content: String) {
+            tempDir.resolve("schemaMetadata.yml").toFile().writeText(content)
+        }
+    }
+
+    @Nested
+    inner class Constraints {
+        @TempDir
+        lateinit var tempDir: Path
+
+        private val fixtureDir: Path =
+            Path.of("src/test/resources/constraints")
+
+        private val employeesMetadata =
+            """
+            tables:
+              - name: departments
+                description: "Company departments"
+                columns:
+                  - name: department_id
+                    primaryKey: true
+                  - name: department_name
+                    notNull: true
+              - name: employees
+                description: "Employees"
+                columns:
+                  - name: employee_id
+                    primaryKey: true
+                  - name: email
+                    unique: true
+                    notNull: true
+                  - name: department_id
+                    notNull: true
+                    foreignKey: "departments.department_id"
+                  - name: name
+                    notNull: true
+            """.trimIndent()
+
+        @Test
+        fun `all constraints satisfied loads successfully`() {
+            setupDir("employees_all_constraints_satisfied.parquet")
+
+            val env = DuckDbDatabaseEnvironment.fromParquet(tempDir)
+
+            assertEquals(setOf(TableName("departments"), TableName("employees")), env.listTables())
+            val empInfo = env.getTableInfo(TableName("employees"))
+            assertTrue(empInfo.columns.first { it.name.value == "employee_id" }.primaryKey)
+            assertEquals(false, empInfo.columns.first { it.name.value == "name" }.nullable)
+            assertEquals(
+                ForeignKeyRef(TableName("departments"), ColumnName("department_id")),
+                empInfo.columns.first { it.name.value == "department_id" }.foreignKey,
+            )
+        }
+
+        @Test
+        fun `primary key violation throws by default`() {
+            setupDir("employees_with_primary_key_constraint_violated.parquet")
+
+            assertThrows<IllegalStateException> {
+                DuckDbDatabaseEnvironment.fromParquet(tempDir)
+            }
+        }
+
+        @Test
+        fun `primary key violation ignored when strategy is IGNORE`() {
+            setupDir("employees_with_primary_key_constraint_violated.parquet")
+
+            val env =
+                DuckDbDatabaseEnvironment.fromParquet(
+                    tempDir,
+                    ConstraintStrategies(onPrimaryKeyViolation = ViolationBehavior.IGNORE),
+                )
+
+            assertEquals(setOf(TableName("departments"), TableName("employees")), env.listTables())
+        }
+
+        @Test
+        fun `unique constraint violation throws by default`() {
+            setupDir("employees_with_unique_constraint_violated.parquet")
+
+            assertThrows<IllegalStateException> {
+                DuckDbDatabaseEnvironment.fromParquet(tempDir)
+            }
+        }
+
+        @Test
+        fun `unique constraint violation ignored when strategy is IGNORE`() {
+            setupDir("employees_with_unique_constraint_violated.parquet")
+
+            val env =
+                DuckDbDatabaseEnvironment.fromParquet(
+                    tempDir,
+                    ConstraintStrategies(onUniqueViolation = ViolationBehavior.IGNORE),
+                )
+
+            assertEquals(setOf(TableName("departments"), TableName("employees")), env.listTables())
+        }
+
+        @Test
+        fun `not null constraint violation throws by default`() {
+            setupDir("employees_with_non_null_constraint_violated.parquet")
+
+            assertThrows<IllegalStateException> {
+                DuckDbDatabaseEnvironment.fromParquet(tempDir)
+            }
+        }
+
+        @Test
+        fun `not null constraint violation ignored when strategy is IGNORE`() {
+            setupDir("employees_with_non_null_constraint_violated.parquet")
+
+            val env =
+                DuckDbDatabaseEnvironment.fromParquet(
+                    tempDir,
+                    ConstraintStrategies(onNotNullViolation = ViolationBehavior.IGNORE),
+                )
+
+            assertEquals(setOf(TableName("departments"), TableName("employees")), env.listTables())
+        }
+
+        @Test
+        fun `foreign key violation throws by default`() {
+            setupDir("employees_with_foreign_key_constraint_violated.parquet")
+
+            assertThrows<IllegalStateException> {
+                DuckDbDatabaseEnvironment.fromParquet(tempDir)
+            }
+        }
+
+        @Test
+        fun `foreign key violation ignored when strategy is IGNORE`() {
+            setupDir("employees_with_foreign_key_constraint_violated.parquet")
+
+            val env =
+                DuckDbDatabaseEnvironment.fromParquet(
+                    tempDir,
+                    ConstraintStrategies(onForeignKeyViolation = ViolationBehavior.IGNORE),
+                )
+
+            assertEquals(setOf(TableName("departments"), TableName("employees")), env.listTables())
+        }
+
+        private fun setupDir(employeesParquetFile: String) {
+            fixtureDir
+                .resolve("departments.parquet")
+                .toFile()
+                .copyTo(tempDir.resolve("departments.parquet").toFile())
+            fixtureDir
+                .resolve(employeesParquetFile)
+                .toFile()
+                .copyTo(tempDir.resolve("employees.parquet").toFile())
+            tempDir.resolve("schemaMetadata.yml").toFile().writeText(employeesMetadata)
         }
     }
 
@@ -415,6 +629,42 @@ class DuckDbDatabaseEnvironmentTest {
             }
 
         @Test
+        fun `uses schemaMetadata yml from S3 when present`() =
+            runBlocking {
+                val parquetBytes = createParquetBytes("orders")
+                val metadataYaml =
+                    """
+                    tables:
+                      - name: orders
+                        description: "Customer orders"
+                        columns:
+                          - name: id
+                            description: "Order identifier"
+                          - name: name
+                            description: "Item name"
+                    """.trimIndent()
+                val s3Client =
+                    mockS3Client(
+                        files =
+                            mapOf(
+                                "data/orders.parquet" to parquetBytes,
+                                "data/schemaMetadata.yml" to metadataYaml.toByteArray(),
+                            ),
+                    )
+
+                val env =
+                    DuckDbDatabaseEnvironment.fromS3(
+                        timestamp = testTimestamp,
+                        s3Uri = S3Uri("s3://my-bucket/data"),
+                        s3Client = s3Client,
+                    )
+
+                val info = env.getTableInfo(TableName("orders"))
+                assertEquals("Customer orders", info.description)
+                assertEquals("Order identifier", info.columns.first { it.name.value == "id" }.description)
+            }
+
+        @Test
         fun `snapshot contains resolved version set`() =
             runBlocking {
                 val parquetBytes = createParquetBytes("orders")
@@ -453,6 +703,13 @@ class DuckDbDatabaseEnvironmentTest {
                         }
                     isTruncated = false
                 }
+
+            coEvery {
+                s3Client.getObject(
+                    any<aws.sdk.kotlin.services.s3.model.GetObjectRequest>(),
+                    any<suspend (GetObjectResponse) -> Unit>(),
+                )
+            } throws RuntimeException("NoSuchKey")
 
             files.forEach { (key, bytes) ->
                 coEvery {

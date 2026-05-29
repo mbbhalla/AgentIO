@@ -1,0 +1,118 @@
+tables:
+  - name: department
+    description: "Company departments with budget and location"
+    columns:
+      - name: department_id
+        description: "Unique department identifier"
+        primaryKey: true
+      - name: department_name
+        description: "Department name"
+        notNull: true
+      - name: location
+        description: "Office location"
+        notNull: true
+      - name: budget
+        description: "Annual budget in USD"
+        notNull: true
+
+  - name: employee
+    description: "All employees with their role, compensation, and reporting structure"
+    columns:
+      - name: employee_id
+        description: "Unique employee identifier"
+        primaryKey: true
+      - name: first_name
+        description: "First name"
+        notNull: true
+      - name: last_name
+        description: "Last name"
+        notNull: true
+      - name: email
+        description: "Corporate email address"
+        notNull: true
+        unique: true
+      - name: department_id
+        description: "FK to department"
+        notNull: true
+        foreignKey: "department.department_id"
+      - name: manager_id
+        description: "FK to employee (self-referencing); null for top-level"
+        foreignKey: "employee.employee_id"
+      - name: hire_date
+        description: "Date employee joined the company"
+        notNull: true
+      - name: salary
+        description: "Annual salary in USD"
+        notNull: true
+      - name: job_title
+        description: "Current job title"
+        notNull: true
+
+  - name: performance_review
+    description: "Periodic performance reviews submitted by managers"
+    columns:
+      - name: review_id
+        description: "Unique review identifier"
+        primaryKey: true
+      - name: employee_id
+        description: "FK to employee being reviewed"
+        notNull: true
+        foreignKey: "employee.employee_id"
+      - name: reviewer_id
+        description: "FK to employee who conducted the review; null for self-assessments"
+        foreignKey: "employee.employee_id"
+      - name: review_date
+        description: "Date review was submitted"
+        notNull: true
+      - name: rating
+        description: "Numeric rating (1-5)"
+        notNull: true
+      - name: comments
+        description: "Free-text reviewer comments"
+
+  - name: project
+    description: "Company projects owned by a department with a designated lead"
+    columns:
+      - name: project_id
+        description: "Unique project identifier"
+        primaryKey: true
+      - name: project_name
+        description: "Project name"
+        notNull: true
+      - name: department_id
+        description: "FK to owning department"
+        notNull: true
+        foreignKey: "department.department_id"
+      - name: lead_employee_id
+        description: "FK to employee leading the project"
+        notNull: true
+        foreignKey: "employee.employee_id"
+      - name: start_date
+        description: "Project start date"
+        notNull: true
+      - name: end_date
+        description: "Project end date; null if ongoing"
+      - name: status
+        description: "One of: planning, active, completed, cancelled"
+        notNull: true
+
+  - name: project_assignment
+    description: "Assignments linking employees to projects with allocated hours"
+    columns:
+      - name: assignment_id
+        description: "Unique assignment identifier"
+        primaryKey: true
+      - name: project_id
+        description: "FK to project"
+        notNull: true
+        foreignKey: "project.project_id"
+      - name: employee_id
+        description: "FK to assigned employee"
+        notNull: true
+        foreignKey: "employee.employee_id"
+      - name: role
+        description: "Role on the project (e.g. developer, designer, analyst)"
+        notNull: true
+      - name: hours_allocated
+        description: "Weekly hours allocated to this project"
+        notNull: true

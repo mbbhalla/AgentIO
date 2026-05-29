@@ -8,21 +8,28 @@ import io.github.mbbhalla.agentio.core.common.generateList
 import io.github.mbbhalla.agentio.data.model.ColumnInfo
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.ColumnType
+import io.github.mbbhalla.agentio.data.model.ConstraintStrategies
 import io.github.mbbhalla.agentio.data.model.DatabaseEnvironmentSnapshot
 import io.github.mbbhalla.agentio.data.model.Dataset
 import io.github.mbbhalla.agentio.data.model.ExplainResult
+import io.github.mbbhalla.agentio.data.model.ForeignKeyRef
 import io.github.mbbhalla.agentio.data.model.S3ObjectKey
 import io.github.mbbhalla.agentio.data.model.S3Uri
+import io.github.mbbhalla.agentio.data.model.SchemaMetadata
 import io.github.mbbhalla.agentio.data.model.TableInfo
 import io.github.mbbhalla.agentio.data.model.TableName
 import io.github.mbbhalla.agentio.data.model.Version
 import io.github.mbbhalla.agentio.data.model.VersionSet
+import io.github.mbbhalla.agentio.data.model.ViolationBehavior
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.Connection
 import java.sql.DriverManager
+
+private val logger = LoggerFactory.getLogger(DuckDbDatabaseEnvironment::class.java)
 
 class DuckDbDatabaseEnvironment private constructor(
     private val connection: Connection,
@@ -84,19 +91,31 @@ class DuckDbDatabaseEnvironment private constructor(
             return env
         }
 
-        fun fromParquet(directory: Path): DuckDbDatabaseEnvironment {
+        fun fromParquet(
+            directory: Path,
+            constraintStrategies: ConstraintStrategies = ConstraintStrategies(),
+        ): DuckDbDatabaseEnvironment {
             val parquetFiles =
                 directory.toFile().listFiles { f -> f.extension == "parquet" }
                     ?: throw IllegalArgumentException("Directory does not exist: $directory")
             require(parquetFiles.isNotEmpty()) { "No .parquet files found in: $directory" }
 
-            return loadParquetFiles(parquetFiles.toList(), snapshot = null)
+            val metadataFile = directory.resolve(SchemaMetadata.FILENAME).toFile()
+            val schemaMetadata = if (metadataFile.exists()) SchemaMetadata.fromFile(metadataFile) else null
+
+            return loadParquetFiles(
+                parquetFiles.toList(),
+                snapshot = null,
+                schemaMetadata = schemaMetadata,
+                constraintStrategies = constraintStrategies,
+            )
         }
 
         suspend fun fromS3(
             timestamp: java.time.Instant,
             s3Uri: S3Uri,
             s3Client: S3Client,
+            constraintStrategies: ConstraintStrategies = ConstraintStrategies(),
         ): DuckDbDatabaseEnvironment {
             val tempDir =
                 withContext(Dispatchers.IO) {
@@ -123,6 +142,8 @@ class DuckDbDatabaseEnvironment private constructor(
                 }
             }
 
+            val schemaMetadata = downloadSchemaMetadata(s3Uri, s3Client, tempDir)
+
             val snapshot =
                 DatabaseEnvironmentSnapshot(
                     timestamp = timestamp,
@@ -133,12 +154,22 @@ class DuckDbDatabaseEnvironment private constructor(
                 tempDir.toFile().listFiles { f -> f.extension == "parquet" }?.toList()
                     ?: emptyList()
 
-            return loadParquetFiles(parquetFiles, snapshot = snapshot)
+            val env =
+                loadParquetFiles(
+                    parquetFiles,
+                    snapshot = snapshot,
+                    schemaMetadata = schemaMetadata,
+                    constraintStrategies = constraintStrategies,
+                )
+            withContext(Dispatchers.IO) { tempDir.toFile().deleteRecursively() }
+            return env
         }
 
         private fun loadParquetFiles(
             parquetFiles: List<java.io.File>,
             snapshot: DatabaseEnvironmentSnapshot?,
+            schemaMetadata: SchemaMetadata? = null,
+            constraintStrategies: ConstraintStrategies = ConstraintStrategies(),
         ): DuckDbDatabaseEnvironment {
             Class.forName("org.duckdb.DuckDBDriver")
             val connection = DriverManager.getConnection("jdbc:duckdb:")
@@ -148,15 +179,37 @@ class DuckDbDatabaseEnvironment private constructor(
                 parquetFiles.forEach { file ->
                     val tableName = TableName(file.nameWithoutExtension)
                     stmt.execute(
-                        "CREATE VIEW ${tableName.value} AS SELECT * FROM read_parquet('${file.absolutePath}')",
+                        "CREATE TABLE ${tableName.value} AS SELECT * FROM read_parquet('${file.absolutePath}')",
                     )
-                    val columns = inferColumns(connection, tableName)
+                    val columns =
+                        inferColumns(connection, tableName).map { col ->
+                            val meta = schemaMetadata?.columnConstraints(tableName, col.name)
+                            val desc = meta?.description?.ifBlank { null }
+                            val fk = meta?.foreignKey?.let { parseForeignKey(it) }
+                            col.copy(
+                                description = desc ?: col.description,
+                                primaryKey = meta?.primaryKey ?: col.primaryKey,
+                                foreignKey = fk ?: col.foreignKey,
+                                nullable = if (meta?.notNull == true) false else col.nullable,
+                            )
+                        }
+                    val tableDescription =
+                        schemaMetadata?.tableDescription(tableName) ?: "Table loaded from ${file.name}"
                     tableMetadata[tableName] =
                         TableInfo(
                             name = tableName,
-                            description = "Table loaded from ${file.name}",
+                            description = tableDescription,
                             columns = columns,
                         )
+
+                    applyComments(stmt, tableName, tableDescription, columns)
+                    applyConstraints(connection, tableName, columns, schemaMetadata, constraintStrategies)
+                }
+            }
+
+            if (schemaMetadata != null) {
+                connection.createStatement().use { stmt ->
+                    validateForeignKeys(stmt, tableMetadata, schemaMetadata, constraintStrategies)
                 }
             }
 
@@ -164,6 +217,170 @@ class DuckDbDatabaseEnvironment private constructor(
             activate(env)
             return env
         }
+
+        private fun applyComments(
+            stmt: java.sql.Statement,
+            tableName: TableName,
+            tableDescription: String,
+            columns: List<ColumnInfo>,
+        ) {
+            stmt.execute("COMMENT ON TABLE ${tableName.value} IS '${tableDescription.replace("'", "''")}'")
+            columns.filter { it.description.isNotBlank() }.forEach { col ->
+                stmt.execute(
+                    "COMMENT ON COLUMN ${tableName.value}.${col.name.value} IS '${col.description.replace("'", "''")}'",
+                )
+            }
+        }
+
+        private fun applyConstraints(
+            connection: Connection,
+            tableName: TableName,
+            columns: List<ColumnInfo>,
+            schemaMetadata: SchemaMetadata?,
+            strategies: ConstraintStrategies,
+        ) {
+            if (schemaMetadata == null) return
+
+            // NOT NULL first — ALTER TABLE fails if indexes/PKs already exist on the table
+            columns.forEach { col ->
+                val meta = schemaMetadata.columnConstraints(tableName, col.name) ?: return@forEach
+                if (meta.notNull) {
+                    executeConstraint(
+                        connection,
+                        "ALTER TABLE ${tableName.value} ALTER COLUMN ${col.name.value} SET NOT NULL",
+                        strategies.onNotNullViolation,
+                        "NOT NULL on ${tableName.value}.${col.name.value}",
+                    )
+                }
+            }
+
+            // PRIMARY KEY
+            val pkColumns =
+                columns.filter { col ->
+                    schemaMetadata.columnConstraints(tableName, col.name)?.primaryKey == true
+                }
+            if (pkColumns.isNotEmpty()) {
+                val pkColNames = pkColumns.joinToString(", ") { it.name.value }
+                executeConstraint(
+                    connection,
+                    "ALTER TABLE ${tableName.value} ADD PRIMARY KEY ($pkColNames)",
+                    strategies.onPrimaryKeyViolation,
+                    "PRIMARY KEY on ${tableName.value}($pkColNames)",
+                )
+            }
+
+            // UNIQUE (via index — must come after ALTER TABLE operations)
+            columns.forEach { col ->
+                val meta = schemaMetadata.columnConstraints(tableName, col.name) ?: return@forEach
+                if (meta.unique && !meta.primaryKey) {
+                    val indexName = "uq_${tableName.value}_${col.name.value}"
+                    executeConstraint(
+                        connection,
+                        "CREATE UNIQUE INDEX $indexName ON ${tableName.value} (${col.name.value})",
+                        strategies.onUniqueViolation,
+                        "UNIQUE on ${tableName.value}.${col.name.value}",
+                    )
+                }
+            }
+        }
+
+        private fun validateForeignKeys(
+            stmt: java.sql.Statement,
+            tableMetadata: Map<TableName, TableInfo>,
+            schemaMetadata: SchemaMetadata,
+            strategies: ConstraintStrategies,
+        ) {
+            schemaMetadata.tables.forEach { tableEntry ->
+                val tableName = TableName(tableEntry.name)
+                if (tableName !in tableMetadata) return@forEach
+
+                tableEntry.columns.filter { it.foreignKey != null }.forEach { colEntry ->
+                    val fk = parseForeignKey(colEntry.foreignKey!!) ?: return@forEach
+                    if (fk.table !in tableMetadata) return@forEach
+
+                    val sql =
+                        "SELECT COUNT(*) FROM ${tableName.value} " +
+                            "WHERE ${colEntry.name} IS NOT NULL " +
+                            "AND ${colEntry.name} NOT IN (SELECT ${fk.column.value} FROM ${fk.table.value})"
+                    try {
+                        val rs = stmt.executeQuery(sql)
+                        rs.next()
+                        val orphanCount = rs.getLong(1)
+                        rs.close()
+                        if (orphanCount > 0) {
+                            val msg =
+                                "FOREIGN KEY violation: ${tableName.value}.${colEntry.name} " +
+                                    "has $orphanCount orphaned rows referencing ${fk.table.value}.${fk.column.value}"
+                            when (strategies.onForeignKeyViolation) {
+                                ViolationBehavior.THROW -> throw IllegalStateException(msg)
+                                ViolationBehavior.IGNORE -> logger.warn(msg)
+                            }
+                        }
+                    } catch (e: IllegalStateException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.warn("Failed to validate FK ${tableName.value}.${colEntry.name}: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        private fun executeConstraint(
+            connection: Connection,
+            sql: String,
+            behavior: ViolationBehavior,
+            description: String,
+        ) {
+            try {
+                connection.createStatement().use { it.execute(sql) }
+            } catch (e: Exception) {
+                when (behavior) {
+                    ViolationBehavior.THROW -> throw IllegalStateException(
+                        "Constraint violation ($description): ${e.message}",
+                        e,
+                    )
+                    ViolationBehavior.IGNORE ->
+                        logger.warn(
+                            "Constraint violation ignored ($description): ${e.message}",
+                        )
+                }
+            }
+        }
+
+        private fun parseForeignKey(fk: String): ForeignKeyRef? {
+            val parts = fk.split(".")
+            if (parts.size != 2) return null
+            return try {
+                ForeignKeyRef(table = TableName(parts[0]), column = ColumnName(parts[1]))
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        }
+
+        private suspend fun downloadSchemaMetadata(
+            s3Uri: S3Uri,
+            s3Client: S3Client,
+            tempDir: Path,
+        ): SchemaMetadata? =
+            try {
+                val metadataKey = "${s3Uri.key.value.trimEnd('/')}/${SchemaMetadata.FILENAME}"
+                var bytes: ByteArray? = null
+                s3Client.getObject(
+                    GetObjectRequest {
+                        bucket = s3Uri.bucket
+                        key = metadataKey
+                    },
+                ) { getResponse ->
+                    bytes = getResponse.body?.toByteArray()
+                }
+                bytes?.let { raw ->
+                    val localFile = tempDir.resolve(SchemaMetadata.FILENAME)
+                    withContext(Dispatchers.IO) { Files.write(localFile, raw) }
+                    SchemaMetadata.fromFile(localFile.toFile())
+                }
+            } catch (_: Exception) {
+                null
+            }
 
         private suspend fun resolveVersionsAtTimestamp(
             timestamp: java.time.Instant,
