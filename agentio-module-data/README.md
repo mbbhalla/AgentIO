@@ -35,7 +35,7 @@ io.github.mbbhalla.agentio.data/
 │   └── MVELExpression.kt   — validated MVEL expression (compiled at construction)
 └── env/
     ├── DatabaseEnvironment.kt        — abstract class with snapshot, companion holds active env
-    ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet() + fromS3(timestamp)
+    ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet(dir, constraintStrategies) + fromS3(timestamp, s3Uri, s3Client, constraintStrategies)
     └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
 ```
 
@@ -114,30 +114,65 @@ tables:
 | Field | Effect |
 |-------|--------|
 | `primaryKey: true` | `ALTER TABLE ADD PRIMARY KEY` — rejects duplicate values |
-| `unique: true` | `ALTER TABLE ADD UNIQUE` — rejects duplicate values |
+| `unique: true` | `CREATE UNIQUE INDEX` — rejects duplicate values |
 | `notNull: true` | `ALTER TABLE ALTER COLUMN SET NOT NULL` — rejects null values |
 | `foreignKey: "table.column"` | Validates referential integrity via query — rejects orphaned rows |
+
+Constraints are applied in order: NOT NULL → PRIMARY KEY → UNIQUE INDEX. This ordering is required because DuckDB cannot `ALTER TABLE` after an index exists on the table.
 
 Without `schemaMetadata.yml`, tables default to `"Table loaded from <filename>"` and columns have empty descriptions with no constraints.
 
 ### Constraint Strategies
 
-By default, all constraint violations throw `IllegalStateException`. Override per constraint type:
+`ConstraintStrategies` controls what happens when loaded data violates a declared constraint. It is an optional parameter on `fromParquet` and `fromS3` — non-nullable with defaults that enforce all constraints.
 
 ```kotlin
+data class ConstraintStrategies(
+    val onPrimaryKeyViolation: ViolationBehavior = ViolationBehavior.THROW,
+    val onUniqueViolation: ViolationBehavior = ViolationBehavior.THROW,
+    val onNotNullViolation: ViolationBehavior = ViolationBehavior.THROW,
+    val onForeignKeyViolation: ViolationBehavior = ViolationBehavior.THROW,
+)
+
+enum class ViolationBehavior { THROW, IGNORE }
+```
+
+**Behavior per mode:**
+
+| Mode | On violation |
+|------|-------------|
+| `THROW` | Throws `IllegalStateException` — environment creation fails |
+| `IGNORE` | Logs warning via SLF4J, skips the constraint, continues loading |
+
+In both modes, `ColumnInfo` metadata (primaryKey, foreignKey, nullable) is still populated from `schemaMetadata.yml` — the strategy only affects enforcement against actual data.
+
+**Usage:**
+
+```kotlin
+// Default: all constraints enforced (safe for production pipelines)
+val env = DuckDbDatabaseEnvironment.fromParquet(Path("/data/"))
+
+// Relax specific constraints (useful for exploratory/dirty data)
 val env = DuckDbDatabaseEnvironment.fromParquet(
     directory = Path("/data/"),
     constraintStrategies = ConstraintStrategies(
-        onPrimaryKeyViolation = ViolationBehavior.THROW,   // default
-        onUniqueViolation = ViolationBehavior.THROW,       // default
-        onNotNullViolation = ViolationBehavior.IGNORE,     // log warning, continue
-        onForeignKeyViolation = ViolationBehavior.IGNORE,  // log warning, continue
+        onNotNullViolation = ViolationBehavior.IGNORE,
+        onForeignKeyViolation = ViolationBehavior.IGNORE,
+    ),
+)
+
+// Same parameter available on fromS3
+val env = DuckDbDatabaseEnvironment.fromS3(
+    timestamp = Instant.parse("2026-05-28T10:00:00Z"),
+    s3Uri = S3Uri("s3://bucket/prefix"),
+    s3Client = s3Client,
+    constraintStrategies = ConstraintStrategies(
+        onPrimaryKeyViolation = ViolationBehavior.IGNORE,
     ),
 )
 ```
 
-- `THROW` — fail environment creation if data violates the constraint
-- `IGNORE` — attempt enforcement, log warning on violation, continue with data loaded
+**When no `schemaMetadata.yml` is present**, no constraints are declared and `ConstraintStrategies` has no effect — data loads unconditionally.
 
 ### Typed SQL — cannot construct invalid SQL
 
@@ -190,6 +225,10 @@ val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
 - **DuckDB is the engine.** Customer data arrives as Parquet (local or S3) or DDL+INSERT. DuckDB validates and executes. No JDBC driver matrix.
 - **`DatabaseEnvironment.current`** — singleton reference used by typed SQL statements for validation. Set by factory methods via `activate()`.
 - **`DatabaseEnvironment.snapshot`** — optional provenance metadata. Non-null for S3-loaded environments (fully constructed with timestamp + resolved VersionSet). Null for filesystem/DDL-based environments.
+- **`schemaMetadata.yml` — dbt-inspired sidecar metadata.** Parquet carries data + physical schema but no descriptions, constraints, or relationships. A YAML sidecar file (optional, loaded from local directory or S3) enriches `TableInfo`/`ColumnInfo` with descriptions and declares PK/UNIQUE/NOT NULL/FK constraints. Format follows dbt `schema.yml` conventions for familiarity.
+- **Constraints are enforced at load time.** Data that violates declared constraints is invalid state. By default, `fromParquet`/`fromS3` throw `IllegalStateException` on violation. `ConstraintStrategies` allows callers to downgrade specific constraint types to IGNORE (log + continue) for exploratory workflows.
+- **UNIQUE via `CREATE UNIQUE INDEX`** — DuckDB does not support `ALTER TABLE ADD UNIQUE`. Indexes create dependencies that prevent further `ALTER TABLE`, so constraint application order is: NOT NULL → PRIMARY KEY → UNIQUE INDEX.
+- **FK validated post-load via query** — DuckDB FK constraints are informational only (not enforced at runtime). Referential integrity is validated by querying for orphaned rows after all tables are loaded. Null FK values are allowed (standard SQL semantics).
 - **`fromS3` is `suspend`** — uses AWS S3 Kotlin SDK (suspend functions). Blocking I/O (`Files.createTempDirectory`, `Files.write`) wrapped in `withContext(Dispatchers.IO)`. Consistent with `agentio-core` concurrency pattern.
 - **Point-in-time S3 resolution** — `fromS3` uses `listObjectVersions` to resolve each parquet file to its version at-or-before the given timestamp. Downloads with explicit `versionId` for reproducibility. Pre-versioning objects (versionId="null") are included best-effort with `versionId = null` in the snapshot.
 - **`fromStatements` and `fromParquet` are non-suspend** — blocking JDBC. Callers wrap in `runBlocking` or `withContext(Dispatchers.IO)` if needed.
