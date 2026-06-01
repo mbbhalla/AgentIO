@@ -16,9 +16,6 @@ AgentIO.iml
 # Coding agent discussions
 discussions/
 
-# Docs
-docs
-
 # Bin files
 agentio-cmm-impl/bin
 agentio-core/bin/
