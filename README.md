@@ -136,7 +136,6 @@ val agentConfiguration = AgentConfiguration(
     contextMemoryManagers = ContextMemoryManagers(
         value = listOf(
             CompactingContextMemoryManager(compactionConfig),  // summarize old turns
-            AdaptiveContextMemoryManager(),                     // reshuffle for attention
         ),
     ),
 )
@@ -200,12 +199,6 @@ val agentConfiguration = AgentConfiguration(
 
 ```bash
 ./gradlew :agentio-examples:RunHackerNewsAgenticFunction
-```
-
-## Running Experiments
-
-```bash
-./gradlew :agentio-experiments:RunAdaptiveExperiment
 ```
 
 ## Architecture Benefits

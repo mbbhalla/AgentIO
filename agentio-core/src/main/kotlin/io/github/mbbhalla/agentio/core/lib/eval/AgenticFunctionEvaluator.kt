@@ -21,8 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *   Suitable when the function and its dependencies are stateless.
  * - **Factory mode**: a factory produces a fresh [AbstractAgenticFunction] per iteration.
  *   Required when the function's dependencies carry mutable state that must not leak
- *   between trials (e.g., [io.github.mbbhalla.agentio.core.lib.ctx.cmm.adaptive.AdaptiveContextMemoryManager]
- *   whose heatmap accumulates across turns).
+ *   between trials.
  *
  * Use [EvaluationInput.withFunction] for shared-instance mode and
  * [EvaluationInput.withFactory] for factory mode.

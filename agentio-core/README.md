@@ -20,7 +20,6 @@ io.github.mbbhalla.agentio.core/
     └── tool/            ToolsProvider, AbstractMcpTool, McpClients
 
 io.github.mbbhalla.agentio.cmm.impl/
-├── adaptive/       Adaptive attention-based context reshuffling
 └── compacting/     LLM-powered conversation summarization
 
 io.github.mbbhalla.agentio.eventlistener.impl/
@@ -117,83 +116,6 @@ val result = evaluator.evaluate()
 
 ---
 
-## Bundled CMM: Adaptive Context Memory Manager
-
-A novel CMM that empirically measures LLM attention distribution across the context window and reshuffles content to maximize alignment between segment importance and observed attention.
-
-### The Problem
-
-LLMs don't pay equal attention to all positions in the context window. Research shows a "lost in the middle" pattern — information near the start and end gets noticed, while the middle is ignored. If critical information lands in a dead zone, the model misses it.
-
-### The Solution: Probe → Measure → Reshuffle
-
-```
-┌─────────────────────────────────────────────┐
-│  1. PROBE                                   │
-│     Embed unique markers in each segment    │
-│     [CTX_PROBE_S0=abc123]                   │
-│                                             │
-│  2. MEASURE                                 │
-│     Parse the model's response to see       │
-│     which probes it recalled (and in what   │
-│     order). Build an attention heatmap.     │
-│                                             │
-│  3. RESHUFFLE                               │
-│     Move high-importance segments to        │
-│     high-attention positions.               │
-└─────────────────────────────────────────────┘
-```
-
-The key insight: you don't need model internals to measure attention. Embed a unique marker at each position, ask "which markers do you remember?", and the ones recalled first are in high-attention positions.
-
-### Usage
-
-```kotlin
-import io.github.mbbhalla.agentio.cmm.impl.adaptive.AdaptiveContextMemoryManager
-import io.github.mbbhalla.agentio.cmm.impl.adaptive.AdaptiveConfig
-
-val agentConfig = AgentConfiguration(
-    // ...
-    contextMemoryManagers = ContextMemoryManagers(
-        value = listOf(AdaptiveContextMemoryManager()),
-    ),
-)
-
-// Custom configuration
-AdaptiveContextMemoryManager(
-    config = AdaptiveConfig(
-        measurementFrequency = 1,
-        measurementStrategy = SingleProbeRecallStrategy,
-        heatmapDecayFactor = 0.5,
-        enablePiggyback = true,
-    ),
-)
-```
-
-### Configuration
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `measurementFrequency` | `3` | Run measure + reshuffle every N turns |
-| `measurementStrategy` | `MultiProbeRecallStrategy` | How to query and parse probe recall |
-| `segmentExtractor` | `DefaultSegmentExtractor` | How to break conversation into segments |
-| `segmentAssembler` | `DefaultSegmentAssembler` | How to write segments back |
-| `heatmapDecayFactor` | `0.8` | EMA decay (higher = more stable, lower = faster adaptation) |
-| `enablePiggyback` | `true` | Append recall request to user message (zero extra API calls) |
-
-### Files
-
-| File | Purpose |
-|------|---------|
-| `AdaptiveContextMemoryManager.kt` | Orchestrator + config + segment extractor/assembler interfaces |
-| `AttentionHeatmap.kt` | Immutable EMA-smoothed position → attention score map |
-| `ContextReshuffler.kt` | Constrained greedy assignment (importance × attention) |
-| `ContextSegment.kt` | Data model for movable context units |
-| `MeasurementStrategy.kt` | Probe query/response parsing strategies |
-| `ProbeTokenManager.kt` | Probe embedding, stripping, and registry management |
-
----
-
 ## Bundled CMM: Compacting Context Memory Manager
 
 A CMM that monitors context window usage and, when it crosses a configurable threshold, uses an LLM to summarize older conversation turns while preserving the anchor (initial instruction) and recent turns verbatim.
@@ -275,13 +197,13 @@ val agentConfig = AgentConfiguration(
 
 ## Chaining CMMs
 
-Order matters. Put compaction before adaptive reshuffling:
+Multiple CMMs can be chained — each transforms the conversation in order:
 
 ```kotlin
 contextMemoryManagers = ContextMemoryManagers(
     value = listOf(
-        compactingCmm,                    // First: summarize old turns
-        AdaptiveContextMemoryManager(),   // Then: reshuffle what remains
+        compactingCmm,
+        // additional CMMs as needed
     ),
 )
 ```
