@@ -31,8 +31,9 @@ dependencies {
     // AWS SDK for Bedrock Runtime
     implementation("aws.sdk.kotlin:bedrockruntime:1.6.68")
 
-    // Model Context Protocol Kotlin SDK
-    implementation("io.modelcontextprotocol:kotlin-sdk:0.12.0")
+    // Model Context Protocol Kotlin SDK — re-exported because AbstractMcpTool/AbstractMcpServer
+    // expose CallToolRequest, RegisteredTool, ServerCapabilities, etc. in their public API.
+    api("io.modelcontextprotocol:kotlin-sdk:0.12.0")
 
     // Logging — only the SLF4J API facade; consumers provide their own backend
     implementation("org.slf4j:slf4j-api:2.0.16")

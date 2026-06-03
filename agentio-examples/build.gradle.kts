@@ -2,15 +2,14 @@ dependencies {
     implementation(project(":agentio-core"))
     implementation(project(":agentio-module-data"))
     implementation(project(":agentio-module-text2sql"))
+    implementation(project(":agentio-module-solver"))
+    implementation(project(":agentio-module-compass"))
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // AWS SDK for Bedrock Runtime
     implementation("aws.sdk.kotlin:bedrockruntime:1.6.68")
-
-    // Model Context Protocol Kotlin SDK
-    implementation("io.modelcontextprotocol:kotlin-sdk:0.12.0")
 
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.16")
@@ -157,5 +156,22 @@ tasks.register<JavaExec>("RunText2SqlAgenticFunction-EmployeeDB") {
         listOf(
             project.findProperty("query")?.toString()
                 ?: "Who are the top-rated employees and what projects are they working on?",
+        )
+}
+
+tasks.register<JavaExec>("RunCompassAgenticFunction") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.compass.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5019
+    }
+    args =
+        listOf(
+            project.findProperty("objective")?.toString()
+                ?: "Overstock at site DC-SEATTLE for product SSD-1TB-NVMe in the month of June 2025",
         )
 }

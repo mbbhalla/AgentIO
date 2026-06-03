@@ -3,30 +3,21 @@ plugins {
 }
 
 dependencies {
-    // AgentIO Core — re-exported because db tool classes extend AbstractMcpTool from core.
-    // MCP SDK comes transitively via core's api dependency.
     api(project(":agentio-core"))
-
-    // DuckDB JDBC
-    implementation("org.duckdb:duckdb_jdbc:1.5.2.0")
+    api(project(":agentio-module-data"))
+    api(project(":agentio-module-solver"))
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    // YAML parsing (kaml — kotlinx-serialization backend)
-    implementation("com.charleskorn.kaml:kaml:0.104.0")
-
-    // AWS SDK for S3
-    implementation("aws.sdk.kotlin:s3:1.6.68")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-
-    // MVEL2 expression engine
-    implementation("org.mvel:mvel2:2.5.2.Final")
+    // AWS SDK for Bedrock Runtime
+    implementation("aws.sdk.kotlin:bedrockruntime:1.6.68")
 
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.16")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.14.2")

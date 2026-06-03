@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.module.text2sql
+package io.github.mbbhalla.agentio.data.tool
 
 import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.lib.tool.AbstractMcpTool
@@ -13,7 +13,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
-internal class ListTablesTool(
+/**
+ * Lists all table names in the given [DatabaseEnvironment].
+ */
+class ListTablesTool(
     private val env: DatabaseEnvironment,
 ) : AbstractMcpTool<Unit, ListTablesTool.Output>() {
     @Serializable
@@ -24,7 +27,7 @@ internal class ListTablesTool(
 
     override fun name() = "list_tables"
 
-    override fun description() = "List all tables available in the database"
+    override fun description() = "List all table names available in the database"
 
     override fun getInputKClass() = Unit::class
 
@@ -34,13 +37,13 @@ internal class ListTablesTool(
 
     override fun buildInput(callToolRequest: CallToolRequest) = Unit
 
-    override fun invoke(input: Unit) =
-        Output(
-            tableNames = env.listTables().map { it.value }.toSet(),
-        )
+    override fun invoke(input: Unit) = Output(tableNames = env.listTables().map { it.value }.toSet())
 }
 
-internal class GetTablesTool(
+/**
+ * Retrieves schema information (columns, types, keys, descriptions) for a set of tables.
+ */
+class GetTablesTool(
     private val env: DatabaseEnvironment,
 ) : AbstractMcpTool<GetTablesTool.Input, GetTablesTool.Output>() {
     @Serializable
@@ -87,11 +90,13 @@ internal class GetTablesTool(
             callToolRequest.params.arguments
                 ?.get("tableNames")
                 ?.jsonArray
-                ?.map { it.jsonPrimitive.content } ?: emptyList()
+                ?.map { it.jsonPrimitive.content }
+                ?: emptyList()
         return Input(tableNames = tableNames)
     }
 
     override fun invoke(input: Input): Output {
+        require(input.tableNames.isNotEmpty()) { "No table names provided" }
         val tables =
             input.tableNames.map { name ->
                 val info = env.getTableInfo(TableName(name))
@@ -111,19 +116,21 @@ internal class GetTablesTool(
                         },
                 )
             }
-        require(tables.isNotEmpty()) { "No table names provided" }
         return Output(tables = tables)
     }
 
     private fun ForeignKeyRef.toDisplayString(): String = "${table.value}.${column.value}"
 }
 
-internal class ExecuteSqlTool(
+/**
+ * Executes a SELECT SQL statement against the [DatabaseEnvironment] and returns the result set.
+ */
+class ExecuteSqlTool(
     private val env: DatabaseEnvironment,
 ) : AbstractMcpTool<ExecuteSqlTool.Input, ExecuteSqlTool.Output>() {
     @Serializable
     data class Input(
-        @field:Description("DuckDB SQL SELECT statement to execute against the database")
+        @field:Description("DuckDB SELECT SQL statement to execute against the database")
         val sql: String,
     )
 
@@ -135,7 +142,7 @@ internal class ExecuteSqlTool(
 
     override fun name() = "execute_sql"
 
-    override fun description() = "Execute a SQL SELECT query against the database and return results"
+    override fun description() = "Execute a SELECT SQL query against the database and return results"
 
     override fun getInputKClass() = Input::class
 
@@ -153,8 +160,5 @@ internal class ExecuteSqlTool(
         return Input(sql = sql)
     }
 
-    override fun invoke(input: Input): Output {
-        val validated = SelectSqlStatement(input.sql)
-        return Output(resultSet = env.executeQuery(validated))
-    }
+    override fun invoke(input: Input): Output = Output(resultSet = env.executeQuery(SelectSqlStatement(input.sql)))
 }

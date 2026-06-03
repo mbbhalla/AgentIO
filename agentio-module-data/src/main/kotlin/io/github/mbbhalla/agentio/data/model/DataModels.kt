@@ -14,7 +14,7 @@ data class ColumnName(
     }
 
     companion object {
-        private val VALID_PATTERN = Regex("[a-z][a-z0-9_]*")
+        private val VALID_PATTERN = Regex("[a-z_][a-z0-9_]*")
     }
 }
 

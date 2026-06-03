@@ -8,4 +8,6 @@ rootProject.name = "AgentIO"
 include("agentio-core")
 include("agentio-module-data")
 include("agentio-module-text2sql")
+include("agentio-module-solver")
+include("agentio-module-compass")
 include("agentio-examples")

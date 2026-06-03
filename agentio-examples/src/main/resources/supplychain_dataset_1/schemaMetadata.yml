@@ -1,0 +1,1038 @@
+tables:
+  - name: asc_insights_projected_inventory
+    description: "Stores information for sites holding inventory, like stores and distribution centers. Query this entity for details about specific inventory sites."
+    columns:
+      - name: site_id
+        description: "Site ID. Query this column if the input question requires details about a specific site."
+        foreignKey: "site.id"
+      - name: creation_date
+        description: "Date/time when projection was created."
+      - name: projection_start_time
+        description: "Start of projection period."
+      - name: inbound_quantity_shipped
+        description: "Netted total inbound shipped quantity for the given date."
+      - name: inbound_quantity_ordered
+        description: "Netted total inbound on-order quantity for the given date (excludes inbound_quantity_shipped)."
+      - name: total_inbound_quantity
+        description: "Netted total inbound quantity covering on-order plus shipped."
+      - name: outbound_quantity_shipped
+        description: "Netted total shipped quantity out of the site for the given date."
+      - name: outbound_quantity_ordered
+        description: "Netted total outbound on-order quantity for the given date."
+      - name: total_outbound_quantity
+        description: "Netted total outbound quantity covering on-order plus shipped."
+      - name: forecasted_demand_quantity
+        description: "Total forecasted demand quantity for the given date."
+      - name: projected_inventory_quantity
+        description: "Final projected inventory quantity at projection_end_time."
+      - name: quantity_uom
+        description: "Unit of measure of quantities."
+      - name: projected_inventory_days_of_cover
+        description: "Final projected inventory in days at projection_end_time."
+      - name: inventory_risk_type
+        description: "Risk classification — one of: NONE, STOCK_OUT, OVERSTOCK."
+      - name: product_id
+        description: "Product for which inventory is being projected."
+        foreignKey: "product.id"
+      - name: company_id
+        description: "Company for which inventory is being projected."
+        foreignKey: "company.id"
+      - name: dataset_input_dttm
+        description: "Date up to which data was captured for the projection."
+      - name: projection_end_time
+        description: "End of projection period."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: company
+    description: "Stores the name and location of your company. Query this entity to find companies based on their location."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "ID of the company. Query this column if the input question requires details about a specific company ID."
+      - name: description
+        description: "Description of the company. Query this column if the input question asks for the description of the company."
+      - name: address_1
+        description: "Company addresses. Query these columns if the input question asks for the address of the company."
+      - name: address_2
+        description: "Company addresses. Query these columns if the input question asks for the address of the company."
+      - name: address_3
+        description: "Company addresses. Query these columns if the input question asks for the address of the company."
+      - name: city
+        description: "City where the company is located. Query this column if the input question asks for the city of the company."
+      - name: state_prov
+        description: "State where the company is located. Query this column if the input question asks for the state of the company."
+      - name: postal_code
+        description: "Postal code of the company address. Query this column if the input question asks for the postal code of the company."
+      - name: country
+        description: "Country where the company is located. Query this column if the input question asks for the country of the company."
+      - name: phone_number
+        description: "Company's contact number. Query this column if the input question asks for the phone number of the company."
+      - name: time_zone
+        description: "Company's local time zone. Query this column if the input question asks for the time zone of the company."
+      - name: calendar_id
+        description: "Default calendar that the company uses for planning. Query this column if the input question asks for the default calendar used by the company."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+
+  - name: forecast
+    description: "Stores forecast data for products and sites. Query this entity for demand forecasting and planning."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: snapshot_date
+        description: "Date up to when data was captured to generate forecasts. Query this column if the input question involves filtering based on the date of snapshot."
+      - name: product_id
+        description: "Product or product group level for the forecast. Query this column if the input question requires details about specific product or product group IDs."
+        foreignKey: "product.id"
+      - name: site_id
+        description: "Site ID that the forecast is generated for. Query this column if the input question requires details about specific site IDs for forecasts."
+        foreignKey: "site.id"
+      - name: region_id
+        description: "Geographical region ID. Query this column if the input question requires details about specific geographical region IDs."
+        foreignKey: "geography.id"
+      - name: product_group_id
+        description: "Product group ID. Query this column if the input question requires details about specific product group IDs."
+        foreignKey: "product_hierarchy.id"
+      - name: forecast_start_dttm
+        description: "Forecast start date and time. Query this column if the input question involves specific start date and time for forecasts."
+      - name: forecast_end_dttm
+        description: "Forecast end date and time. Query this column if the input question involves specific end date and time for forecasts."
+      - name: mean
+        description: "Mean value of forecast. Query this column if the input question requires details about mean forecast values."
+      - name: p10
+        description: "P10 quantile of forecast. Query this column if the input question requires details about the P10 quantile of forecasts."
+      - name: p50
+        description: "P50 quantile of forecast. Query this column if the input question requires details about the P50 quantile of forecasts."
+      - name: p90
+        description: "P90 quantile of forecast. Query this column if the input question requires details about the P90 quantile of forecasts."
+      - name: creation_date
+        description: "Date when a forecast was created. Query this column if the input question requires details about the creation date of forecasts."
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: geography
+    description: "Stores the geographical hierarchy of your company. Query this entity to understand the geographic distribution of your company's operations."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "Geographical ID. Query this column if the input question requires details about a specific geographical ID."
+      - name: description
+        description: "Geographical location. Query this column if the input question asks for the description of the geographical location."
+      - name: parent_geo_id
+        description: "Stores parent geographical ID for this record. Query this column if the input question asks for the parent geographical ID."
+        foreignKey: "geography.id"
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+
+  - name: inbound_order
+    description: "Contains information about inbound orders. Query this entity to track incoming orders and their details."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: id
+        description: "Object ID. Query this column if the input question requires details about specific object IDs."
+      - name: tpartner_id
+        description: "Trading partner that the order will be sent to. Query this column if the input question requires information about trading partners for orders."
+        foreignKey: "trading_partner.id"
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: order_type
+        description: "Type of order. Query this column if the input question asks for details about the specific type of orders placed, such as Purchase Orders (PO), Transfer Orders (TO), Manufacturing Orders (MO), Blanket Orders (BO), or Consumption Orders (CO)."
+      - name: submitted_date
+        description: "Date and time when order was submitted to vendor. Query this column if the input question requires details about the submission date of orders."
+      - name: to_site_id
+        description: "Site where the order will arrive. Query this column if the input question requires details about the arrival site for orders."
+        foreignKey: "site.id"
+      - name: order_status
+        description: "Status of the order. Query this column if the input question requires information about the status of orders."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: inbound_order_line
+    description: "Stores line-level information for inbound/incoming orders. Query this entity for detailed product-level inbound/incoming order data."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: id
+        description: "Order line ID. Query this column if the input question requires details about specific order line IDs."
+      - name: order_id
+        description: "ID of parent order. Query this column if the input question requires information about the parent order IDs."
+        foreignKey: "inbound_order.id"
+      - name: tpartner_id
+        description: "Partner that the order will be sent to. Query this column if the input question requires information about the partners the orders are sent to."
+        foreignKey: "trading_partner.id"
+      - name: product_id
+        description: "Product ID. Query this column if the input question involves specific product IDs."
+        foreignKey: "product.id"
+      - name: quantity_submitted
+        description: "Quantity submitted to the vendor. Query this column if the input question involves the quantity submitted to vendors."
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: order_type
+        description: "Type of order. Query this column if the input question asks for details about the specific type of orders placed."
+      - name: status
+        description: "Status of the line. Query this column if the input question requires information about the status of order lines."
+      - name: to_site_id
+        description: "Site where the order will arrive. Query this column if the input question requires details about the arrival site for orders."
+        foreignKey: "site.id"
+      - name: from_site_id
+        description: "Site where order line originates. Query this column if the input question involves the origin site of order lines."
+        foreignKey: "site.id"
+      - name: quantity_confirmed
+        description: "Quantity confirmed by the vendor. Query this column if the input question involves the quantity confirmed by vendors."
+      - name: quantity_received
+        description: "Quantity received into inventory. Query this column if the input question involves the quantity received into inventory."
+      - name: expected_delivery_date
+        description: "Date when the order is expected to be delivered."
+      - name: submitted_date
+        description: "Date and time when the order was submitted to the vendor. Query this column if the input question involves the submission date of orders."
+      - name: confirmation_date
+        description: "Date and time when the order was confirmed by the vendor. Query this column if the input question involves the confirmation date of orders by vendors."
+      - name: incoterm
+        description: "Three-letter incoterm code. Query this column if the input question involves incoterms used in orders."
+      - name: quantity_uom
+        description: "Quantity UOM for the order line. Query this column if the input question involves the unit of measure for order line quantities."
+      - name: reservation_id
+        description: "Reservation ID associated with the line. Query this column if the input question involves reservation IDs."
+      - name: reference_object_type
+        description: "Type of associated reference object. Query this column if the input question involves the type of associated reference objects."
+      - name: reference_object_id
+        description: "ID of associated reference object. Query this column if the input question involves the IDs of associated reference objects."
+      - name: cost
+        description: "Cost of the product in the company's currency, after all discounts. Query this column if the input question involves product costs in the company's currency."
+      - name: cost_uom
+        description: "Cost UOM in the company's currency. Query this column if the input question involves the unit of measure for product costs in the company's currency."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: inbound_order_line_schedule
+    description: "Schedule-level data within an inbound order line. Query this entity for scheduling details of inbound/incoming orders."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "Order line schedule ID. Query this column if the input question requires details about specific order line schedule IDs."
+      - name: order_id
+        description: "ID of the parent order. Query this column if the input question requires information about the parent order IDs."
+        foreignKey: "inbound_order.id"
+      - name: order_line_id
+        description: "ID of the parent order line. Query this column if the input question requires information about the parent order line IDs."
+        foreignKey: "inbound_order_line.id"
+      - name: product_id
+        description: "Product ID. Query this column if the input question involves specific product IDs."
+        foreignKey: "product.id"
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: inv_level
+    description: "Snapshot of the product's inventory condition at each site. Query this entity for current inventory status at different locations."
+    columns:
+      - name: snapshot_date
+        description: "Date and time when the inventory snapshot was taken. Query this column if the input question requires details about the snapshot timing."
+      - name: site_id
+        description: "Site ID of the inventory. Query this column if the input question needs inventory information about specific sites."
+        foreignKey: "site.id"
+      - name: product_id
+        description: "Product ID of the inventory displayed. Query this column if the input question requires specific product inventory details."
+        foreignKey: "product.id"
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: on_hand_inventory
+        description: "Physical inventory available at the site. Query this column if the input question involves available physical inventory."
+      - name: allocated_inventory
+        description: "Inventory allocated for some process. Query this column if the input question involves allocated inventory details."
+      - name: bound_inventory
+        description: "Inventory bound to some process. Query this column if the input question involves inventory bound to specific processes."
+      - name: lot_number
+        description: "Lot number of the inventory. Query this column if the input question involves specific lot numbers of inventory."
+      - name: expiry_date
+        description: "Expiry date of the inventory. Query this column if the input question involves inventory expiry details."
+      - name: inv_condition
+        description: "Condition of the inventory. Inventory in different conditions are displayed in different rows. You can also enter your own value. Reserved inventory condition values are as follows: Unrestricted - Inventory is available. Inspection - Below quality or any other inspection. Returns - Inventory goes to return area. Blocked - Inventory is blocked for a reason. InTransfer - Used during inventory stock transfer. Restricted - Restricted for other reasons but not blocked. Query this column if the input question requires information about the condition of inventory or filtering based on specific inventory conditions."
+
+  - name: inv_policy
+    description: "Contains inventory policies like safety stock policy and target inventory quantity. Query this entity to optimize inventory levels based on policies."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: id
+        description: "Policy ID. Query this column if the input question asks for details about a specific policy ID."
+      - name: site_id
+        description: "Site ID for the policy being defined. Query this column if the input question requires details related to a specific site ID."
+        foreignKey: "site.id"
+      - name: product_id
+        description: "Product ID for the policy being defined. Query this column if the input question requires details related to a specific product ID."
+        foreignKey: "product.id"
+      - name: product_group_id
+        description: "Product group ID that the policies are being defined for. Query this column if the input question requires details related to a specific product group ID."
+        foreignKey: "product_hierarchy.id"
+      - name: dest_geo_id
+        description: "Sets default values at the geo level of the destination. Query this column if the input question requires details related to a specific destination geo ID."
+        foreignKey: "geography.id"
+      - name: vendor_tpartner_id
+        description: "Trading partner ID of the vendor. Query this column if the input question is about information specific to a particular vendor's product, lead time, and holidays."
+        foreignKey: "trading_partner.id"
+      - name: eff_start_date
+        description: "Dates from when the record is effective. Query this column if the input question requires details related to the effective start date."
+      - name: eff_end_date
+        description: "Dates till when the record is effective. Query this column if the input question requires details related to the effective end date."
+      - name: company_id
+        description: "Company ID. Query this column if the input question requires filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: ss_policy
+        description: "Type of safety stock policy. Query this column if the input question requires details related to the safety stock policy."
+      - name: target_inventory_qty
+        description: "Target inventory level quantity. Query this column if the input question requires details related to the target inventory level quantity."
+      - name: target_doc_limit
+        description: "Target value for safety stock policies \"DOC_dem\" and \"DOC_fcst\". Query this column if the input question requires details related to the target days of cover value."
+      - name: target_sl
+        description: "Target service level used for policy sl. Query this column if the input question requires details related to the target service level."
+      - name: min_safety_stock
+        description: "Minimum safety stock level. Query this column if the input question requires details related to the minimum safety stock level."
+      - name: max_safety_stock
+        description: "Maximum safety stock level. Query this column if the input question requires details related to the maximum safety stock level."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: outbound_order_line
+    description: "Contains outbound/outgoing orders and details. Query this entity to monitor outbound/outgoing order processing."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "Outbound order line ID. Query this column if the input question requires details about specific outbound order line IDs."
+      - name: cust_order_id
+        description: "Outbound order ID. Query this column if the input question requires details about specific outbound order IDs."
+      - name: product_id
+        description: "Product ID. Query this column if the input question requires details about specific product IDs."
+        foreignKey: "product.id"
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: ship_from_site_id
+        description: "Site ID where the product is shipped from. Query this column if the input question involves specific site ID inquiries."
+        foreignKey: "site.id"
+      - name: ship_to_site_id
+        description: "Site ID where the product is shipped to. Query this column if the input question involves specific site ID inquiries."
+        foreignKey: "site.id"
+      - name: status
+        description: "Status of the customer order. Query this column if the input question requires details about order statuses."
+      - name: init_quantity_requested
+        description: "Original order quantity. Query this column if the input question requires details about the initial order quantity."
+      - name: quantity_promised
+        description: "Quantity promised on order line. Query this column if the input question requires details about promised quantities."
+      - name: quantity_delivered
+        description: "Quantity delivered against this order line. Query this column if the input question requires details about delivered quantities."
+      - name: final_quantity_requested
+        description: "Final quantity after any cancellations or changes. Query this column if the input question requires details about the final order quantity."
+      - name: requested_delivery_date
+        description: "Requested delivery date for order line. Query this column if the input question involves specific delivery date inquiries."
+      - name: promised_delivery_date
+        description: "Delivery date promised for order lines. Query this column if the input question requires details about promised delivery dates."
+      - name: actual_delivery_date
+        description: "Actual delivery date for order line. Query this column if the input question requires details about actual delivery dates."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: order_date
+        description: "Date and time when customer order was placed. Query this column if the input question requires details about order placement dates."
+
+  - name: outbound_shipment
+    description: "Shipment information for outbound/outgoing orders. Query this entity for insights into outbound/outgoing logistics."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "Outbound shipment ID. Query this column if the input question requires details about specific outbound shipment IDs."
+      - name: cust_order_id
+        description: "Customer order ID. Query this column if the input question requires details about specific customer order IDs."
+        foreignKey: "outbound_order_line.cust_order_id"
+      - name: cust_order_line_id
+        description: "Customer order line ID. Query this column if the input question requires details about specific customer order line IDs."
+        foreignKey: "outbound_order_line.id"
+      - name: product_id
+        description: "Product ID. Query this column if the input question requires details about specific product IDs."
+        foreignKey: "product.id"
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: shipped_qty
+        description: "Shipment quantity. Query this column if the input question involves details about the quantity of shipped items."
+      - name: cust_shipment_status
+        description: "Status of the shipment. Query this column if the input question requires details about shipment statuses."
+      - name: expected_ship_date
+        description: "Date product was expected to ship from the company location. Query this column if the input question involves expected shipment dates."
+      - name: actual_ship_date
+        description: "Date product was actually shipped from the company location. Query this column if the input question involves actual shipment dates."
+      - name: from_site_id
+        description: "Site ID where the product is shipped from. Query this column if the input question involves specific site IDs for shipment origins."
+        foreignKey: "site.id"
+      - name: to_site_id
+        description: "Destination site ID for outbound shipments. Query this column if the input question involves specific site IDs for shipment destinations."
+        foreignKey: "site.id"
+      - name: expected_delivery_date
+        description: "Expected delivery date of the products to the customer. Query this column if the input question involves expected delivery dates."
+      - name: actual_delivery_date
+        description: "Displays when the product was actually delivered to the customer. Query this column if the input question involves actual delivery dates."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+
+  - name: product
+    description: "Contains key product attributes such as name, description, and price. Query this entity to retrieve detailed information about specific products."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "Product ID. Query this column if the input question requires details about a specific product ID."
+      - name: description
+        description: "Description of the product. Query this column if the input question requires details about the product's description."
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: product_group_id
+        description: "Product group ID that this product belongs to. Query this column if the input question requires details about the product group ID."
+        foreignKey: "product_hierarchy.id"
+      - name: product_type
+        description: "Type of product, for example, finished good, component, service, or packaging. Query this column if the input question asks for the product type."
+      - name: parent_product_id
+        description: "Lists the ID of the parent product if the product is part of a bundle. Query this column if the input question asks for the parent product ID."
+        foreignKey: "product.id"
+      - name: base_uom
+        description: "Unit of measure for the product. Query this column if the input question asks for the product's base UOM."
+      - name: unit_cost
+        description: "Average unit cost of the product. Query this column if the input question asks for the product's average unit cost."
+      - name: unit_price
+        description: "Unit price, standard price, or MSRP of the product. Query this column if the input question asks for the product's unit price."
+      - name: is_deleted
+        description: "Indicates whether the product is deleted or active. Query this column if the input question asks if the product is deleted."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: product_bom
+    description: "Bill of materials — components consumed when assembling a parent product."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "BOM line identifier. Referred by other objects as 'bom_id'."
+      - name: product_id
+        description: "Parent product."
+        foreignKey: "product.id"
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: site_id
+        description: "Site associated with the BOM."
+        foreignKey: "site.id"
+      - name: production_process_id
+        description: "Production process associated with this BOM line."
+        foreignKey: "production_process.production_process_id"
+      - name: component_product_id
+        description: "Component product consumed at this BOM step."
+        foreignKey: "product.id"
+      - name: component_quantity_per
+        description: "Quantity of component consumed per unit of parent product (in eaches)."
+      - name: assembly_cost
+        description: "Cost added at this BOM step."
+      - name: assembly_cost_uom
+        description: "Unit of measure for assembly cost."
+      - name: priority
+        description: "Resolution priority among components used in BOM."
+      - name: eff_start_date
+        description: "Effective start date."
+      - name: eff_end_date
+        description: "Effective end date."
+
+  - name: product_hierarchy
+    description: "Contains product categories and sub-categories. Query this entity to classify products into their respective categories."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "Product group ID. Query this column if the input question requires details about a specific product group ID."
+      - name: description
+        description: "Description of the product group. Query this column if the input question requires details about the product group's description."
+      - name: parent_product_group_id
+        description: "Parent of this product group. If null, it indicates this record is a top-level product group. Query this column if the input question requires details about the parent product group."
+        foreignKey: "product_hierarchy.id"
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: production_process
+    description: "Production processes — manufacturing steps producing products at sites."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: production_process_id
+        description: "Process ID associated with the process and product."
+      - name: production_process_name
+        description: "Name of the production process (e.g. milling, drilling, welding)."
+      - name: product_id
+        description: "Product produced by the process."
+        foreignKey: "product.id"
+      - name: site_id
+        description: "Site where the production process runs."
+        foreignKey: "site.id"
+      - name: company_id
+        description: "Company associated with the production process."
+        foreignKey: "company.id"
+      - name: setup_time
+        description: "Time to set up the process."
+      - name: setup_time_uom
+        description: "UOM for the setup time."
+      - name: operation_time
+        description: "Total time to complete the process."
+      - name: operation_time_uom
+        description: "UOM for the operation time."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: segmentation
+    description: "Stores segments used in conjunction with products and sites. Query this entity to categorize products or sites for targeted strategies."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: segment_id
+        description: "Segment ID. Query this column if the input question requires details about a specific segment ID."
+      - name: creation_date
+        description: "Date and time that the segment was created. Query this column if the input question requires details about the creation date."
+      - name: site_id
+        description: "Overrides policies specified for the region for this node in the product hierarchy. Query this column if the input question requires details about a specific site ID."
+        foreignKey: "site.id"
+      - name: product_id
+        description: "Overrides policies specified for the product-group for this node in the geo hierarchy. Query this column if the input question requires details about a specific product ID."
+        foreignKey: "product.id"
+      - name: eff_start_date
+        description: "Effective start date of the calendar. Query this column if the input question requires details about the effective start date."
+      - name: eff_end_date
+        description: "Effective end date of the calendar. Query this column if the input question requires details about the effective end date."
+      - name: company_id
+        description: "Displays the company ID. Query this column if the input question requires details about a specific company ID."
+        foreignKey: "company.id"
+      - name: segment_type
+        description: "Type of segmentation, for example, value-based, demand variability-based, or demand speed-based. Query this column if the input question requires details about a specific segment type."
+      - name: segment_value
+        description: "Metric associated with the segment calculated when the segment is generated. Value depends on segment_type. Query this column if the input question requires details about the segment value."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: shipment
+    description: "Stores shipment information. Query this entity to track shipments and their status."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "Shipment ID. Query this column if the input question requires details about specific shipment IDs."
+      - name: supplier_tpartner_id
+        description: "Supplier partner ID of the vendor. Query this column if the input question is about information specific to a particular vendor's product, lead time, and holidays."
+        foreignKey: "trading_partner.id"
+      - name: product_id
+        description: "Product ID.Query this column if the input question requires details about specific product IDs."
+        foreignKey: "product.id"
+      - name: order_id
+        description: "Order ID. Query this column if the input question requires details about specific order IDs."
+        foreignKey: "inbound_order.id"
+      - name: order_line_id
+        description: "Order line ID. Query this column if the input question requires details about specific order line IDs."
+        foreignKey: "inbound_order_line.id"
+      - name: package_id
+        description: "Package ID. Query this column if the input question requires details about specific package IDs."
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: ship_to_site_id
+        description: "Site where this shipment ends. Query this column if the input question involves the ending site of shipments."
+        foreignKey: "site.id"
+      - name: ship_from_site_id
+        description: "Site where this shipment starts from. Query this column if the input question involves the starting site of shipments."
+        foreignKey: "site.id"
+      - name: order_type
+        description: "Order type. Query this column if the input question involves specific order types."
+      - name: units_shipped
+        description: "Units shipped. Query this column if the input question involves specific units shipped."
+      - name: planned_delivery_date
+        description: "Planned delivery date. Query this column if the input question involves specific planned delivery dates."
+      - name: actual_delivery_date
+        description: "Actual delivery date. Query this column if the input question involves specific actual delivery dates."
+      - name: carrier_eta_date
+        description: "ETA date from the carrier. Query this column if the input question involves specific estimated time of arrival dates from the carrier."
+      - name: planned_ship_date
+        description: "Planned shipping date. Query this column if the input question involves specific planned shipping dates."
+      - name: actual_ship_date
+        description: "Actual shipping date. Query this column if the input question involves specific actual shipping dates."
+      - name: creation_date
+        description: "Creation date of the shipment. Query this column if the input question involves the creation dates of shipments."
+      - name: shipment_status
+        description: "Status of the shipment. Query this column if the input question involves specific shipment statuses."
+      - name: carrier_id
+        description: "ID of the carrier. Query this column if the input question involves specific carrier IDs."
+        foreignKey: "trading_partner.id"
+      - name: transportation_mode
+        description: "Mode of transport. Query this column if the input question involves specific transportation modes."
+      - name: service_level
+        description: "Service level of shipment. Query this column if the input question involves specific service levels."
+      - name: weight
+        description: "Weight of the product. Query this column if the input question involves specific product weights."
+      - name: weight_uom
+        description: "Weight UOM of the product. Query this column if the input question involves specific product weight units of measurement."
+      - name: volume
+        description: "Total volume."
+      - name: volume_uom
+        description: "Volume UOM."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+
+  - name: site
+    description: "Stores information for sites holding inventory, like stores and distribution centers. Query this entity for details about specific inventory sites."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: id
+        description: "Site ID. Query this column if the input question requires details about a specific site."
+      - name: description
+        description: "Description of the site. Query this column if the input question requires details about the site's description."
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: geo_id
+        description: "If the site belongs to a geography, displays the ID of the geographical hierarchy. Query this column if the input question requires details about the site's geography."
+        foreignKey: "geography.id"
+      - name: site_type
+        description: "Type of site, for example, warehouse, delivery station, factory, store, and so on. Query this column if the input question requires details about the site's type."
+      - name: latitude
+        description: "Latitude and Longitude of the site location. Query these columns if the input question requires details about the site's location coordinates."
+      - name: longitude
+        description: "Latitude and Longitude of the site location. Query these columns if the input question requires details about the site's location coordinates."
+      - name: is_active
+        description: "Indicates whether the site is deleted (\"true\") or active (\"false\"). Query this column if the input question requires details about the site's active status."
+      - name: open_date
+        description: "Date when the site started operations. Query this column if the input question requires details about the site's start date of operations."
+      - name: end_date
+        description: "Date when the site discontinued operational perspective. Query this column if the input question requires details about the site's end date of operations."
+      - name: address_1
+        description: "Site address. Query these columns if the input question requires details about the site's address."
+      - name: city
+        description: "City in which the site is located. Query this column if the input question requires details about the site's city location."
+      - name: state_prov
+        description: "State where the site is located. Query this column if the input question requires details about the site's state location."
+      - name: postal_code
+        description: "Postal code of the site. Query this column if the input question requires details about the site's postal code."
+      - name: country
+        description: "Country where the site is located. Query this column if the input question requires details about the site's country."
+      - name: time_zone
+        description: "Local time zone of the site. Query this column if the input question requires details about the site's time zone."
+      - name: phone_number
+        description: "Contact number of the site. Query this column if the input question requires details about the site's contact number."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+
+  - name: sourcing_rule
+    description: "Defines sourcing attributes at the product-site level. Query this entity to understand sourcing strategies for specific products and sites."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: sourcing_rule_id
+        description: "Sourcing rule ID. Query this column if the input question involves the identification of specific sourcing rules."
+      - name: company_id
+        description: "Company ID. Query this column if the input question pertains to filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: product_id
+        description: "Product ID to be sourced. Query this column if the input question is about details of the product to be sourced."
+        foreignKey: "product.id"
+      - name: product_group_id
+        description: "Product group ID. Query this column if the input question requires information about the product group."
+        foreignKey: "product_hierarchy.id"
+      - name: from_site_id
+        description: "Site ID from which the product will be sourced. Query this column if the input question requires information about the source site."
+        foreignKey: "site.id"
+      - name: to_site_id
+        description: "Site ID into which the product will be sourced. Query this column if the input question requires information about the destination site."
+        foreignKey: "site.id"
+      - name: sourcing_rule_type
+        description: "Type of sourcing rule. Query this column if the input question involves different types of sourcing rules such as transfer, buy, or manufacture."
+      - name: tpartner_id
+        description: "Trading partner ID used depending on the sourcing rule type. Query this column if the input question is about vendor-specific details."
+        foreignKey: "trading_partner.id"
+      - name: transportation_lane_id
+        description: "Transportation lane ID used depending on the sourcing rule type. Query this column if the input question requires details about transportation lanes."
+        foreignKey: "transportation_lane.id"
+      - name: sourcing_priority
+        description: "Priority of the sourcing rule. Query this column if the input question involves prioritizing sourcing rules."
+      - name: min_qty
+        description: "Minimum quantity for the sourcing rule. Query this column if the input question involves the minimum quantity allowed for sourcing."
+      - name: max_qty
+        description: "Maximum quantity for the sourcing rule. Query this column if the input question involves the maximum quantity allowed for sourcing."
+      - name: eff_start_date
+        description: "Effective start date of the calendar. Query this column if the input question requires data within a specific effective date range."
+      - name: eff_end_date
+        description: "Effective end date of the calendar. Query this column if the input question requires data within a specific effective date range."
+      - name: qty_uom
+        description: "Quantity UOM associated with the sourcing rule. Query this column if the input question involves the unit of measure for quantities."
+      - name: sourcing_ratio
+        description: "Proportion of product to be sourced from this product/group, to_site, from_site/tpartner_id combination. Query this column if the input question involves understanding sourcing proportions."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: sourcing_schedule
+    description: "Determines when to source, e.g., from vendors or between sites. Query this entity to plan sourcing activities."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: sourcing_schedule_id
+        description: "Sourcing schedule ID. Query this column if the input question involves identifying specific sourcing schedules."
+      - name: company_id
+        description: "Company ID. Query this column if the input question pertains to filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: tpartner_id
+        description: "Trading partner ID. Query this column if the input question involves details about a specific trading partner."
+        foreignKey: "trading_partner.id"
+      - name: status
+        description: "Status of the supply schedule. Query this column if the input question involves filtering schedules based on status."
+      - name: from_site_id
+        description: "Origin site ID. Query this column if the input question requires information about the site of origin."
+        foreignKey: "site.id"
+      - name: to_site_id
+        description: "Destination site ID. Query this column if the input question requires information about the destination site."
+        foreignKey: "site.id"
+      - name: schedule_type
+        description: "Type of schedule. Query this column if the input question involves different types of scheduling, such as inbound ordering or outbound shipping."
+      - name: eff_start_date
+        description: "Effective start date of the schedule. Query this column if the input question requires data within a specific effective date range."
+      - name: eff_end_date
+        description: "Effective end date of the schedule. Query this column if the input question requires data within a specific effective date range."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: sourcing_schedule_details
+    description: "Provides detailed sourcing schedules. Query this entity for specific sourcing timeframes."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: sourcing_schedule_detail_id
+        description: "Schedule detail ID. Query this column if the input question requires identifying specific schedule details."
+      - name: sourcing_schedule_id
+        description: "Sourcing schedule ID. Query this column if the input question involves identifying specific sourcing schedules."
+        foreignKey: "sourcing_schedule.sourcing_schedule_id"
+      - name: company_id
+        description: "Company ID. Query this column if the input question pertains to filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: product_id
+        description: "Product ID. Query this column if the input question requires information about a specific product."
+        foreignKey: "product.id"
+      - name: product_group_id
+        description: "Product group ID. Query this column if the input question involves details about a specific product group."
+        foreignKey: "product_hierarchy.id"
+      - name: day_of_week
+        description: "Day of the week. Query this column if the input question involves filtering data based on days of the week."
+      - name: week_of_month
+        description: "Week of the month. Query this column if the input question requires information based on weeks within a month."
+      - name: time_of_day
+        description: "Time of day. Query this column if the input question requires information about a specific time in a day."
+      - name: date
+        description: "Date. Query this column if the input question requires information about a specific date."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: trading_partner
+    description: "Contains the partners with a trading relationship with your company, like vendors and distributors. Query this entity to identify and analyze your company's trading partners."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: id
+        description: "Partner ID. Query this column if the input question requires details about a specific partner ID."
+      - name: tpartner_type
+        description: "Type of partner, for example, vendor, channel partner, or 3PL. Query this column if the input question asks for the partner's type."
+      - name: geo_id
+        description: "Region of the company associated with the trading partner. Query this column if the input question asks for the partner's geographical ID."
+        foreignKey: "geography.id"
+      - name: eff_start_date
+        description: "The start timestamp of the relationship between the trading partner and the company. Query this column if the input question requires filtering records based on the start date of the relationship."
+      - name: eff_end_date
+        description: "The end timestamp of the relationship between the trading partner and the company. Query this column if the input question requires filtering records based on the end date of the relationship."
+      - name: description
+        description: "Description of the trading partner. Query this column if the input question asks for the partner's description."
+      - name: country
+        description: "The country corresponding to the trading partner. Query this column if the input question asks for the partner's country."
+      - name: time_zone
+        description: "The trading partner's local time zone. Query this column if the input question asks for the partner's time zone."
+      - name: is_active
+        description: "Indicates whether the trading partner is active or inactive. Query this column if the input question asks if the partner is active."
+      - name: latitude
+        description: "Latitude of the trading partner location. Query this column if the input question asks for the partner's latitude."
+      - name: longitude
+        description: "Longitude of the trading partner location. Query this column if the input question asks for the partner's longitude."
+      - name: address_1
+        description: "Addresses corresponding to the trading partner. Query these columns if the input question asks for the partner's address details."
+      - name: city
+        description: "The city corresponding to the trading partner. Query this column if the input question asks for the partner's city."
+      - name: state_prov
+        description: "The state corresponding to the trading partner. Query this column if the input question asks for the partner's state."
+      - name: postal_code
+        description: "The postal code of the trading partner. Query this column if the input question asks for the partner's postal code."
+      - name: phone_number
+        description: "The trading partner's contact phone number. Query this column if the input question asks for the partner's phone number."
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+
+  - name: trading_partner_poc
+    description: "Points of contact for trading partners."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: tpartner_id
+        description: "Trading partner ID."
+        foreignKey: "trading_partner.id"
+      - name: email
+        description: "Email of the point of contact."
+      - name: poc_first_name
+        description: "POC first name."
+      - name: poc_last_name
+        description: "POC last name."
+      - name: poc_org_unit_name
+        description: "Name of team or internal organizational unit."
+      - name: poc_org_unit_description
+        description: "Description of the team's role in the organization."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+
+  - name: transportation_lane
+    description: "Information about transportation lanes, including modes and transit time. Query this entity to plan and optimize transportation routes."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by ASC."
+      - name: id
+        description: "Lane ID. Query this column if the input question requires details about a specific transportation lane."
+      - name: from_site_id
+        description: "Origin site location for the lane. Query this column if the input question requires details about the origin site location."
+        foreignKey: "site.id"
+      - name: to_site_id
+        description: "Destination site location for the lane. Query this column if the input question requires details about the destination site location."
+        foreignKey: "site.id"
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: from_geo_id
+        description: "When lane definition is at geographical level, displays the 'from' or 'source' geographical region. Query this column if the input question requires details about the 'from' geographical region."
+        foreignKey: "geography.id"
+      - name: to_geo_id
+        description: "When lane definition is at geographical level, displays the 'to' or 'source' geographical region. Query this column if the input question requires details about the 'to' geographical region."
+        foreignKey: "geography.id"
+      - name: carrier_tpartner_id
+        description: "ID of the carrier. Query this column if the input question requires details about the carrier."
+        foreignKey: "trading_partner.id"
+      - name: trans_mode
+        description: "Transportation mode, for example, ship, water, rail, or truck. Query this column if the input question requires details about the transportation mode."
+      - name: service_type
+        description: "Provides information on the shipping method for the carrier. Query this column if the input question requires details about the service type."
+      - name: product_group_id
+        description: "Product group ID if transit time varies by product group. Query this column if the input question requires details about the product group."
+        foreignKey: "product_hierarchy.id"
+      - name: transit_time
+        description: "Transit time of products. Query this column if the input question requires details about the transit time."
+      - name: time_uom
+        description: "Unit of measure of transit time. Query this column if the input question requires details about the unit of measure of transit time."
+      - name: distance
+        description: "Distance traveled on the lane. Query this column if the input question requires details about the distance traveled on the lane."
+      - name: distance_uom
+        description: "Unit of measure (UOM) of distance. Query this column if the input question requires details about the unit of measure of distance."
+      - name: eff_start_date
+        description: "Date and time when this record becomes effective. Query this column if the input question requires filtering records based on the effective start date."
+      - name: eff_end_date
+        description: "Date and time till when this record becomes effective. Query this column if the input question requires filtering records based on the effective end date."
+      - name: cost_per_unit
+        description: "Cost per distance UOM. Query this column if the input question requires details about the cost per distance unit."
+      - name: cost_currency
+        description: "Currency UOM of costs. Query this column if the input question requires details about the currency of costs."
+      - name: transportation_cost
+        description: "Total transportation cost for the lane."
+      - name: transportation_cost_uom
+        description: "UOM of transportation cost."
+      - name: daily_start_time
+        description: "Time when the lane begins operating. Query this column if the input question requires details about the start time of lane operation."
+      - name: daily_end_time
+        description: "Time when the lane ends operation. Query this column if the input question requires details about the end time of lane operation."
+      - name: open_mon
+        description: "Displays whether the lane is open on Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday, respectively. Query these columns if the input question requires details about the lane's open status on specific days."
+      - name: open_tue
+        description: "Displays whether the lane is open on Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday, respectively. Query these columns if the input question requires details about the lane's open status on specific days."
+      - name: open_wed
+        description: "Displays whether the lane is open on Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday, respectively. Query these columns if the input question requires details about the lane's open status on specific days."
+      - name: open_thu
+        description: "Displays whether the lane is open on Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday, respectively. Query these columns if the input question requires details about the lane's open status on specific days."
+      - name: open_fri
+        description: "Displays whether the lane is open on Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday, respectively. Query these columns if the input question requires details about the lane's open status on specific days."
+      - name: open_sat
+        description: "Displays whether the lane is open on Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday, respectively. Query these columns if the input question requires details about the lane's open status on specific days."
+      - name: open_sun
+        description: "Displays whether the lane is open on Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday, respectively. Query these columns if the input question requires details about the lane's open status on specific days."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: vendor_lead_time
+    description: "Planned and actual lead times from vendors. Query this entity to assess vendor performance and lead time reliability."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: company_id
+        description: "Company ID. Represents the identifier of the company associated with the record. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: vendor_tpartner_id
+        description: "Trading partner ID of the vendor. Represents information specific to a particular vendor's product, lead time, and holidays. Query this column if the input question is about this information."
+        foreignKey: "trading_partner.id"
+      - name: product_id
+        description: "Product ID. Indicates the unique identifier of a product. Query this column if the input question involves details about a specific product."
+        foreignKey: "product.id"
+      - name: product_group_id
+        description: "Product Group ID. Indicates the unique identifier of a product group. Query this column if the input question involves product grouping information."
+        foreignKey: "product_hierarchy.id"
+      - name: site_id
+        description: "Site ID. Represents the unique identifier of the site where the product is being supplied. Query this column if the input question involves details about a specific site."
+        foreignKey: "site.id"
+      - name: region_id
+        description: "Region ID. Represents the unique identifier of a geographical region. Query this column if the input question involves regional information."
+        foreignKey: "geography.id"
+      - name: planned_lead_time
+        description: "Planned lead time from vendor into the company's site. Query this column if the input question requires details about planned lead times."
+      - name: eff_start_date
+        description: "Date and time from when this record is effective. Query this column if the input question requires filtering records based on the record's effective start date."
+      - name: eff_end_date
+        description: "Date and time till when this record is effective. Query this column if the input question requires filtering records based on the record's effective end date."
+      - name: actual_lead_time_mean
+        description: "Field to store actual lead time computed from transactional data. Query this column if the input question requires details about computed actual lead times."
+      - name: actual_lead_time_sd
+        description: "Standard deviation of actual lead time. Query this column if the input question requires details about the deviation in actual lead times."
+      - name: shipping_cost
+        description: "Inbound shipping cost from vendor to company. Query this column if the input question requires details about shipping costs."
+      - name: cost_uom
+        description: "Unit of measure of shipping cost. Query this column if the input question involves details about the unit of measure for shipping costs."
+      - name: we_pay
+        description: "Indicator whether the company pays for inbound shipping. Query this column if the input question involves payment responsibility for inbound shipping."
+      - name: trans_mode
+        description: "Transportation mode — ship, water, truck, rail."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."
+
+  - name: vendor_product
+    description: "Product information per vendor, including price and lead-time. Query this entity to compare products across different vendors."
+    columns:
+      - name: connection_id
+        description: "Unique identifier for the data source. Auto populated by Galaxy."
+      - name: company_id
+        description: "Company ID. Query this column if the input questions require filtering data specific to different companies or organizational units."
+        foreignKey: "company.id"
+      - name: vendor_tpartner_id
+        description: "Trading partner ID of the vendor. Query this column if the input question is about information specific to a particular vendor's product, lead time, and holidays."
+        foreignKey: "trading_partner.id"
+      - name: product_id
+        description: "Product ID. Query this column if the input question requires details specific to a product."
+        foreignKey: "product.id"
+      - name: eff_start_date
+        description: "Displays the date and time from when the vendor's product is active. Query this column if the input question requires filtering records based on the effective start date of a vendor's product."
+      - name: eff_end_date
+        description: "Displays the date and time till when the vendor's product will be active. Query this column if the input question requires filtering records based on the effective end date of a vendor's product."
+      - name: vendor_product_code
+        description: "Product identifier used by the vendor. Query this column if the input question requires details about the identifier used by the vendor for a product."
+      - name: vendor_product_desc
+        description: "Product description used by the vendor. Query this column if the input question requires details about the description used by the vendor for a product."
+      - name: vendor_cost
+        description: "Cost of product from this vendor. Query this column if the input question requires details about the cost of a product from a vendor."
+      - name: vendor_cost_uom
+        description: "Unit of measure (UOM) of the product cost from this vendor. Query this column if the input question requires details about the unit of measure for the product cost from a vendor."
+      - name: status
+        description: "Status of the product. Query this column if the input question requires details about the status of a product (e.g., new product, obsolete)."
+      - name: unit_volume
+        description: "Volume of one unit of product. Query this column if the input question requires details about the volume of a product unit."
+      - name: volume_uom
+        description: "Unit of measure (UOM) for volume. Query this column if the input question requires details about the unit of measure for volume."
+      - name: unit_weight
+        description: "Weight of one unit of product. Query this column if the input question requires details about the weight of a product unit."
+      - name: weight_uom
+        description: "Weight unit of measurement for weight. Query this column if the input question requires details about the unit of measurement for weight."
+      - name: min_order_unit
+        description: "Minimum order quantity for a product from this vendor. Query this column if the input question requires details about the minimum order quantity for a product from a vendor."
+      - name: max_order_unit
+        description: "Maximum order quantity for this vendor/product."
+      - name: country_of_origin
+        description: "Country of origin by product. Query this column if the input question requires details about the country of origin for a product."
+      - name: db_creation_dttm
+        description: "Internal audit field — when the record was created."
+      - name: db_updation_dttm
+        description: "Internal audit field — when the record was last updated."
+      - name: _asc_updated_at
+        description: "ASC reserved field for data lineage."

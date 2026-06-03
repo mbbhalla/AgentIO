@@ -6,17 +6,14 @@ dependencies {
     api(project(":agentio-core"))
     api(project(":agentio-module-data"))
 
+    // Z3 SMT solver — turnkey bundle includes native libraries for all major platforms
+    api("tools.aqua:z3-turnkey:4.14.0")
+
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    // AWS SDK for Bedrock Runtime
-    implementation("aws.sdk.kotlin:bedrockruntime:1.6.68")
-
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.16")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.14.2")
