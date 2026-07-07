@@ -137,7 +137,7 @@ tasks.register<JavaExec>("RunText2SqlAgenticFunction-RetailDB") {
     args =
         listOf(
             project.findProperty("query")?.toString()
-                ?: "What products have inventory below safety stock levels?",
+                ?: "What products will have inventory below safety stock levels in the next week and above the week after ?",
         )
 }
 
