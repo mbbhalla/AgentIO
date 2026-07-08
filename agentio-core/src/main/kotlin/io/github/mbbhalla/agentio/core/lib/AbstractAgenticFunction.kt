@@ -36,6 +36,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.serializer
 import org.slf4j.LoggerFactory
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.reflect.KClass
 import kotlin.time.measureTimedValue
 
@@ -96,6 +97,14 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                         val output = coreLogic(input)
                         LOG.debug("Successfully computed result for ${input.instructionId()}")
                         Result.success(output)
+                    } catch (e: CancellationException) {
+                        // Cancellation is not a business failure: it signals the enclosing coroutine
+                        // scope is being torn down (e.g. timeout, or a host shutting down in-flight
+                        // work). Swallowing it into Result.failure would break structured concurrency
+                        // and make callers treat a cancelled invocation as a retryable error. Rethrow
+                        // so cancellation propagates to the caller as cancellation.
+                        LOG.debug("Invocation cancelled for ${input.instructionId()}")
+                        throw e
                     } catch (e: Exception) {
                         LOG.error("Failure in computing result for ${input.instructionId()}")
                         Result.failure(e)

@@ -22,12 +22,17 @@ import io.github.mbbhalla.agentio.core.model.TopP
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.reflect.KClass
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -127,6 +132,55 @@ internal class AbstractAgenticFunctionTest {
             assertTrue(result.exceptionOrNull() is RuntimeException)
             assertEquals("Tool provider failed", result.exceptionOrNull()?.message)
         }
+
+    @Test
+    fun `should propagate CancellationException instead of capturing it as a failure Result`() {
+        // Given — a tool provider that throws CancellationException, simulating the enclosing
+        // scope being cancelled mid-invocation. This MUST NOT be folded into Result.failure,
+        // because CancellationException extends Exception and the generic catch would otherwise
+        // swallow it, breaking structured concurrency.
+        val testInput =
+            TestInput(
+                id = "test-cancel",
+                instruction = "This invocation is cancelled",
+            )
+
+        coEvery { mockToolsProvider.listTools() } throws CancellationException("Scope cancelled")
+
+        // When / Then — the cancellation propagates out of invoke rather than being returned.
+        val thrown =
+            assertThrows(CancellationException::class.java) {
+                runBlocking { testFunction.invoke(testInput) }
+            }
+        assertEquals("Scope cancelled", thrown.message)
+    }
+
+    @Test
+    fun `should propagate cancellation when the enclosing coroutine times out`() {
+        // Given — a Bedrock call that hangs longer than the enclosing timeout, so real coroutine
+        // cancellation (TimeoutCancellationException, a CancellationException) fires inside coreLogic.
+        val testInput =
+            TestInput(
+                id = "test-timeout",
+                instruction = "This invocation times out",
+            )
+
+        coEvery { mockToolsProvider.listTools() } returns emptyList()
+        coEvery { mockBedrockClient.converse(any()) } coAnswers {
+            delay(10_000.milliseconds) // hang well past the withTimeout window
+            error("should have been cancelled before returning")
+        }
+
+        // When / Then — cancellation escapes invoke as a TimeoutCancellationException; invoke does
+        // not return a (failure) Result, proving the cancellation path is honoured end to end.
+        assertThrows(TimeoutCancellationException::class.java) {
+            runBlocking {
+                withTimeout(200.milliseconds) {
+                    testFunction.invoke(testInput)
+                }
+            }
+        }
+    }
 
     @Test
     fun `should handle context memory manager failures`() =
