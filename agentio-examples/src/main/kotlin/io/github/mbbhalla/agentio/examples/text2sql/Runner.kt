@@ -12,7 +12,6 @@ import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.examples.text2sql.data.EmployeeDatabase
 import io.github.mbbhalla.agentio.examples.text2sql.data.RetailDatabase
 import io.github.mbbhalla.agentio.module.text2sql.Text2SqlAgenticFunction
-import io.vavr.control.Try
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicInteger
@@ -40,7 +39,7 @@ internal object Runner {
     fun run(
         env: DatabaseEnvironment,
         query: String,
-    ): Try<AgentOutput<Text2SqlAgenticFunction.Output>> =
+    ): Result<AgentOutput<Text2SqlAgenticFunction.Output>> =
         runBlocking {
             /*
                 Pre-create one independent function per trial. create() is a suspend function that
@@ -105,7 +104,7 @@ internal object Runner {
         val countBySql =
             evaluation.allOutputs
                 .filter { it.isSuccess }
-                .groupingBy { it.get().output.sql }
+                .groupingBy { it.getOrThrow().output.sql }
                 .eachCount()
 
         LOG.info(

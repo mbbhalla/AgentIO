@@ -10,9 +10,6 @@ import io.github.mbbhalla.agentio.core.lib.Instructible
 import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import io.mockk.coEvery
 import io.mockk.mockk
-import io.vavr.control.Try
-import io.vavr.kotlin.failure
-import io.vavr.kotlin.success
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -41,7 +38,7 @@ internal class AgenticFunctionEvaluatorTest {
         val score: Int,
     )
 
-    private lateinit var mockAgenticFunction: Instructible<TestInput, Try<AgentOutput<TestOutput>>>
+    private lateinit var mockAgenticFunction: Instructible<TestInput, Result<AgentOutput<TestOutput>>>
     private lateinit var testInput: TestInput
 
     @BeforeEach
@@ -97,15 +94,15 @@ internal class AgenticFunctionEvaluatorTest {
         val output2 = TestOutput("result2", 20)
         val outputs =
             listOf(
-                success(agentOutput(output1)),
-                success(agentOutput(output2)),
-                success(agentOutput(output1)), // output1 wins 2-1
+                Result.success(agentOutput(output1)),
+                Result.success(agentOutput(output2)),
+                Result.success(agentOutput(output1)), // output1 wins 2-1
             )
 
         val result = MostFrequentAgentOutputSelector<TestOutput>().select(outputs)
 
         assertTrue(result.isSuccess)
-        assertEquals(output1, result.get().output)
+        assertEquals(output1, result.getOrThrow().output)
     }
 
     @Test
@@ -113,15 +110,15 @@ internal class AgenticFunctionEvaluatorTest {
         val output1 = TestOutput("result1", 10)
         val outputs =
             listOf(
-                success(agentOutput(output1)),
-                failure(RuntimeException("Failed")),
-                failure(RuntimeException("Failed again")),
+                Result.success(agentOutput(output1)),
+                Result.failure(RuntimeException("Failed")),
+                Result.failure(RuntimeException("Failed again")),
             )
 
         val result = MostFrequentAgentOutputSelector<TestOutput>().select(outputs)
 
         assertTrue(result.isSuccess)
-        assertEquals(output1, result.get().output)
+        assertEquals(output1, result.getOrThrow().output)
     }
 
     @Test
@@ -130,25 +127,25 @@ internal class AgenticFunctionEvaluatorTest {
         val output2 = TestOutput("result2", 20)
         val outputs =
             listOf(
-                success(agentOutput(output1)),
-                success(agentOutput(output2)), // 1-1 tie
+                Result.success(agentOutput(output1)),
+                Result.success(agentOutput(output2)), // 1-1 tie
             )
 
         val tieBreaker = AgentOutputSelector<TestOutput> { it.last() }
         val result = MostFrequentAgentOutputSelector(tieBreaker).select(outputs)
 
         assertTrue(result.isSuccess)
-        assertEquals(output2, result.get().output)
+        assertEquals(output2, result.getOrThrow().output)
     }
 
     @Test
     fun `MostFrequentAgentOutputSelector returns failure when there are no successes`() {
-        val outputs = listOf(failure<AgentOutput<TestOutput>>(RuntimeException("boom")))
+        val outputs = listOf(Result.failure<AgentOutput<TestOutput>>(RuntimeException("boom")))
 
         val result = MostFrequentAgentOutputSelector<TestOutput>().select(outputs)
 
         assertTrue(result.isFailure)
-        assertTrue(result.cause is IllegalStateException)
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
     }
 
     @Test
@@ -157,8 +154,8 @@ internal class AgenticFunctionEvaluatorTest {
         val high = TestOutput("high", 99)
         val outputs =
             listOf(
-                success(agentOutput(low)),
-                success(agentOutput(high)),
+                Result.success(agentOutput(low)),
+                Result.success(agentOutput(high)),
             )
 
         val result =
@@ -166,7 +163,7 @@ internal class AgenticFunctionEvaluatorTest {
                 .select(outputs)
 
         assertTrue(result.isSuccess)
-        assertEquals(high, result.get().output)
+        assertEquals(high, result.getOrThrow().output)
     }
 
     @Test
@@ -175,8 +172,8 @@ internal class AgenticFunctionEvaluatorTest {
         val high = TestOutput("high", 99)
         val outputs =
             listOf(
-                success(agentOutput(low)),
-                success(agentOutput(high)),
+                Result.success(agentOutput(low)),
+                Result.success(agentOutput(high)),
             )
 
         val result =
@@ -184,40 +181,40 @@ internal class AgenticFunctionEvaluatorTest {
                 .select(outputs)
 
         assertTrue(result.isSuccess)
-        assertEquals(low, result.get().output)
+        assertEquals(low, result.getOrThrow().output)
     }
 
     @Test
     fun `MetricAgentOutputSelector returns failure when there are no successes`() {
-        val outputs = listOf(failure<AgentOutput<TestOutput>>(RuntimeException("boom")))
+        val outputs = listOf(Result.failure<AgentOutput<TestOutput>>(RuntimeException("boom")))
 
         val result =
             MetricAgentOutputSelector<TestOutput>(SelectionMode.MAXIMIZE) { it.output.score.toDouble() }
                 .select(outputs)
 
         assertTrue(result.isFailure)
-        assertTrue(result.cause is IllegalStateException)
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
     }
 
     @Test
     fun `MetricAgentOutputSelector can minimize a conversation metric to pick the cheapest output`() {
         val cheap = agentOutputWithTokens(TestOutput("cheap", 1), inputTokens = 10, outputTokens = 5)
         val pricey = agentOutputWithTokens(TestOutput("pricey", 2), inputTokens = 100, outputTokens = 80)
-        val outputs = listOf(success(pricey), success(cheap))
+        val outputs = listOf(Result.success(pricey), Result.success(cheap))
 
         val result =
             MetricAgentOutputSelector<TestOutput>(SelectionMode.MINIMIZE, ConversationMetrics::totalTokens)
                 .select(outputs)
 
         assertTrue(result.isSuccess)
-        assertEquals("cheap", result.get().output.result)
+        assertEquals("cheap", result.getOrThrow().output.result)
     }
 
     @Test
     fun `FilteringAgentOutputSelector discards outputs failing the predicate before delegating`() {
         val keep = agentOutputWithTokens(TestOutput("keep", 1), inputTokens = 10, outputTokens = 5)
         val drop = agentOutputWithTokens(TestOutput("drop", 2), inputTokens = 1, outputTokens = 1)
-        val outputs = listOf(success(drop), success(keep))
+        val outputs = listOf(Result.success(drop), Result.success(keep))
 
         // Only keep conversations that used more than 2 output tokens, then take the most frequent.
         val selector =
@@ -228,13 +225,13 @@ internal class AgenticFunctionEvaluatorTest {
         val result = selector.select(outputs)
 
         assertTrue(result.isSuccess)
-        assertEquals("keep", result.get().output.result)
+        assertEquals("keep", result.getOrThrow().output.result)
     }
 
     @Test
     fun `FilteringAgentOutputSelector yields the delegate failure when nothing survives`() {
         val drop = agentOutputWithTokens(TestOutput("drop", 2), inputTokens = 1, outputTokens = 1)
-        val outputs = listOf(success(drop))
+        val outputs = listOf(Result.success(drop))
 
         val selector =
             FilteringAgentOutputSelector<TestOutput>(
@@ -244,7 +241,7 @@ internal class AgenticFunctionEvaluatorTest {
         val result = selector.select(outputs)
 
         assertTrue(result.isFailure)
-        assertTrue(result.cause is IllegalStateException)
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
     }
 
     @Test
@@ -253,7 +250,7 @@ internal class AgenticFunctionEvaluatorTest {
         val cheap = agentOutputWithTokens(output, inputTokens = 5, outputTokens = 5)
         val pricey = agentOutputWithTokens(output, inputTokens = 50, outputTokens = 50)
         // Both carry the same output value, so frequency ties; the tie-breaker decides.
-        val outputs = listOf(success(pricey), success(cheap))
+        val outputs = listOf(Result.success(pricey), Result.success(cheap))
 
         val selector =
             MostFrequentAgentOutputSelector(
@@ -263,7 +260,7 @@ internal class AgenticFunctionEvaluatorTest {
         val result = selector.select(outputs)
 
         assertTrue(result.isSuccess)
-        assertEquals(10.0, ConversationMetrics.totalTokens(result.get()))
+        assertEquals(10.0, ConversationMetrics.totalTokens(result.getOrThrow()))
     }
 
     @Test
@@ -271,7 +268,7 @@ internal class AgenticFunctionEvaluatorTest {
         val result = FirstSuccessAgentOutputSelector<TestOutput>().select(emptyList())
 
         assertTrue(result.isFailure)
-        assertTrue(result.cause is IllegalStateException)
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
     }
 
     // ─── ConversationMetrics ────────────────────────────────────────────────
@@ -339,7 +336,7 @@ internal class AgenticFunctionEvaluatorTest {
     fun `evaluate runs all iterations and returns the selected output plus raw data`() =
         runBlocking {
             val output = TestOutput("success", 95)
-            coEvery { mockAgenticFunction.invoke(testInput) } returns success(agentOutput(output))
+            coEvery { mockAgenticFunction.invoke(testInput) } returns Result.success(agentOutput(output))
 
             val evaluator =
                 AgenticFunctionEvaluator(
@@ -357,8 +354,8 @@ internal class AgenticFunctionEvaluatorTest {
             assertEquals(3, result.allOutputs.size)
             assertTrue(result.allOutputs.all { it.isSuccess })
             assertTrue(result.selectedOutput.isSuccess)
-            assertEquals(output, result.selectedOutput.get().output)
-            assertEquals("test-1", result.selectedOutput.get().instructionId)
+            assertEquals(output, result.selectedOutput.getOrThrow().output)
+            assertEquals("test-1", result.selectedOutput.getOrThrow().instructionId)
         }
 
     @Test
@@ -368,9 +365,9 @@ internal class AgenticFunctionEvaluatorTest {
             val output2 = TestOutput("loser", 75)
             coEvery { mockAgenticFunction.invoke(testInput) } returnsMany
                 listOf(
-                    success(agentOutput(output1)),
-                    failure(RuntimeException("Test failure")),
-                    success(agentOutput(output2)),
+                    Result.success(agentOutput(output1)),
+                    Result.failure(RuntimeException("Test failure")),
+                    Result.success(agentOutput(output2)),
                 )
 
             val evaluator =
@@ -388,13 +385,13 @@ internal class AgenticFunctionEvaluatorTest {
             assertEquals(3, result.allOutputs.size)
             assertEquals(1, result.allOutputs.count { it.isFailure })
             assertTrue(result.selectedOutput.isSuccess)
-            assertEquals(output1, result.selectedOutput.get().output)
+            assertEquals(output1, result.selectedOutput.getOrThrow().output)
         }
 
     @Test
     fun `evaluate yields a failed selection when all iterations fail`() =
         runBlocking {
-            coEvery { mockAgenticFunction.invoke(testInput) } returns failure(RuntimeException("All failed"))
+            coEvery { mockAgenticFunction.invoke(testInput) } returns Result.failure(RuntimeException("All failed"))
 
             val evaluator =
                 AgenticFunctionEvaluator(
@@ -418,7 +415,7 @@ internal class AgenticFunctionEvaluatorTest {
     fun `evaluate invokes the progress callback once per iteration`() =
         runBlocking {
             val output = TestOutput("ok", 50)
-            coEvery { mockAgenticFunction.invoke(testInput) } returns success(agentOutput(output))
+            coEvery { mockAgenticFunction.invoke(testInput) } returns Result.success(agentOutput(output))
 
             val progress = mutableListOf<AgenticFunctionEvaluator.IterationProgress<TestOutput>>()
             val evaluator =
@@ -450,8 +447,8 @@ internal class AgenticFunctionEvaluatorTest {
                     AgenticFunctionEvaluator.EvaluationConfig(
                         agenticFunctionFactory = {
                             factoryCallCount++
-                            val mock = mockk<Instructible<TestInput, Try<AgentOutput<TestOutput>>>>()
-                            coEvery { mock.invoke(any()) } returns success(agentOutput(output))
+                            val mock = mockk<Instructible<TestInput, Result<AgentOutput<TestOutput>>>>()
+                            coEvery { mock.invoke(any()) } returns Result.success(agentOutput(output))
                             mock
                         },
                         numIterations = 3,
@@ -475,9 +472,9 @@ internal class AgenticFunctionEvaluatorTest {
             val output2 = TestOutput("trial2", 200)
             coEvery { mockAgenticFunction.invoke(testInput) } returnsMany
                 listOf(
-                    success(agentOutput(output1)),
-                    success(agentOutput(output2)),
-                    success(agentOutput(output1)), // output1 wins by frequency
+                    Result.success(agentOutput(output1)),
+                    Result.success(agentOutput(output2)),
+                    Result.success(agentOutput(output1)), // output1 wins by frequency
                 )
 
             val evaluator =
@@ -493,13 +490,13 @@ internal class AgenticFunctionEvaluatorTest {
             val result = evaluator.invoke(testInput)
 
             assertTrue(result.isSuccess)
-            assertEquals(output1, result.get().output)
+            assertEquals(output1, result.getOrThrow().output)
         }
 
     @Test
     fun `invoke propagates a failed selection when all trials fail`() =
         runBlocking {
-            coEvery { mockAgenticFunction.invoke(testInput) } returns failure(RuntimeException("boom"))
+            coEvery { mockAgenticFunction.invoke(testInput) } returns Result.failure(RuntimeException("boom"))
 
             val evaluator =
                 AgenticFunctionEvaluator(

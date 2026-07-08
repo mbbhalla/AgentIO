@@ -4,7 +4,6 @@ import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
 import io.github.mbbhalla.agentio.core.lib.AgentOutput
 import io.github.mbbhalla.agentio.examples.hackernews.function.HackerNewsAgenticFunction
 import io.github.mbbhalla.agentio.examples.hackernews.function.HackerNewsAgenticFunctionProvider
-import io.vavr.control.Try
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import org.slf4j.LoggerFactory
@@ -14,7 +13,7 @@ internal object Runner {
 
     private val LOG = LoggerFactory.getLogger(Runner::class.java)
 
-    fun run(args: Array<String>): Try<AgentOutput<HackerNewsAgenticFunction.HackerNewsAgenticFunctionOutput>> =
+    fun run(args: Array<String>): Result<AgentOutput<HackerNewsAgenticFunction.HackerNewsAgenticFunctionOutput>> =
         runBlocking {
             val agenticFunction =
                 HackerNewsAgenticFunctionProvider.get(

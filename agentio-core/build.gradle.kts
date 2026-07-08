@@ -22,9 +22,6 @@ dependencies {
     // JSON Schema validation
     implementation("com.networknt:json-schema-validator:1.5.3")
 
-    // Vavr (exposed in public API: Try<AgentOutput<O>>)
-    api("io.vavr:vavr-kotlin:0.10.2")
-
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 

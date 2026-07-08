@@ -4,7 +4,6 @@ import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
 import io.github.mbbhalla.agentio.core.lib.AgentOutput
 import io.github.mbbhalla.agentio.examples.gitanalyzer.function.GitAnalyzerAgenticFunction
 import io.github.mbbhalla.agentio.examples.gitanalyzer.function.GitAnalyzerAgenticFunctionProvider
-import io.vavr.control.Try
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import org.slf4j.LoggerFactory
@@ -14,7 +13,7 @@ internal object Runner {
 
     private val LOG = LoggerFactory.getLogger(Runner::class.java)
 
-    fun run(args: Array<String>): Try<AgentOutput<GitAnalyzerAgenticFunction.Output>> =
+    fun run(args: Array<String>): Result<AgentOutput<GitAnalyzerAgenticFunction.Output>> =
         runBlocking {
             val repoPath = args[0]
             val agenticFunction =

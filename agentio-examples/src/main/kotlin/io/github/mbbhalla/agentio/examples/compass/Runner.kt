@@ -28,8 +28,8 @@ internal object Runner {
                         datasetName = SupplyChainDatabase.DATASET_NAME,
                     ),
                 )
-            check(analysisTry.isSuccess) { "Analyzer failed: ${analysisTry.cause}" }
-            val analysisOutput = analysisTry.get().output
+            check(analysisTry.isSuccess) { "Analyzer failed: ${analysisTry.exceptionOrNull()}" }
+            val analysisOutput = analysisTry.getOrThrow().output
 
             LOG.info("Analyzer produced {} result items", analysisOutput.analysisResult.resultItems.size)
             LOG.info(
@@ -51,8 +51,8 @@ internal object Runner {
                         datasetName = SupplyChainDatabase.DATASET_NAME,
                     ),
                 )
-            check(formulaTry.isSuccess) { "ConstraintGenerator failed: ${formulaTry.cause}" }
-            val formulaOutput = formulaTry.get().output
+            check(formulaTry.isSuccess) { "ConstraintGenerator failed: ${formulaTry.exceptionOrNull()}" }
+            val formulaOutput = formulaTry.getOrThrow().output
 
             LOG.info("ConstraintGenerator produced SMTLIB2 formula:\n{}", formulaOutput.smtlibv2Formula.smtlibv2Formula)
             LOG.info("Explanation:\n{}", formulaOutput.explanation)

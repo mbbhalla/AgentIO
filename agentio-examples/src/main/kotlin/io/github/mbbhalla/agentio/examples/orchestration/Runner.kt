@@ -59,37 +59,37 @@ internal object Runner {
             val (securityResult, qualityResult, docsResult) = workerResults
 
             if (securityResult.isFailure) {
-                LOG.error("[Security Worker] Failed: {}", securityResult.cause.message)
+                LOG.error("[Security Worker] Failed: {}", securityResult.exceptionOrNull()?.message)
                 return@runBlocking
             }
             if (qualityResult.isFailure) {
-                LOG.error("[Quality Worker] Failed: {}", qualityResult.cause.message)
+                LOG.error("[Quality Worker] Failed: {}", qualityResult.exceptionOrNull()?.message)
                 return@runBlocking
             }
             if (docsResult.isFailure) {
-                LOG.error("[Documentation Worker] Failed: {}", docsResult.cause.message)
+                LOG.error("[Documentation Worker] Failed: {}", docsResult.exceptionOrNull()?.message)
                 return@runBlocking
             }
 
             val securityJson =
                 JsonSchemaUtil.json.encodeToString(
                     SecurityWorkerAgenticFunction.Output.serializer(),
-                    securityResult.get().output,
+                    securityResult.getOrThrow().output,
                 )
             val qualityJson =
                 JsonSchemaUtil.json.encodeToString(
                     QualityWorkerAgenticFunction.Output.serializer(),
-                    qualityResult.get().output,
+                    qualityResult.getOrThrow().output,
                 )
             val docsJson =
                 JsonSchemaUtil.json.encodeToString(
                     DocumentationWorkerAgenticFunction.Output.serializer(),
-                    docsResult.get().output,
+                    docsResult.getOrThrow().output,
                 )
 
-            LOG.info("[Security Worker] Risk: {}", securityResult.get().output.riskLevel)
-            LOG.info("[Quality Worker] Grade: {}", qualityResult.get().output.grade)
-            LOG.info("[Documentation Worker] Grade: {}", docsResult.get().output.grade)
+            LOG.info("[Security Worker] Risk: {}", securityResult.getOrThrow().output.riskLevel)
+            LOG.info("[Quality Worker] Grade: {}", qualityResult.getOrThrow().output.grade)
+            LOG.info("[Documentation Worker] Grade: {}", docsResult.getOrThrow().output.grade)
 
             // Phase 2: Orchestrator synthesizes
             LOG.info("\n--- Phase 2: Orchestrator Synthesis ---")
@@ -106,11 +106,11 @@ internal object Runner {
                 )
 
             if (finalResult.isFailure) {
-                LOG.error("[Orchestrator] Failed: {}", finalResult.cause.message)
+                LOG.error("[Orchestrator] Failed: {}", finalResult.exceptionOrNull()?.message)
                 return@runBlocking
             }
 
-            val output = finalResult.get().output
+            val output = finalResult.getOrThrow().output
             LOG.info("\n=== Project Health Report ===")
             LOG.info("Health Score: {}/10", output.healthScore)
             LOG.info("Summary: {}", output.executiveSummary)

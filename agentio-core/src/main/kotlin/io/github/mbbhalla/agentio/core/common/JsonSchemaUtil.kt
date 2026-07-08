@@ -14,7 +14,6 @@ import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
 import com.networknt.schema.ValidationMessage
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil.json
-import io.vavr.kotlin.Try
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -247,7 +246,7 @@ data class JsonString(
 ) {
     init {
         require(
-            Try {
+            runCatching {
                 json.parseToJsonElement(value)
             }.isSuccess,
         ) {

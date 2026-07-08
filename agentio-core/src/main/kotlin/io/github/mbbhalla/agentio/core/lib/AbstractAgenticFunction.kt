@@ -22,10 +22,6 @@ import io.github.mbbhalla.agentio.core.model.conversation.Conversation
 import io.github.mbbhalla.agentio.core.model.conversation.IndexedConversation
 import io.github.mbbhalla.agentio.core.model.event.Event
 import io.github.mbbhalla.agentio.core.model.event.EventPayload
-import io.vavr.control.Try
-import io.vavr.kotlin.Try
-import io.vavr.kotlin.failure
-import io.vavr.kotlin.success
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -69,7 +65,7 @@ data class AgentOutput<O>(
 
 abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any>(
     private val agentConfiguration: AgentConfiguration,
-) : Instructible<I, Try<AgentOutput<O>>> {
+) : Instructible<I, Result<AgentOutput<O>>> {
     companion object {
         private val LOG = LoggerFactory.getLogger(AbstractAgenticFunction::class.java)
     }
@@ -79,7 +75,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
     abstract fun getOutputKClass(): KClass<O>
 
     @Suppress("TooGenericExceptionCaught")
-    final override suspend fun invoke(input: I): Try<AgentOutput<O>> =
+    final override suspend fun invoke(input: I): Result<AgentOutput<O>> =
         withContext(Dispatchers.IO) {
             val eventListeners = agentConfiguration.eventListeners
 
@@ -99,10 +95,10 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                     try {
                         val output = coreLogic(input)
                         LOG.debug("Successfully computed result for ${input.instructionId()}")
-                        success(output)
+                        Result.success(output)
                     } catch (e: Exception) {
                         LOG.error("Failure in computing result for ${input.instructionId()}")
-                        failure(e)
+                        Result.failure(e)
                     }
                 }
 
@@ -116,7 +112,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                             totalInputTokens = result.map { it.conversation.tokenUsage.totalInputTokens }.getOrElse { 0 },
                             totalOutputTokens = result.map { it.conversation.tokenUsage.totalOutputTokens }.getOrElse { 0 },
                             success = result.isSuccess,
-                            error = if (result.isFailure) result.cause else null,
+                            error = result.exceptionOrNull(),
                             latency = duration,
                         ),
                 ),
@@ -637,7 +633,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
             REGEX_JSON_EXTRACT
                 .toRegex(RegexOption.DOT_MATCHES_ALL)
                 .findAll(conversationText)
-                .lastOrNull { Try { JsonString(it.groupValues[1]) }.isSuccess }
+                .lastOrNull { runCatching { JsonString(it.groupValues[1]) }.isSuccess }
                 ?.groupValues
                 ?.get(1)
                 ?: throw IllegalStateException(

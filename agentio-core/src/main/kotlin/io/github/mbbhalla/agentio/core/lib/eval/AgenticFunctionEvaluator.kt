@@ -3,8 +3,6 @@ package io.github.mbbhalla.agentio.core.lib.eval
 import aws.sdk.kotlin.services.bedrockruntime.model.ContentBlock
 import io.github.mbbhalla.agentio.core.lib.AgentOutput
 import io.github.mbbhalla.agentio.core.lib.Instructible
-import io.vavr.control.Try
-import io.vavr.kotlin.failure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -19,7 +17,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * running an agentic function multiple times.
  *
  * Implementations receive every trial outcome (successes and failures) and MUST be total:
- * they return a [Try.failure] rather than throwing or returning nonsense when no output can
+ * they return a [Result.failure] rather than throwing or returning nonsense when no output can
  * be selected (e.g. all trials failed).
  *
  * This is a `fun interface`, so a one-off selection policy can be passed as a lambda while
@@ -27,7 +25,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * [FirstSuccessAgentOutputSelector], [FilteringAgentOutputSelector]) remain named types.
  */
 fun interface AgentOutputSelector<O : Any> {
-    fun select(outputs: List<Try<AgentOutput<O>>>): Try<AgentOutput<O>>
+    fun select(outputs: List<Result<AgentOutput<O>>>): Result<AgentOutput<O>>
 }
 
 /**
@@ -35,9 +33,9 @@ fun interface AgentOutputSelector<O : Any> {
  * Serves as the default tie-breaker for frequency-based selection.
  */
 class FirstSuccessAgentOutputSelector<O : Any> : AgentOutputSelector<O> {
-    override fun select(outputs: List<Try<AgentOutput<O>>>): Try<AgentOutput<O>> =
+    override fun select(outputs: List<Result<AgentOutput<O>>>): Result<AgentOutput<O>> =
         outputs.firstOrNull { it.isSuccess }
-            ?: failure(IllegalStateException("No successful output to select from"))
+            ?: Result.failure(IllegalStateException("No successful output to select from"))
 }
 
 /**
@@ -47,14 +45,14 @@ class FirstSuccessAgentOutputSelector<O : Any> : AgentOutputSelector<O> {
 class MostFrequentAgentOutputSelector<O : Any>(
     private val tieBreaker: AgentOutputSelector<O> = FirstSuccessAgentOutputSelector(),
 ) : AgentOutputSelector<O> {
-    override fun select(outputs: List<Try<AgentOutput<O>>>): Try<AgentOutput<O>> {
+    override fun select(outputs: List<Result<AgentOutput<O>>>): Result<AgentOutput<O>> {
         val successes = outputs.filter { it.isSuccess }
         if (successes.isEmpty()) {
-            return failure(IllegalStateException("No successful outputs to select the most frequent from"))
+            return Result.failure(IllegalStateException("No successful outputs to select the most frequent from"))
         }
-        val frequencyByOutput = successes.groupingBy { it.get().output }.eachCount()
+        val frequencyByOutput = successes.groupingBy { it.getOrThrow().output }.eachCount()
         val maxFrequency = frequencyByOutput.values.max()
-        val mostFrequent = successes.filter { frequencyByOutput[it.get().output] == maxFrequency }
+        val mostFrequent = successes.filter { frequencyByOutput[it.getOrThrow().output] == maxFrequency }
         return tieBreaker.select(mostFrequent)
     }
 }
@@ -85,15 +83,15 @@ class MetricAgentOutputSelector<O : Any>(
         return metric
     }
 
-    override fun select(outputs: List<Try<AgentOutput<O>>>): Try<AgentOutput<O>> {
-        val successes = outputs.filter { it.isSuccess }.map { it.get() }
+    override fun select(outputs: List<Result<AgentOutput<O>>>): Result<AgentOutput<O>> {
+        val successes = outputs.filter { it.isSuccess }.map { it.getOrThrow() }
         val selected =
             when (mode) {
                 SelectionMode.MINIMIZE -> successes.minByOrNull { compute(it) }
                 SelectionMode.MAXIMIZE -> successes.maxByOrNull { compute(it) }
             }
-        return selected?.let { Try.success(it) }
-            ?: failure(IllegalStateException("No successful output to score"))
+        return selected?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No successful output to score"))
     }
 }
 
@@ -110,8 +108,8 @@ class FilteringAgentOutputSelector<O : Any>(
     private val predicate: (AgentOutput<O>) -> Boolean,
     private val delegate: AgentOutputSelector<O>,
 ) : AgentOutputSelector<O> {
-    override fun select(outputs: List<Try<AgentOutput<O>>>): Try<AgentOutput<O>> =
-        delegate.select(outputs.filter { it.isSuccess && predicate(it.get()) })
+    override fun select(outputs: List<Result<AgentOutput<O>>>): Result<AgentOutput<O>> =
+        delegate.select(outputs.filter { it.isSuccess && predicate(it.getOrThrow()) })
 }
 
 /**
@@ -165,7 +163,7 @@ object ConversationMetrics {
  */
 class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
     private val config: EvaluationConfig<I, O>,
-) : Instructible<I, Try<AgentOutput<O>>> {
+) : Instructible<I, Result<AgentOutput<O>>> {
     companion object {
         private val LOG = LoggerFactory.getLogger(AgenticFunctionEvaluator::class.java)
     }
@@ -188,7 +186,7 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
          * (`{ myFunction }`) for stateless functions, or a fresh instance per invocation when
          * mutable dependency state must not leak between trials.
          */
-        val agenticFunctionFactory: () -> Instructible<I, Try<AgentOutput<O>>>,
+        val agenticFunctionFactory: () -> Instructible<I, Result<AgentOutput<O>>>,
         /** Number of iterations to run. Must be >= 1. */
         val numIterations: Int,
         /** Maximum concurrent iterations. Must be >= 1. */
@@ -214,7 +212,7 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
         /** Total iterations in this evaluation. */
         val totalIterations: Int,
         /** The result of this iteration. */
-        val result: Try<AgentOutput<O>>,
+        val result: Result<AgentOutput<O>>,
         /** Running count of failures so far. */
         val failuresSoFar: Int,
     )
@@ -223,18 +221,18 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
     data class EvaluationResult<O : Any>(
         val totalIterations: Int,
         /** The output chosen by the selection strategy (a failure if none could be selected). */
-        val selectedOutput: Try<AgentOutput<O>>,
+        val selectedOutput: Result<AgentOutput<O>>,
         /**
          * Every per-trial outcome, ordered by iteration index. Preserves the full
          * [AgentOutput] (including [io.github.mbbhalla.agentio.core.model.conversation.Conversation]
          * with token usage) for successes, and the cause for failures. Use for per-trial
          * analysis: token counts, latency, match rates, etc.
          */
-        val allOutputs: List<Try<AgentOutput<O>>>,
+        val allOutputs: List<Result<AgentOutput<O>>>,
     )
 
     /** [Instructible] entry point: run the trials and return the strategy's selected output. */
-    override suspend fun invoke(input: I): Try<AgentOutput<O>> = evaluate(input).selectedOutput
+    override suspend fun invoke(input: I): Result<AgentOutput<O>> = evaluate(input).selectedOutput
 
     /** Run the trials and return the selected output alongside the full raw trial data. */
     suspend fun evaluate(input: I): EvaluationResult<O> {
@@ -272,7 +270,7 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
 
     private fun reportProgress(
         completed: Int,
-        result: Try<AgentOutput<O>>,
+        result: Result<AgentOutput<O>>,
         failuresSoFar: Int,
     ) {
         val callback = config.onIterationComplete
@@ -286,7 +284,7 @@ class AgenticFunctionEvaluator<I : Instructible.WithInstruction, O : Any>(
                 ),
             )
         } else {
-            val status = if (result.isFailure) "FAILED: ${result.cause.message}" else "SUCCESS"
+            val status = if (result.isFailure) "FAILED: ${result.exceptionOrNull()?.message}" else "SUCCESS"
             LOG.debug(
                 "[Iteration {}/{}] {} | failures so far: {}",
                 completed,

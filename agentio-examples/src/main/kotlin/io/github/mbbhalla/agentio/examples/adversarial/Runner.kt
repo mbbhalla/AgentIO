@@ -49,11 +49,11 @@ internal object Runner {
                     )
 
                 if (designResult.isFailure) {
-                    LOG.error("[Designer] Failed: {}", designResult.cause.message)
+                    LOG.error("[Designer] Failed: {}", designResult.exceptionOrNull()?.message)
                     return@runBlocking
                 }
 
-                val designOutput = designResult.get().output
+                val designOutput = designResult.getOrThrow().output
                 finalDesign = designOutput
                 LOG.info("[Designer] Produced {} endpoints, {} data models", designOutput.endpoints.size, designOutput.dataModels.size)
 
@@ -74,11 +74,11 @@ internal object Runner {
                     )
 
                 if (criticResult.isFailure) {
-                    LOG.error("[Critic] Failed: {}", criticResult.cause.message)
+                    LOG.error("[Critic] Failed: {}", criticResult.exceptionOrNull()?.message)
                     return@runBlocking
                 }
 
-                val criticOutput = criticResult.get().output
+                val criticOutput = criticResult.getOrThrow().output
                 LOG.info(
                     "[Critic] Verdict: {} | Issues: {} | Suggestions: {}",
                     criticOutput.verdict,

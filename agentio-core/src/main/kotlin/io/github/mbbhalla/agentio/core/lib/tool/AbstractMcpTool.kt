@@ -8,7 +8,6 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.Tool
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
-import io.vavr.kotlin.Try
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -60,7 +59,7 @@ abstract class AbstractMcpTool<I : Any, O : Any> {
                     description = tool.description(),
                 ),
         ) { request ->
-            Try {
+            runCatching {
                 val input = tool.buildInput(request)
 
                 val output = tool.invoke(input)
@@ -122,7 +121,7 @@ abstract class AbstractMcpTool<I : Any, O : Any> {
                             }.toList(),
                     isError = false,
                 )
-            }.getOrElseGet { t ->
+            }.getOrElse { t ->
                 CallToolResult(
                     content = listOf(TextContent("Error: ${t.message}")),
                     isError = true,

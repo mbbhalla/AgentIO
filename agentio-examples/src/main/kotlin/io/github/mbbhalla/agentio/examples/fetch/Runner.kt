@@ -4,7 +4,6 @@ import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
 import io.github.mbbhalla.agentio.core.lib.AgentOutput
 import io.github.mbbhalla.agentio.examples.fetch.function.FetchAgenticFunction
 import io.github.mbbhalla.agentio.examples.fetch.function.FetchAgenticFunctionProvider
-import io.vavr.control.Try
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 
@@ -13,7 +12,7 @@ internal object Runner {
 
     private val LOG = LoggerFactory.getLogger(Runner::class.java)
 
-    fun run(args: Array<String>): Try<AgentOutput<FetchAgenticFunction.Output>> =
+    fun run(args: Array<String>): Result<AgentOutput<FetchAgenticFunction.Output>> =
         runBlocking {
             val agenticFunction =
                 FetchAgenticFunctionProvider.get(

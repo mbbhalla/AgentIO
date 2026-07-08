@@ -188,7 +188,7 @@ class CompactingContextMemoryManager(
         val result = this.invoke(compactionInput)
 
         return if (result.isSuccess) {
-            val summary = result.get().output.summary
+            val summary = result.getOrThrow().output.summary
             LOG.info(
                 "Turn $turnNumber: compaction produced {} char summary from {} char input",
                 summary.length,
@@ -203,7 +203,7 @@ class CompactingContextMemoryManager(
         } else {
             LOG.error(
                 "Turn $turnNumber: compaction failed, returning original conversation",
-                result.cause,
+                result.exceptionOrNull(),
             )
             // Fail-safe: return original conversation unchanged
             conversation

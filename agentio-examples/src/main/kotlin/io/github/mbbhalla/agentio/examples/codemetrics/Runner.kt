@@ -4,7 +4,6 @@ import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
 import io.github.mbbhalla.agentio.core.lib.AgentOutput
 import io.github.mbbhalla.agentio.examples.codemetrics.function.CodeMetricsAgenticFunction
 import io.github.mbbhalla.agentio.examples.codemetrics.function.CodeMetricsAgenticFunctionProvider
-import io.vavr.control.Try
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
@@ -14,7 +13,7 @@ internal object Runner {
 
     private val LOG = LoggerFactory.getLogger(Runner::class.java)
 
-    fun run(args: Array<String>): Try<AgentOutput<CodeMetricsAgenticFunction.Output>> =
+    fun run(args: Array<String>): Result<AgentOutput<CodeMetricsAgenticFunction.Output>> =
         runBlocking {
             val projectPath = args[0]
             val checkpointDir = Path.of(args[1])

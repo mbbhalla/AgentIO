@@ -16,7 +16,6 @@ import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequestParams
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
-import io.vavr.kotlin.Try
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
@@ -175,12 +174,12 @@ data class McpClients(
                         ?.map { it.text }
                         ?.map { text ->
                             val tryJsonObject =
-                                Try {
+                                runCatching {
                                     JsonSchemaUtil.json.parseToJsonElement(text).jsonObject
                                 }
                             if (tryJsonObject.isSuccess) {
                                 ToolResultContentBlock.Json(
-                                    value = tryJsonObject.get().toDocument(),
+                                    value = tryJsonObject.getOrThrow().toDocument(),
                                 )
                             } else {
                                 ToolResultContentBlock.Text(

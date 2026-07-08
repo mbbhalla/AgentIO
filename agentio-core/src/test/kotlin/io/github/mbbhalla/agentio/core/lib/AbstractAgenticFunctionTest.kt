@@ -124,8 +124,8 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isFailure)
-            assertTrue(result.cause is RuntimeException)
-            assertEquals("Tool provider failed", result.cause.message)
+            assertTrue(result.exceptionOrNull() is RuntimeException)
+            assertEquals("Tool provider failed", result.exceptionOrNull()?.message)
         }
 
     @Test
@@ -180,8 +180,8 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isFailure)
-            assertTrue(result.cause is RuntimeException)
-            assertEquals("Context manager failed", result.cause.message)
+            assertTrue(result.exceptionOrNull() is RuntimeException)
+            assertEquals("Context manager failed", result.exceptionOrNull()?.message)
         }
 
     @Test
@@ -203,8 +203,8 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isFailure)
-            assertTrue(result.cause is RuntimeException)
-            assertEquals("Bedrock failed", result.cause.message)
+            assertTrue(result.exceptionOrNull() is RuntimeException)
+            assertEquals("Bedrock failed", result.exceptionOrNull()?.message)
         }
 
     @Test
@@ -260,7 +260,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            val output = result.get()
+            val output = result.getOrThrow()
             assertEquals("test-success", output.instructionId)
             assertEquals("success", output.output.result)
             assertTrue(output.output.success)
@@ -312,7 +312,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("stopped", result.get().output.result)
+            assertEquals("stopped", result.getOrThrow().output.result)
         }
 
     @Test
@@ -387,7 +387,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("thought through", result.get().output.result)
+            assertEquals("thought through", result.getOrThrow().output.result)
         }
 
     @Test
@@ -477,7 +477,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("tool used", result.get().output.result)
+            assertEquals("tool used", result.getOrThrow().output.result)
         }
 
     @Test
@@ -527,7 +527,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("custom", result.get().output.result)
+            assertEquals("custom", result.getOrThrow().output.result)
         }
 
     @Test
@@ -579,7 +579,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("no domain", result.get().output.result)
+            assertEquals("no domain", result.getOrThrow().output.result)
         }
 
     @Test
@@ -632,7 +632,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("no system", result.get().output.result)
+            assertEquals("no system", result.getOrThrow().output.result)
         }
 
     @Test
@@ -684,7 +684,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("no thinking", result.get().output.result)
+            assertEquals("no thinking", result.getOrThrow().output.result)
         }
 
     @Test
@@ -733,7 +733,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("max tokens", result.get().output.result)
+            assertEquals("max tokens", result.getOrThrow().output.result)
         }
 
     @Test
@@ -782,7 +782,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("guardrail", result.get().output.result)
+            assertEquals("guardrail", result.getOrThrow().output.result)
         }
 
     @Test
@@ -831,7 +831,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("tool stop", result.get().output.result)
+            assertEquals("tool stop", result.getOrThrow().output.result)
         }
 
     @Test
@@ -897,7 +897,7 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("with fields", result.get().output.result)
+            assertEquals("with fields", result.getOrThrow().output.result)
         }
 
     @Test
@@ -941,6 +941,6 @@ internal class AbstractAgenticFunctionTest {
 
             // Then
             assertTrue(result.isSuccess)
-            assertEquals("no usage", result.get().output.result)
+            assertEquals("no usage", result.getOrThrow().output.result)
         }
 }
