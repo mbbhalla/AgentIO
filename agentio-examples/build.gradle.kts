@@ -1,9 +1,13 @@
 dependencies {
     implementation(project(":agentio-core"))
+    implementation(project(":agentio-camel"))
     implementation(project(":agentio-module-data"))
     implementation(project(":agentio-module-text2sql"))
     implementation(project(":agentio-module-solver"))
     implementation(project(":agentio-module-compass"))
+
+    // Apache Camel routing engine for the route example.
+    implementation("org.apache.camel:camel-core:4.21.0")
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -173,5 +177,22 @@ tasks.register<JavaExec>("RunCompassAgenticFunction") {
         listOf(
             project.findProperty("objective")?.toString()
                 ?: "Overstock at site DC-SEATTLE for product SSD-1TB-NVMe in the month of June 2025",
+        )
+}
+
+tasks.register<JavaExec>("RunCamelText2SqlRoute") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.camel.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5020
+    }
+    args =
+        listOf(
+            project.findProperty("queriesFile")?.toString()
+                ?: "${project.projectDir}/src/main/resources/camel/text2sql-queries.txt",
         )
 }

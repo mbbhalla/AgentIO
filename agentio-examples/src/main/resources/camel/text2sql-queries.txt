@@ -1,0 +1,5 @@
+# Natural-language queries, one per line. Blank lines and lines starting with '#' are ignored.
+# Each surviving line is routed through the Text2Sql agentic function and converted to DuckDB SQL.
+What products have inventory below their safety stock levels?
+Which five products have the highest total sales revenue?
+List all warehouses and how many distinct products each one stocks.
