@@ -6,6 +6,7 @@ plugins {
 rootProject.name = "AgentIO"
 
 include("agentio-core")
+include("agentio-camel")
 include("agentio-module-data")
 include("agentio-module-text2sql")
 include("agentio-module-solver")

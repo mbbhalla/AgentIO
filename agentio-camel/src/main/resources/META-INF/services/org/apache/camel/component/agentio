@@ -1,0 +1,3 @@
+# Camel component discovery for the "agentio:" URI scheme.
+# Maps the scheme to its component class so to("agentio:<bean>") resolves at route start.
+class=io.github.mbbhalla.agentio.camel.AgentIoComponent
