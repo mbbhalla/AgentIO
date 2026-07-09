@@ -10,9 +10,9 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test:2.2.0")
 
     // Jackson
-    implementation("com.fasterxml.jackson.core:jackson-core:2.18.2")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.22.1")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.1")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.1")
 
     // JSON Schema generation
     implementation("com.github.victools:jsonschema-generator:4.36.0")

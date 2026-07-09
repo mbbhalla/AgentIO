@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!--
+        False positive: dependency-check matches the MCP Kotlin SDK's version number (0.12.0)
+        against cpe:/a:jetbrains:kotlin, i.e. it mistakes the Model Context Protocol SDK for the
+        Kotlin language itself. The io.modelcontextprotocol artifacts are NOT the Kotlin language,
+        so every jetbrains:kotlin CVE matched against them (old Kotlin CVEs and any future ones)
+        is spurious. Suppress the jetbrains:kotlin CPE for all io.modelcontextprotocol packages.
+        The actual Kotlin language version in use is governed by org.jetbrains.kotlin:* artifacts,
+        which are scanned on their own and not suppressed here.
+    -->
+    <suppress>
+        <notes><![CDATA[
+            MCP Kotlin SDK (io.modelcontextprotocol) is mis-identified as cpe:/a:jetbrains:kotlin
+            purely by version-number coincidence. It is not the Kotlin language runtime.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.modelcontextprotocol/.*$</packageUrl>
+        <cpe>cpe:/a:jetbrains:kotlin</cpe>
+    </suppress>
+</suppressions>

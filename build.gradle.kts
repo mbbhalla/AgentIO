@@ -51,4 +51,12 @@ dependencyCheck {
     formats = listOf("HTML", "JSON")
     analyzers.assemblyEnabled = false
     nvd.apiKey = System.getenv("NVD_API_KEY") ?: ""
+
+    // Only scan what actually ships: the runtime classpath. This excludes build-time tooling
+    // (Kotlin compiler/daemon/scripting, ABI tools, Gradle buildscript deps) that dependency-check
+    // otherwise flags but that is never packaged into AgentIO's artifacts.
+    scanConfigurations = listOf("runtimeClasspath")
+
+    // Suppress known false positives (e.g. the MCP Kotlin SDK mis-matched as the Kotlin language).
+    suppressionFile = "$rootDir/dependency-check-suppressions.xml"
 }
