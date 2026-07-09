@@ -17,4 +17,31 @@
         <packageUrl regex="true">^pkg:maven/io\.modelcontextprotocol/.*$</packageUrl>
         <cpe>cpe:/a:jetbrains:kotlin</cpe>
     </suppress>
+
+    <!--
+        CVE-2026-53914: unsafe deserialization in Kotlin BUILD CACHE METADATA (CWE-502). The
+        vulnerable component is Kotlin build tooling (compiler / Gradle plugin build cache), not
+        the runtime libraries. dependency-check matches it against every jetbrains:kotlin artifact
+        via broad CPE matching, including kotlin-stdlib and kotlin-reflect, which carry no
+        build-cache logic and are not the vulnerable component.
+
+        Corroboration: Sonatype OSS Index (coordinate-precise, not CPE-based) reports 0 known
+        vulnerabilities for org.jetbrains.kotlin:kotlin-stdlib:2.2.0, and the NVD record does not
+        name stdlib/reflect as affected artifacts. This is an OWASP CPE false positive.
+
+        The only version resolving the CVE is Kotlin 2.4.20, which is pre-release only
+        (2.4.20-Beta1; no stable 2.4.20 exists on Maven Central). We do not ship a beta compiler,
+        and these runtime artifacts are not the attack surface. Suppressed narrowly by CVE +
+        artifact. Revisit and remove once a stable Kotlin >= 2.4.20 is available and adopted.
+    -->
+    <suppress>
+        <notes><![CDATA[
+            CVE-2026-53914 is a build-cache-metadata deserialization flaw in Kotlin build tooling,
+            not in the kotlin-stdlib / kotlin-reflect runtime artifacts it is matched against
+            (Sonatype OSS Index reports 0 vulns for kotlin-stdlib:2.2.0). Fix (2.4.20) is
+            beta-only. Suppressed narrowly by CVE + artifact; revisit on stable 2.4.20.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-(stdlib|reflect)@.*$</packageUrl>
+        <cve>CVE-2026-53914</cve>
+    </suppress>
 </suppressions>
