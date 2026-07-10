@@ -18,7 +18,7 @@ This approach preserves the ergonomic benefits of traditional function compositi
 ```
 AgentIO/
 ├── agentio-core/                  Core SDK — agents, tools, MCP, CMMs, event listeners
-├── agentio-camel/                 Apache Camel component — run agents as nodes in Camel routes
+├── agentio-module-camel/          Apache Camel component — run agents as nodes in Camel routes
 ├── agentio-module-data/           Data environment module — DuckDB, typed SQL, Dataset, MVEL
 ├── agentio-module-text2sql/       Text2SQL module — NL-to-SQL agentic function + MCP server
 ├── agentio-examples/              Example agents (Hacker News, Git Analyzer, Text2SQL, etc.)
@@ -29,7 +29,7 @@ AgentIO/
 
 ```
 io.github.mbbhalla:agentio-core
-io.github.mbbhalla:agentio-camel
+io.github.mbbhalla:agentio-module-camel
 io.github.mbbhalla:agentio-module-data
 io.github.mbbhalla:agentio-module-text2sql
 io.github.mbbhalla:agentio-examples
@@ -39,8 +39,8 @@ io.github.mbbhalla:agentio-experiments
 ### Dependency Graph
 
 ```
-agentio-examples ──────────────→ agentio-core + agentio-camel + agentio-module-text2sql
-agentio-camel ─────────────────→ agentio-core
+agentio-examples ──────────────→ agentio-core + agentio-module-camel + agentio-module-text2sql
+agentio-module-camel ─────────→ agentio-core
 agentio-module-text2sql ──────→ agentio-core + agentio-module-data
 agentio-module-data ──────────→ agentio-core
 agentio-experiments ───────────→ agentio-core
@@ -56,7 +56,7 @@ agentio-experiments ───────────→ agentio-core
 - **Memory Management**: Load and store context from/to backend storage via ContextProviders and ContextWriters
 - **Thinking Mode**: Additional reasoning iterations for more accurate responses
 - **Evaluation Framework**: Built-in evaluation tools for testing and refining agents
-- **Apache Camel Integration**: Run agents as nodes in Camel routes via the [`agentio-camel`](agentio-camel/README.md) component — compose agents with 300+ connectors and Enterprise Integration Patterns
+- **Apache Camel Integration**: Run agents as nodes in Camel routes via the [`agentio-module-camel`](agentio-module-camel/README.md) component — compose agents with 300+ connectors and Enterprise Integration Patterns
 
 ## Architecture
 

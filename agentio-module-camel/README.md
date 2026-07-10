@@ -1,4 +1,4 @@
-# agentio-camel
+# agentio-module-camel
 
 Apache Camel component that lets an AgentIO agent participate in a Camel route as a node. An
 agentic function is addressed by a URI — `to("agentio:<beanName>")` — so agents compose with
@@ -15,7 +15,7 @@ from("aws2-sqs://teamTickets")
 ## Core Principle: Edge Adapter, Not a New Platform
 
 This module is an **optional edge adapter**. The dependency arrow points inward only —
-`agentio-camel → agentio-core` — and `agentio-core` depends on neither Camel nor this module.
+`agentio-module-camel → agentio-core` — and `agentio-core` depends on neither Camel nor this module.
 The connector ecosystem's transitive/CVE surface stays quarantined here; the typed,
 coroutine-native core is untouched. You bring agents to the integration fabric you already run,
 rather than adopting a new agent platform.

@@ -12,12 +12,12 @@ tasks.jacocoTestReport {
 }
 
 /*
-    agentio-camel is an OPTIONAL edge adapter that lets an AgentIO Instructible (a single
+    agentio-module-camel is an OPTIONAL edge adapter that lets an AgentIO Instructible (a single
     agentic function, an AgenticFunctionEvaluator, or any composite) participate in an
     Apache Camel route as a producer endpoint (to("agentio:<beanName>")).
 
     Architectural invariant: the dependency arrow points inward only.
-    agentio-camel -> agentio-core. agentio-core MUST NOT depend on agentio-camel or on
+    agentio-module-camel -> agentio-core. agentio-core MUST NOT depend on agentio-module-camel or on
     Apache Camel. This keeps the typed, coroutine-native core free of the connector
     ecosystem's transitive/CVE surface, which stays quarantined in this module.
  */

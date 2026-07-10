@@ -1,6 +1,6 @@
 dependencies {
     implementation(project(":agentio-core"))
-    implementation(project(":agentio-camel"))
+    implementation(project(":agentio-module-camel"))
     implementation(project(":agentio-module-data"))
     implementation(project(":agentio-module-text2sql"))
     implementation(project(":agentio-module-solver"))
