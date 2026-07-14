@@ -1,5 +1,6 @@
 package io.github.mbbhalla.agentio.data.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.mvel2.MVEL
 import java.sql.ResultSet
@@ -119,34 +120,47 @@ data class Dataset(
     }
 }
 
+/**
+ * A tabular scalar value. Serialized polymorphically with the default `"type"` discriminator; each
+ * subtype declares an explicit, stable [SerialName] so the discriminator value is a short token
+ * (e.g. `"LongValue"`) rather than the fully-qualified class name. This keeps the wire contract
+ * stable across refactors and lets producers (including LLMs emitting AnalysisResult JSON) write a
+ * readable, predictable discriminator — e.g. `{"type":"LongValue","value":0}`.
+ */
 @Serializable
 sealed class DataValue {
     @Serializable
+    @SerialName("StringValue")
     data class StringValue(
         val value: String,
     ) : DataValue()
 
     @Serializable
+    @SerialName("LongValue")
     data class LongValue(
         val value: Long,
     ) : DataValue()
 
     @Serializable
+    @SerialName("DoubleValue")
     data class DoubleValue(
         val value: Double,
     ) : DataValue()
 
     @Serializable
+    @SerialName("TimestampValue")
     data class TimestampValue(
         val value: String,
     ) : DataValue()
 
     @Serializable
+    @SerialName("BooleanValue")
     data class BooleanValue(
         val value: Boolean,
     ) : DataValue()
 
     @Serializable
+    @SerialName("NullValue")
     data object NullValue : DataValue()
 
     companion object {
