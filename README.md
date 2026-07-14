@@ -21,8 +21,9 @@ AgentIO/
 ├── agentio-module-camel/          Apache Camel component — run agents as nodes in Camel routes
 ├── agentio-module-data/           Data environment module — DuckDB, typed SQL, Dataset, MVEL
 ├── agentio-module-text2sql/       Text2SQL module — NL-to-SQL agentic function + MCP server
-├── agentio-examples/              Example agents (Hacker News, Git Analyzer, Text2SQL, etc.)
-└── agentio-experiments/           Research experiments (Needle-in-a-Haystack, Distributed Counting)
+├── agentio-module-solver/         SMTLIB2 + Z3 solver facade with correctness-at-construction
+├── agentio-module-compass/        Constraint optimization via multi-agent problem analysis + solver synthesis
+└── agentio-examples/              Example agents (Hacker News, Git Analyzer, Text2SQL, etc.)
 ```
 
 ### Maven Coordinates
@@ -32,18 +33,21 @@ io.github.mbbhalla:agentio-core
 io.github.mbbhalla:agentio-module-camel
 io.github.mbbhalla:agentio-module-data
 io.github.mbbhalla:agentio-module-text2sql
+io.github.mbbhalla:agentio-module-solver
+io.github.mbbhalla:agentio-module-compass
 io.github.mbbhalla:agentio-examples
-io.github.mbbhalla:agentio-experiments
 ```
 
 ### Dependency Graph
 
 ```
-agentio-examples ──────────────→ agentio-core + agentio-module-camel + agentio-module-text2sql
-agentio-module-camel ─────────→ agentio-core
+agentio-examples ──────────────→ agentio-core + agentio-module-camel + agentio-module-data
+                                  + agentio-module-text2sql + agentio-module-solver + agentio-module-compass
+agentio-module-compass ───────→ agentio-core + agentio-module-data + agentio-module-solver
+agentio-module-solver ────────→ agentio-core + agentio-module-data
 agentio-module-text2sql ──────→ agentio-core + agentio-module-data
+agentio-module-camel ─────────→ agentio-core
 agentio-module-data ──────────→ agentio-core
-agentio-experiments ───────────→ agentio-core
 ```
 
 ## Key Features
@@ -147,29 +151,44 @@ val agentConfiguration = AgentConfiguration(
 
 ## Advanced Features
 
-### Consensus Mechanisms
+### Consensus Mechanisms and Evaluation
 
-```kotlin
-val trialsAgent = AgenticFunctionTrials(
-    agenticFunction = agent,
-    numberOfTrials = 5,
-    agentOutputSelector = MajorityOccurredAgentOutputSelector(/* ... */)
-)
-```
-
-### Evaluation Framework
+`AgenticFunctionEvaluator` runs an agentic function multiple times with the same input, then
+applies an `AgentOutputSelector` strategy to pick a single winning output. It separates
+**execution** (how many times to run, concurrency, staggering) from **selection** (which output
+wins), so the same evaluator drives both consensus and evaluation.
 
 ```kotlin
 val evaluator = AgenticFunctionEvaluator(
-    EvaluationInput.withFunction(
-        agenticFunction = agent,
-        input = myInput,
-        numIterations = 100,
+    AgenticFunctionEvaluator.EvaluationConfig(
+        agenticFunctionFactory = { agent },     // reuse a stateless agent, or build a fresh one per trial
+        numIterations = 5,
         maxParallelism = 5,
-        outputMatcher = { output -> output.answer.contains("expected") },
-    )
+        selectionStrategy = MostFrequentAgentOutputSelector(),  // majority-vote consensus
+        delayBetweenIterationsMs = 100,          // stagger requests to avoid API throttling
+    ),
 )
-val results = evaluator.evaluate()
+
+val result = evaluator.evaluate(MyAgent.Input(question = "What is AgentIO?"))
+result.selectedOutput.onSuccess { println("Consensus answer: ${it.output.answer}") }
+result.allOutputs.forEach { /* per-trial analysis: tokens, latency, match rates */ }
+```
+
+Built-in selection strategies:
+
+| Strategy | Picks |
+|----------|-------|
+| `FirstSuccessAgentOutputSelector` | The first successful trial |
+| `MostFrequentAgentOutputSelector` | The output value that occurred most often (majority vote) |
+| `MetricAgentOutputSelector` | The output that minimizes/maximizes a metric (e.g. fewest tokens) |
+| `FilteringAgentOutputSelector` | Delegates after discarding trials that fail a predicate |
+
+`ConversationMetrics` provides ready-made metrics — `totalTokens`, `rounds`, `toolCalls`,
+`thinkingIterations` — to compose with `MetricAgentOutputSelector`:
+
+```kotlin
+// Among successful trials, keep the cheapest by total token usage.
+selectionStrategy = MetricAgentOutputSelector(SelectionMode.MINIMIZE, ConversationMetrics::totalTokens)
 ```
 
 ### Context Providers and Writers
