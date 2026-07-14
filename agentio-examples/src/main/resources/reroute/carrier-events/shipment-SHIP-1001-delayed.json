@@ -1,0 +1,23 @@
+[
+  {
+    "shipmentId": "SHIP-1001",
+    "status": "IN_TRANSIT",
+    "location": "Port of Long Beach, CA",
+    "timestamp": "2025-06-10T08:00:00Z",
+    "note": "Departed origin port on schedule."
+  },
+  {
+    "shipmentId": "SHIP-1001",
+    "status": "DELAYED",
+    "location": "Port of Long Beach, CA",
+    "timestamp": "2025-06-14T18:30:00Z",
+    "note": "Held at port 4 days due to customs inspection backlog; carrier ETA slipped past planned delivery date."
+  },
+  {
+    "shipmentId": "SHIP-1001",
+    "status": "EXCEPTION",
+    "location": "Port of Long Beach, CA",
+    "timestamp": "2025-06-15T09:00:00Z",
+    "note": "Carrier reports congestion; no firm re-departure time. Destination site at risk of stock-out."
+  }
+]

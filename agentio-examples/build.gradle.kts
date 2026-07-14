@@ -196,3 +196,22 @@ tasks.register<JavaExec>("RunCamelText2SqlRoute") {
                 ?: "${project.projectDir}/src/main/resources/camel/text2sql-queries.txt",
         )
 }
+
+tasks.register<JavaExec>("RunRerouteDemo") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.camel.RerouteRunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5021
+    }
+    args =
+        listOf(
+            project.findProperty("eventsDir")?.toString()
+                ?: "${project.projectDir}/src/main/resources/reroute/carrier-events",
+            project.findProperty("outputDir")?.toString()
+                ?: "${project.layout.buildDirectory.get()}/reroute-recommendations",
+        )
+}

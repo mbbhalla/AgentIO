@@ -1,0 +1,16 @@
+[
+  {
+    "shipmentId": "SHIP-2002",
+    "status": "IN_TRANSIT",
+    "location": "Memphis, TN hub",
+    "timestamp": "2025-06-11T06:00:00Z",
+    "note": "Sorted at hub, on planned transportation lane."
+  },
+  {
+    "shipmentId": "SHIP-2002",
+    "status": "OUT_FOR_DELIVERY",
+    "location": "Destination metro",
+    "timestamp": "2025-06-12T05:15:00Z",
+    "note": "Tracking on schedule; expected to arrive on or before planned delivery date."
+  }
+]
