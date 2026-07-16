@@ -1,4 +1,18 @@
+// Resolvable configuration that fetches only the Hawtio web application archive (WAR). It is kept
+// separate from the runtime classpath because the WAR must be handed to the embedded Hawtio server
+// as a file path (-Dhawtio.war=<path>), not placed on the JVM classpath.
+val hawtioWar: Configuration by configurations.creating {
+    isCanBeResolved = true
+    isCanBeConsumed = false
+}
+
+// Pinned dependency versions shared across the route-visualization wiring.
+val camelVersion = "4.21.0"
+val hawtioVersion = "5.2.1"
+
 dependencies {
+    hawtioWar("io.hawt:hawtio-war:$hawtioVersion@war")
+
     implementation(project(":agentio-core"))
     implementation(project(":agentio-module-camel"))
     implementation(project(":agentio-module-data"))
@@ -7,7 +21,20 @@ dependencies {
     implementation(project(":agentio-module-compass"))
 
     // Apache Camel routing engine for the route example.
-    implementation("org.apache.camel:camel-core:4.21.0")
+    implementation("org.apache.camel:camel-core:$camelVersion")
+
+    // Camel JMX management: registers a managed MBean per route and per node (exchange counts,
+    // processing times, throughput). This is the "associated information" Hawtio renders on each
+    // node of the route diagram.
+    implementation("org.apache.camel:camel-management:$camelVersion")
+
+    // Enables CamelContext.dumpRoutesAsXml, which Hawtio invokes (via Jolokia) to render the live
+    // route *diagram* — without it the Camel plugin can only show the routes tree, not the graph.
+    implementation("org.apache.camel:camel-xml-io-dsl:$camelVersion")
+
+    // Embedded Hawtio web console (bundles the Jolokia JMX-over-HTTP agent). Lets the running
+    // Camel routes be visualized in a browser during a demo. See HawtioConsole + the run tasks.
+    implementation("io.hawt:hawtio-embedded:$hawtioVersion")
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -183,6 +210,13 @@ tasks.register<JavaExec>("RunCompassAgenticFunction") {
 tasks.register<JavaExec>("RunCamelText2SqlRoute") {
     mainClass.set("io.github.mbbhalla.agentio.examples.camel.RunnerKt")
     classpath = sourceSets["main"].runtimeClasspath
+    // Hand the resolved Hawtio WAR to the forked JVM as -Dhawtio.war=<path> (see HawtioConsole).
+    // The path is a task-local Provider so the execution-time lambda closes only over it (CC-safe),
+    // never over the build-script object.
+    val warPath = hawtioWar.elements.map { it.single().asFile.absolutePath }
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider { listOf("-Dhawtio.war=${warPath.get()}") },
+    )
     debug = false
     debugOptions {
         server = true
@@ -200,6 +234,13 @@ tasks.register<JavaExec>("RunCamelText2SqlRoute") {
 tasks.register<JavaExec>("RunRerouteDemo") {
     mainClass.set("io.github.mbbhalla.agentio.examples.camel.RerouteRunnerKt")
     classpath = sourceSets["main"].runtimeClasspath
+    // Hand the resolved Hawtio WAR to the forked JVM as -Dhawtio.war=<path> (see HawtioConsole).
+    // The path is a task-local Provider so the execution-time lambda closes only over it (CC-safe),
+    // never over the build-script object.
+    val warPath = hawtioWar.elements.map { it.single().asFile.absolutePath }
+    jvmArgumentProviders.add(
+        CommandLineArgumentProvider { listOf("-Dhawtio.war=${warPath.get()}") },
+    )
     debug = false
     debugOptions {
         server = true

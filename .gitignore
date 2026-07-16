@@ -21,4 +21,9 @@ agentio-cmm-impl/bin
 agentio-core/bin/
 agentio-examples/bin/
 agentio-experiments/bin/
+agentio-module-camel/bin/
+agentio-module-compass/bin/
+agentio-module-data/bin/
+agentio-module-solver/bin/
+agentio-module-text2sql/bin/
 
