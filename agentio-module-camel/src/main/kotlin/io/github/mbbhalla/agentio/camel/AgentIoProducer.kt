@@ -23,9 +23,11 @@ import kotlin.coroutines.cancellation.CancellationException
  * 1. Non-blocking: [process] returns `false` and completes the [AsyncCallback] from a coroutine,
  *    so a minutes-long agent turn never pins a Camel route thread. This preserves the coroutine
  *    model core is built on; a `runBlocking` producer would cap throughput at the route pool size.
- * 2. Bounded concurrency: a [Semaphore] caps concurrent invocations. Freeing the route thread
- *    removes Camel's natural backpressure, so without this an inbound backlog would launch
- *    unbounded concurrent (expensive) agent conversations.
+ * 2. Bounded concurrency: a [Semaphore] caps how many agent invocations run at once, so a burst
+ *    cannot fan out into unbounded concurrent (expensive) conversations. This bounds concurrency
+ *    only, not queue depth: [process] returns immediately, so Camel applies no upstream
+ *    backpressure and a backlog still parks exchanges on the permit — bound memory upstream (see
+ *    [AgentIoEndpoint.maxConcurrency]).
  * 3. Failure as value: a core `Result.failure` becomes an exchange exception, so Camel's
  *    redelivery / dead-letter / circuit-breaker machinery owns retry and fallback declaratively.
  * 4. Cancellation-correct: the coroutine scope is tied to producer lifecycle; on stop it is

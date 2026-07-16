@@ -21,12 +21,26 @@ class AgentIoEndpoint(
     val binding: ExchangeBinding,
 ) : DefaultEndpoint(uri, component) {
     /**
-     * Upper bound on concurrent in-flight agent invocations for this endpoint. Agent calls are
-     * long-running, memory-heavy and costly, so — unlike a cheap I/O endpoint — they need an
-     * explicit ceiling to stop a queue backlog from launching unbounded concurrent conversations
-     * (OOM / throttling / runaway cost). Must be >= 1. Configured via `?maxConcurrency=<n>`.
+     * Upper bound on concurrent in-flight agent *invocations* for this endpoint. Agent calls are
+     * long-running and costly (Bedrock spend, provider throttling), so — unlike a cheap I/O
+     * endpoint — they get an explicit ceiling on how many run at once. Configured via
+     * `?maxConcurrency=<n>`; must be >= 1 (enforced at route start in [doInit]).
+     *
+     * Note this bounds *concurrency*, not queue depth or memory: [AgentIoProducer.process] returns
+     * immediately for every exchange, so Camel applies no upstream backpressure and an inbound
+     * backlog still parks unbounded exchanges on the permit. To bound memory/queue depth, throttle
+     * upstream (a bounded SEDA/thread pool or the `throttle` EIP) rather than relying on this cap.
      */
     var maxConcurrency: Int = DEFAULT_MAX_CONCURRENCY
+
+    override fun doInit() {
+        super.doInit()
+        // Fail fast at route start with a clear, endpoint-scoped message. Without this the invalid
+        // value only surfaces later as a cryptic Semaphore constructor error at producer start.
+        require(maxConcurrency >= MIN_MAX_CONCURRENCY) {
+            "agentio:$beanName maxConcurrency must be >= $MIN_MAX_CONCURRENCY, but was $maxConcurrency"
+        }
+    }
 
     override fun createProducer(): Producer = AgentIoProducer(this)
 
@@ -40,5 +54,8 @@ class AgentIoEndpoint(
 
     companion object {
         const val DEFAULT_MAX_CONCURRENCY: Int = 4
+
+        /** Smallest legal [maxConcurrency]; a value below this cannot admit any invocation. */
+        const val MIN_MAX_CONCURRENCY: Int = 1
     }
 }

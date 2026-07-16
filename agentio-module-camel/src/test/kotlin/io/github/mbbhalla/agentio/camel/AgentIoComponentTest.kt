@@ -372,6 +372,35 @@ internal class AgentIoComponentTest {
         }
     }
 
+    @Test
+    fun `maxConcurrency below the minimum fails route start with a clear message`() {
+        val ctx = contextWith(registryWith("fn" to succeedingFunction()))
+        ctx.addRoutes(
+            object : RouteBuilder() {
+                override fun configure() {
+                    from("direct:in").to("agentio:fn?maxConcurrency=0")
+                }
+            },
+        )
+        val thrown = assertThrows(Exception::class.java) { ctx.start() }
+        assertTrue(thrown.hasCause<IllegalArgumentException>())
+        val message = generateSequence(thrown as Throwable) { it.cause }.mapNotNull { it.message }.joinToString(" | ")
+        assertTrue(message.contains("maxConcurrency"), "message should name the offending parameter: $message")
+        ctx.stop()
+    }
+
+    @Test
+    fun `maxConcurrency at the minimum is accepted`() {
+        val ctx = contextWith(registryWith("fn" to succeedingFunction()))
+        ctx.start()
+        try {
+            val endpoint = ctx.getEndpoint("agentio:fn?maxConcurrency=1") as AgentIoEndpoint
+            assertEquals(AgentIoEndpoint.MIN_MAX_CONCURRENCY, endpoint.maxConcurrency)
+        } finally {
+            ctx.stop()
+        }
+    }
+
     // ---- Concurrency cap ------------------------------------------------------------------
 
     @Test
