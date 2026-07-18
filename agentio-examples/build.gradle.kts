@@ -1,3 +1,6 @@
+// Pinned Camel version shared across the routing-engine and observability dependencies.
+val camelVersion = "4.21.0"
+
 dependencies {
     implementation(project(":agentio-core"))
     implementation(project(":agentio-module-camel"))
@@ -7,7 +10,19 @@ dependencies {
     implementation(project(":agentio-module-compass"))
 
     // Apache Camel routing engine for the route example.
-    implementation("org.apache.camel:camel-core:4.21.0")
+    implementation("org.apache.camel:camel-core:$camelVersion")
+
+    // Camel JMX management: registers a managed MBean per route and per node (exchange counts,
+    // processing times, throughput). This is the per-node statistic data the Camel CLI / TUI
+    // surface alongside the route and topology diagrams.
+    implementation("org.apache.camel:camel-management:$camelVersion")
+
+    // CLI connector: exposes this standalone CamelContext to the local `camel` CLI over a
+    // file-based protocol (no HTTP port, no embedded web server). Auto-detected from the classpath
+    // on context.start() — look for the "Local CLI Connector started" log line. Once running, attach
+    // `camel tui`, `camel get route`, or `camel trace` from another terminal to the RunCamelText2SqlRoute
+    // / RunRerouteDemo tasks. Pulls in camel-console (dev-console SPI) transitively for the diagrams.
+    implementation("org.apache.camel:camel-cli-connector:$camelVersion")
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
