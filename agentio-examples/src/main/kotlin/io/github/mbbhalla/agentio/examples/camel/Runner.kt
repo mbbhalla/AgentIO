@@ -38,9 +38,6 @@ internal object Runner {
 
     private const val AGENT_ID = "camel-text2sql-example"
 
-    /** CamelContext management name — how this context is labelled in the Hawtio tree. */
-    private const val MANAGEMENT_NAME = "agentio-text2sql"
-
     /** Cap on how many query lines convert concurrently — agent calls are expensive. */
     private const val MAX_CONCURRENCY = 2
 
@@ -52,39 +49,19 @@ internal object Runner {
         require(queries.isNotEmpty()) { "No queries found in ${queriesFile.absolutePath}" }
         LOG.info("Loaded {} queries from {}", queries.size, queriesFile.name)
 
-        // Start the embedded Hawtio console (if its WAR was supplied by the Gradle task) so the
-        // route can be watched live in a browser. null => not started; fall back to batch-and-exit.
-        val consoleUrl = HawtioConsole.start()
-
         // Build the agentic function once and register it under the name the route resolves.
         val text2Sql = runBlocking { Text2SqlAgenticFunction.create(agentId = AGENT_ID, env = env) }
         val registry = SimpleRegistry().apply { bind("text2sql", text2Sql) }
 
         val context = DefaultCamelContext(registry)
-        // Name the context so it reads clearly in the Hawtio tree, and enable backlog tracing so
-        // the console's Trace tab shows exchanges flowing through each node during the demo.
-        context.managementName = MANAGEMENT_NAME
-        context.isBacklogTracing = true
         context.addRoutes(buildRoutes())
         context.start()
-
-        // When the console is up, keep the JVM (and the running context + its accumulated JMX
-        // statistics) alive so the route stays visible after the batch completes; the shutdown hook
-        // stops the context on Ctrl-C. Otherwise fall back to the original batch-and-exit behaviour.
-        if (consoleUrl != null) {
-            Runtime.getRuntime().addShutdownHook(Thread { context.stop() })
-        }
         try {
+            // Feed the queries into the route and wait for the split results to complete.
             val template = context.createProducerTemplate()
             template.sendBody("direct:queries", queries)
         } finally {
-            if (consoleUrl == null) {
-                context.stop()
-            }
-        }
-        if (consoleUrl != null) {
-            LOG.info("Batch complete. Route visible at {} (Camel tab). Press Ctrl-C to stop.", consoleUrl)
-            Thread.currentThread().join()
+            context.stop()
         }
     }
 
@@ -101,17 +78,13 @@ internal object Runner {
                     }
 
                 from("direct:queries")
-                    .routeId("text2sql-route")
                     .split(body())
-                    .id("split-queries")
                     .process { exchange ->
                         val query: String = requireNotNull(exchange.message.getBody(String::class.java)) { "empty query line" }
                         // Stash the original query so the print/error steps can reference it.
                         exchange.setProperty(PROPERTY_QUERY, query)
                         exchange.message.body = Text2SqlAgenticFunction.Input(text = query)
-                    }.id("wrap-as-agent-input")
-                    .to("agentio:text2sql?maxConcurrency=$MAX_CONCURRENCY")
-                    .id("invoke-text2sql-agent")
+                    }.to("agentio:text2sql?maxConcurrency=$MAX_CONCURRENCY")
                     .process { exchange ->
                         val query = exchange.getProperty(PROPERTY_QUERY, String::class.java)
                         val output: Text2SqlAgenticFunction.Output =
@@ -120,7 +93,7 @@ internal object Runner {
                             }
                         LOG.info("Q: {}", query)
                         LOG.info("SQL: {}", output.sql)
-                    }.id("print-generated-sql")
+                    }
             }
         }
 

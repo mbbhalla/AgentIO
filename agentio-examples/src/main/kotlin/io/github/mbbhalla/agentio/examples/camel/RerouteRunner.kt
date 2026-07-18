@@ -51,9 +51,6 @@ internal object RerouteRunner {
     /** Agent calls are expensive; cap concurrent in-flight invocations per endpoint. */
     private const val MAX_CONCURRENCY = 2
 
-    /** CamelContext management name — how this context is labelled in the Hawtio tree. */
-    private const val MANAGEMENT_NAME = "agentio-reroute"
-
     /** How long the Aggregator waits for more events of a shipment before firing downstream (ms). */
     private const val AGGREGATION_COMPLETION_TIMEOUT_MS = 2_000L
 
@@ -101,21 +98,10 @@ internal object RerouteRunner {
                 bind("rerouteSolver", rerouteSolver)
             }
 
-        // Start the embedded Hawtio console (if its WAR was supplied by the Gradle task) before the
-        // context, so the route diagram and per-node statistics are visible as soon as it starts.
-        val consoleUrl = HawtioConsole.start()
-
         val context = DefaultCamelContext(registry)
-        // Name the context for the Hawtio tree, and enable backlog tracing so the console's Trace
-        // tab shows each shipment's exchange flowing through the analyzer and solver nodes.
-        context.managementName = MANAGEMENT_NAME
-        context.isBacklogTracing = true
         context.addRoutes(buildRoutes(eventsDir, outputDir))
         context.start()
         LOG.info("Route started. Drop a *.json batch of carrier events into the watched folder. Ctrl-C to stop.")
-        if (consoleUrl != null) {
-            LOG.info("Watch it live at {} (Camel tab -> Route Diagram / Trace).", consoleUrl)
-        }
         // Keep the JVM alive so the file consumer keeps polling for newly dropped files.
         Runtime.getRuntime().addShutdownHook(Thread { context.stop() })
         Thread.currentThread().join()
@@ -144,13 +130,10 @@ internal object RerouteRunner {
                         val json = requireNotNull(exchange.message.getBody(String::class.java)) { "empty event file" }
                         exchange.message.body =
                             JsonSchemaUtil.json.decodeFromString(EVENT_LIST_SERIALIZER, json)
-                    }.id("parse-event-file")
-                    .split(body())
-                    .id("split-events")
+                    }.split(body())
                     // Aggregator EIP: collapse the split event stream back into one batch per shipment.
                     .aggregate(simple("\${body.shipmentId}"), AggregationStrategies.groupedBody())
                     .completionTimeout(AGGREGATION_COMPLETION_TIMEOUT_MS)
-                    .id("aggregate-by-shipment")
                     .process { exchange ->
                         @Suppress("UNCHECKED_CAST")
                         val events = exchange.message.getBody(List::class.java) as List<CarrierEvent>
@@ -162,9 +145,7 @@ internal object RerouteRunner {
                                 objective = buildAnalyzerObjective(shipmentId, events),
                                 datasetName = SupplyChainDatabase.DATASET_NAME,
                             )
-                    }.id("build-analyzer-objective")
-                    .to("agentio:etaAnalyzer?maxConcurrency=$MAX_CONCURRENCY")
-                    .id("invoke-eta-analyzer")
+                    }.to("agentio:etaAnalyzer?maxConcurrency=$MAX_CONCURRENCY")
                     // Only shipments the grounded analysis flags as delayed proceed to the solver.
                     .filter { exchange ->
                         val output = exchange.message.getBody(AnalyzerAgenticFunction.Output::class.java)
@@ -172,16 +153,13 @@ internal object RerouteRunner {
                         val shipmentId = exchange.getProperty(PROPERTY_SHIPMENT_ID, String::class.java)
                         LOG.info("Shipment [{}] delayed? {}", shipmentId, delayed)
                         delayed
-                    }.id("filter-delayed-shipments")
-                    .process { exchange ->
+                    }.process { exchange ->
                         val output =
                             requireNotNull(exchange.message.getBody(AnalyzerAgenticFunction.Output::class.java)) {
                                 "etaAnalyzer produced no output"
                             }
                         exchange.message.body = RerouteSolverAgenticFunction.Input(analysisResult = output.analysisResult)
-                    }.id("build-solver-input")
-                    .to("agentio:rerouteSolver?maxConcurrency=$MAX_CONCURRENCY")
-                    .id("invoke-reroute-solver")
+                    }.to("agentio:rerouteSolver?maxConcurrency=$MAX_CONCURRENCY")
                     .process { exchange ->
                         val shipmentId = exchange.getProperty(PROPERTY_SHIPMENT_ID, String::class.java) ?: "UNKNOWN"
                         val output =
@@ -190,10 +168,8 @@ internal object RerouteRunner {
                             }
                         exchange.message.body = formatRecommendation(shipmentId, output)
                         exchange.message.setHeader(Exchange.FILE_NAME, "reroute-$shipmentId.md")
-                    }.id("format-recommendation")
-                    .log("\n\${body}")
+                    }.log("\n\${body}")
                     .to("file:${outputDir.absolutePath}")
-                    .id("write-recommendation")
             }
         }
 
