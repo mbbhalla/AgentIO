@@ -297,7 +297,6 @@ class S3CheckpointWriter(
 - Kotlinx Serialization
 - Kotlinx Coroutines
 - Jackson (JSON schema generation/validation)
-- Vavr (functional Try type)
 - SLF4J + Logback
 
 ## Build

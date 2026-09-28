@@ -371,7 +371,6 @@ io.github.mbbhalla.agentio.examples/
 - `agentio-module-solver`
 - AWS SDK for Kotlin (Bedrock Runtime)
 - Model Context Protocol Kotlin SDK
-- Vavr
 - Kotlinx Serialization
 
 ## Build

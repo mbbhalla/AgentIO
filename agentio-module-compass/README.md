@@ -89,7 +89,7 @@ val analyzer = AnalyzerAgenticFunction.create(
     problemDomain = "Allocation Optimization",  // displayed in prompt
 )
 
-val result: Try<AgentOutput<AnalyzerAgenticFunction.Output>> =
+val result: Result<AgentOutput<AnalyzerAgenticFunction.Output>> =
     analyzer.invoke(
         AnalyzerAgenticFunction.Input(
             objective = "Find buckets where allocation exceeds capacity in Q3 2026",
@@ -97,7 +97,7 @@ val result: Try<AgentOutput<AnalyzerAgenticFunction.Output>> =
         ),
     )
 
-val analysisResult: AnalysisResult = result.get().output.analysisResult
+val analysisResult: AnalysisResult = result.getOrThrow().output.analysisResult
 ```
 
 The analyzer is given four MCP tools by `AnalyzerMcpServer`:
@@ -116,7 +116,7 @@ val generator = ConstraintGeneratorAgenticFunction.create(
     problemDomain = "Allocation Optimization (SMTLIB2 / Z3)",
 )
 
-val result: Try<AgentOutput<ConstraintGeneratorAgenticFunction.Output>> =
+val result: Result<AgentOutput<ConstraintGeneratorAgenticFunction.Output>> =
     generator.invoke(
         ConstraintGeneratorAgenticFunction.Input(
             analysisResult = analysisResult,
@@ -124,8 +124,9 @@ val result: Try<AgentOutput<ConstraintGeneratorAgenticFunction.Output>> =
         ),
     )
 
-val formula: SMTLIBv2Formula = result.get().output.smtlibv2Formula
-val explanationMd: String = result.get().output.explanation
+val output = result.getOrThrow().output
+val formula: SMTLIBv2Formula = output.smtlibv2Formula
+val explanationMd: String = output.explanation
 ```
 
 The generator's MCP tools are `list_tables`, `get_tables`, `execute_sql`,
@@ -170,7 +171,7 @@ DB tools (`list_tables`, `get_tables`, `execute_sql`) live in
 
 ## Dependencies
 
-- `agentio-core` (re-exports MCP SDK + Vavr `Try`)
+- `agentio-core` (re-exports MCP SDK)
 - `agentio-module-data` (`DatabaseEnvironment`, `DataValue`, db tools)
 - `agentio-module-solver` (`SMTLIBv2Formula`, `Z3SolverFacade`)
 - AWS SDK for Kotlin (Bedrock Runtime)
