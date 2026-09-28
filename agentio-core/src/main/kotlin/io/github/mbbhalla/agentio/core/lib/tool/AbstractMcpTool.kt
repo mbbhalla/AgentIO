@@ -78,8 +78,8 @@ abstract class AbstractMcpTool<I : Any, O : Any> {
                         .validateJsonWithSchema(
                             json = outputAsJson,
                             schema = outputSchemaJson,
-                        ).map { it.error }
-                check(errors.isEmpty()) { errors.joinToString { ", " } }
+                        ).map { it.message }
+                check(errors.isEmpty()) { errors.joinToString(", ") }
 
                 val outputRequired =
                     outputSchema["required"]

@@ -321,6 +321,57 @@ internal class AbstractAgenticFunctionTest {
         }
 
     @Test
+    fun `should report schema validation errors when output JSON violates the output schema`() =
+        runBlocking {
+            // Given
+            val testInput =
+                TestInput(
+                    id = "test-schema-violation",
+                    instruction = "Generate output",
+                )
+
+            val mockResponse =
+                mockk<ConverseResponse> {
+                    every { output } returns
+                        mockk {
+                            every { asMessageOrNull() } returns
+                                Message {
+                                    role = ConversationRole.Assistant
+                                    content =
+                                        listOf(
+                                            ContentBlock.Text(
+                                                """
+                                                <JSON>
+                                                {"result": 42}
+                                                </JSON>
+                                                """.trimIndent(),
+                                            ),
+                                        )
+                                }
+                        }
+                    every { usage } returns
+                        TokenUsage {
+                            inputTokens = 100
+                            outputTokens = 50
+                            totalTokens = 150
+                        }
+                    every { stopReason } returns StopReason.EndTurn
+                }
+
+            coEvery { mockToolsProvider.listTools() } returns emptyList()
+            coEvery { mockBedrockClient.converse(any()) } returns mockResponse
+
+            // When
+            val result = testFunction.invoke(testInput)
+
+            // Then
+            assertTrue(result.isFailure)
+            val message = result.exceptionOrNull()?.message.orEmpty()
+            assertTrue(message.contains("result"), "Expected type error for 'result' in: $message")
+            assertTrue(message.contains("success"), "Expected missing 'success' error in: $message")
+        }
+
+    @Test
     fun `should handle conversation with StopSequence stop reason`() =
         runBlocking {
             // Given

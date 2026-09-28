@@ -1,5 +1,6 @@
 package io.github.mbbhalla.agentio.core.lib.tool
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.server.ClientConnection
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
@@ -183,6 +184,52 @@ class AbstractMcpToolTest {
             assertTrue(result.content.isNotEmpty())
             val firstContent = result.content.first() as TextContent
             assertTrue(firstContent.text?.contains("Error:") == true)
+        }
+
+    @Serializable
+    data class SchemaViolatingOutput(
+        val count: Int,
+        @get:JsonIgnore
+        val label: String,
+    )
+
+    @Test
+    fun `should report schema validation errors when tool output violates its schema`() =
+        runBlocking {
+            // Given
+            val violatingTool =
+                object : AbstractMcpTool<TestInput, SchemaViolatingOutput>() {
+                    override fun name(): String = "violating_tool"
+
+                    override fun description(): String = "A tool whose serialized output omits a required field"
+
+                    override fun invoke(input: TestInput): SchemaViolatingOutput = SchemaViolatingOutput(count = 1, label = "omitted")
+
+                    override fun buildInput(callToolRequest: CallToolRequest): TestInput = TestInput("", 0)
+
+                    override fun getInputKClass(): KClass<TestInput> = TestInput::class
+
+                    override fun getOutputKClass(): KClass<SchemaViolatingOutput> = SchemaViolatingOutput::class
+
+                    override fun getToolConfig(): ToolConfig = ToolConfig()
+                }
+
+            val request =
+                CallToolRequest(
+                    params =
+                        CallToolRequestParams(
+                            name = "violating_tool",
+                            arguments = JsonObject(emptyMap()),
+                        ),
+                )
+
+            // When
+            val result = violatingTool().handler.invoke(mockk<ClientConnection>(relaxed = true), request)
+
+            // Then
+            assertEquals(true, result.isError)
+            val errorText = (result.content.first() as TextContent).text.orEmpty()
+            assertTrue(errorText.contains("label"), "Expected missing 'label' error in: $errorText")
         }
 
     @Test

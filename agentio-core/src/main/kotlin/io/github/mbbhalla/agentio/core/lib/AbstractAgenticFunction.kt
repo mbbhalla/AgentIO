@@ -658,8 +658,8 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
                 .validateJsonWithSchema(
                     json = jsonString,
                     schema = JsonString(value = outputSchemaJson),
-                ).map { it.error }
-        check(errors.isEmpty()) { errors.joinToString { ", " } }
+                ).map { it.message }
+        check(errors.isEmpty()) { errors.joinToString(", ") }
 
         return JsonSchemaUtil.json.decodeFromString(
             getOutputKClass().serializer(),
