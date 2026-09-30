@@ -21,13 +21,17 @@ tasks.jacocoTestReport {
     Apache Camel. This keeps the typed, coroutine-native core free of the connector
     ecosystem's transitive/CVE surface, which stays quarantined in this module.
  */
+
+// Camel version is defined once in gradle.properties and shared with agentio-examples.
+val camelVersion: String by project
+
 dependencies {
     api(project(":agentio-core"))
 
     // Apache Camel SPI to author a component/endpoint/producer. camel-support (not the full
     // camel-core engine) is all the production code needs: DefaultComponent, DefaultEndpoint,
-    // DefaultAsyncProducer live here. Pinned to the latest stable Camel release.
-    implementation("org.apache.camel:camel-support:4.21.0")
+    // DefaultAsyncProducer live here. Version pinned via gradle.properties.
+    implementation("org.apache.camel:camel-support:$camelVersion")
 
     // Coroutines — the producer bridges Camel's async SPI to the core's suspend invoke.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
@@ -41,6 +45,6 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.jetbrains.kotlin:kotlin-test:2.2.0")
     testImplementation("io.mockk:mockk:1.13.13")
-    testImplementation("org.apache.camel:camel-core:4.21.0")
+    testImplementation("org.apache.camel:camel-core:$camelVersion")
     testRuntimeOnly("ch.qos.logback:logback-classic:1.5.12")
 }

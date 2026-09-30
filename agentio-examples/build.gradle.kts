@@ -1,5 +1,6 @@
-// Pinned Camel version shared across the routing-engine and observability dependencies.
-val camelVersion = "4.21.0"
+// Pinned Camel version (from gradle.properties) shared across the routing-engine and
+// observability dependencies.
+val camelVersion: String by project
 
 dependencies {
     implementation(project(":agentio-core"))
