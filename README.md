@@ -20,7 +20,7 @@ AgentIO/
 ├── agentio-core/                  Core SDK — agents, tools, MCP, CMMs, event listeners
 ├── agentio-module-camel/          Apache Camel component — run agents as nodes in Camel routes
 ├── agentio-module-data/           Data environment module — DuckDB, typed SQL, Dataset, MVEL
-├── agentio-module-text2sql/       Text2SQL module — NL-to-SQL agentic function + MCP server
+├── agentio-module-text2sql/       Text2SQL module — NL-to-SQL agentic function, MCP server, SQL authorization
 ├── agentio-module-solver/         SMTLIB2 + Z3 solver facade with correctness-at-construction
 ├── agentio-module-compass/        Constraint optimization via multi-agent problem analysis + solver synthesis
 └── agentio-examples/              Example agents (Hacker News, Git Analyzer, Text2SQL, etc.)
@@ -61,6 +61,7 @@ agentio-module-data ──────────→ agentio-core
 - **Thinking Mode**: Additional reasoning iterations for more accurate responses
 - **Evaluation Framework**: Built-in evaluation tools for testing and refining agents
 - **Apache Camel Integration**: Run agents as nodes in Camel routes via the [`agentio-module-camel`](agentio-module-camel/README.md) component — compose agents with 300+ connectors and Enterprise Integration Patterns
+- **SQL Authorization**: Row-level security for LLM- or user-written SQL via AST rewriting — every base table is wrapped in a filtering CTE from an `AuthorizationContext`; see [`agentio-module-text2sql`](agentio-module-text2sql/README.md)
 
 ## Architecture
 

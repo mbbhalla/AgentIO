@@ -1,0 +1,210 @@
+/* ProjectedInventoryForSitesAndProductsQuery */
+
+WITH
+ /* some
+    Comments
+    here
+ */
+REGIONS_TO_FILTER AS (
+  SELECT
+    REGION.id as REGION_ID,
+    REGION.parent_geo_id as REGION_PARENT_ID,
+    REGION.description AS DESCRIPTION
+  FROM
+    "supply"."Geography" AS REGION
+),
+SITES_TO_FILTER AS (
+  SELECT
+    SITE.id as SITE_ID,
+    SITE.geo_id AS SITE_PARENT_ID,
+    SITE.site_type as SITE_TYPE,
+    SITE.description as SITE_NAME,
+    RF.description AS REGION_NAME,
+    SITE.latitude AS LATITUDE,
+    SITE.longitude as LONGITUDE
+  FROM
+    "supply"."Site" AS SITE
+    JOIN REGIONS_TO_FILTER AS RF ON SITE.geo_id = RF.REGION_ID
+  WHERE
+    SITE.id IN ('NY-001', 'NJ-001', 'NJ-001', 'NJ-001', 'CH-001')
+),
+CATEGORIES_TO_FILTER AS (
+  SELECT
+    CATEGORY.id AS CATEGORY_ID,
+    CATEGORY.description AS CATEGORY_NAME
+  FROM
+    "supply"."ProductHierarchy" AS CATEGORY
+),
+PRODUCTS_TO_FILTER AS (
+  SELECT
+    PRODUCT.id AS PRODUCT_ID,
+    PRODUCT.description AS PRODUCT_NAME,
+    PRODUCT.product_group_id AS CATEGORY_ID,
+    CF.CATEGORY_NAME AS CATEGORY_NAME
+  FROM
+    "supply"."Product" AS PRODUCT
+    JOIN CATEGORIES_TO_FILTER AS CF ON PRODUCT.product_group_id = CF.CATEGORY_ID
+  WHERE
+    PRODUCT.id in (
+      'OLIVE-BL',
+      'OLIVE-RD',
+      'OLIVE-GR',
+      'OLIVE-BL',
+      'OLIVE-BL'
+    )
+),
+BASELINE_RECORD AS (
+  SELECT
+    PI.site_id as SITE_ID,
+    PI.product_id AS PRODUCT_ID,
+    date_trunc('day', PI.baseline_time) AS TIME_POINT,
+    PI.baseline_allocated_inventory_quantity AS ALLOCATED_QUANTITY,
+    PI.baseline_damaged_inventory_quantity AS DAMAGED_QUANTITY,
+    PI.baseline_on_hand_inventory_quantity as ON_HAND_QUANTITY
+  FROM
+    "analytics"."ProjectedInventory" AS PI
+  WHERE
+    PI.baseline_time >= DATEADD(day, -7, '2024-01-15 00:00:00')
+    AND PI.baseline_time <= DATEADD(day, 0, '2024-01-15 00:00:00')
+    AND PI.record_type = 'BASELINE'
+    AND SITE_PRODUCT_HASH in (
+      'NY-001OLIVE-BL',
+      'NJ-001OLIVE-RD',
+      'NJ-001OLIVE-GR',
+      'NJ-001OLIVE-BL',
+      'CH-001OLIVE-BL'
+    )
+),
+WINDOW_RECORD AS (
+  SELECT
+    PI.site_id as SITE_ID,
+    PI.product_id AS PRODUCT_ID,
+    date_trunc('day', PI.window_end_time) AS TIME_POINT,
+    PI.min_safety_stock_inventory_quantity AS MIN_SAFETY_STOCK,
+    PI.max_safety_stock_inventory_quantity AS MAX_SAFETY_STOCK,
+    PI.window_inbound_shipment_inventory_quantity AS INBOUND_SHIPMENT_QUANTITY,
+    PI.window_outbound_shipment_inventory_quantity AS OUTBOUND_SHIPMENT_QUANTITY,
+    PI.window_inbound_on_order_inventory_quantity AS INBOUND_ON_ORDER_QUANTITY,
+    PI.window_outbound_on_order_inventory_quantity AS OUTBOUND_ON_ORDER_QUANTITY,
+    PI.projected_inventory_quantity AS INVENTORY_QTY
+  FROM
+    "analytics"."ProjectedInventory" AS PI
+  WHERE
+    PI.window_end_time >= DATEADD(day, -7, '2024-01-15 00:00:00')
+    AND PI.window_end_time <= DATEADD(day, 153 + 1, '2024-01-15 00:00:00')
+    AND PI.record_type = 'WINDOW'
+    AND SITE_PRODUCT_HASH in (
+      'NY-001OLIVE-BL',
+      'NJ-001OLIVE-RD',
+      'NJ-001OLIVE-GR',
+      'NJ-001OLIVE-BL',
+      'CH-001OLIVE-BL'
+    )
+)
+SELECT
+  MIN(SITE_ID) AS SITE_ID,
+  MIN(SITE_TYPE) AS SITE_TYPE,
+  MIN(SITE_PARENT_ID) AS GEO_ID,
+  MIN(SITE_NAME) AS SITE_NAME,
+  MIN(REGION_NAME) AS REGION_NAME,
+  MIN(LATITUDE) AS LATITUDE,
+  MIN(LONGITUDE) AS LONGITUDE,
+  MIN(PRODUCT_ID) AS PRODUCT_ID,
+  MIN(PRODUCT_NAME) AS PRODUCT_NAME,
+  MIN(CATEGORY_ID) AS PRODUCT_GROUP_ID,
+  MIN(CATEGORY_NAME) AS PRODUCT_GROUP_DESCRIPTION,
+  MIN(MIN_SAFETY_STOCK_DAY) AS MIN_SAFETY_STOCK,
+  MIN(MAX_SAFETY_STOCK_DAY) AS MAX_SAFETY_STOCK,
+  AVG(INBOUND_SHIPMENT_QUANTITY) AS INBOUND_SHIPMENT_QUANTITY,
+  AVG(OUTBOUND_SHIPMENT_QUANTITY) AS OUTBOUND_SHIPMENT_QUANTITY,
+  AVG(INBOUND_ON_ORDER_QUANTITY) AS INBOUND_ON_ORDER_QUANTITY,
+  AVG(OUTBOUND_ON_ORDER_QUANTITY) AS OUTBOUND_ON_ORDER_QUANTITY,
+  MIN(TIME_POINT) AS TIME_POINT_MIN,
+  MAX(TIME_POINT) AS TIME_POINT_MAX,
+  AVG(INVENTORY_QTY_DAY) AS INVENTORY_QTY,
+  CASE
+    WHEN INVENTORY_QTY < MIN_SAFETY_STOCK
+    AND (MIN_SAFETY_STOCK - INVENTORY_QTY) > (0.4 * cast(MIN_SAFETY_STOCK as float)) THEN 'StockOut'
+    WHEN INVENTORY_QTY > MAX_SAFETY_STOCK
+    AND (INVENTORY_QTY - MAX_SAFETY_STOCK) > (0.1 * cast(MAX_SAFETY_STOCK as float)) THEN 'Excess'
+    ELSE 'None'
+  END AS RISK_CLASSIFICATION,
+  AVG(ALLOCATED_QUANTITY) AS ALLOCATED_QUANTITY,
+  AVG(DAMAGED_QUANTITY) AS DAMAGED_QUANTITY,
+  AVG(ON_HAND_QUANTITY) AS ON_HAND_QUANTITY,
+  TIME_IND AS TIME_IND,
+  GRAIN AS GRAIN
+FROM
+  (
+    SELECT
+      WINDOW_RECORD.SITE_ID,
+      SF.SITE_PARENT_ID,
+      SF.SITE_TYPE,
+      SF.SITE_NAME,
+      SF.REGION_NAME,
+      SF.LATITUDE,
+      SF.LONGITUDE,
+      WINDOW_RECORD.PRODUCT_ID,
+      PF.PRODUCT_NAME,
+      PF.CATEGORY_ID,
+      PF.CATEGORY_NAME,
+      WINDOW_RECORD.MIN_SAFETY_STOCK AS MIN_SAFETY_STOCK_DAY,
+      WINDOW_RECORD.MAX_SAFETY_STOCK AS MAX_SAFETY_STOCK_DAY,
+      WINDOW_RECORD.INBOUND_SHIPMENT_QUANTITY,
+      WINDOW_RECORD.OUTBOUND_SHIPMENT_QUANTITY,
+      WINDOW_RECORD.INBOUND_ON_ORDER_QUANTITY,
+      WINDOW_RECORD.OUTBOUND_ON_ORDER_QUANTITY,
+      WINDOW_RECORD.TIME_POINT,
+      WINDOW_RECORD.INVENTORY_QTY AS INVENTORY_QTY_DAY,
+      BASELINE_RECORD.ALLOCATED_QUANTITY,
+      BASELINE_RECORD.DAMAGED_QUANTITY,
+      BASELINE_RECORD.ON_HAND_QUANTITY,
+      CASE
+        WHEN WINDOW_RECORD.TIME_POINT >= date_trunc('day', dateadd(day, -7, '2024-01-15 00:00:00'))
+        AND WINDOW_RECORD.TIME_POINT < date_trunc('day', dateadd(day, 7, '2024-01-15 00:00:00')) THEN datediff(
+          'day',
+          '2024-01-15 00:00:00',
+          WINDOW_RECORD.TIME_POINT
+        )
+        WHEN WINDOW_RECORD.TIME_POINT >= date_trunc('day', dateadd(day, 7, '2024-01-15 00:00:00'))
+        AND WINDOW_RECORD.TIME_POINT < date_trunc('day', dateadd(day, 63, '2024-01-15 00:00:00')) THEN datediff(
+          'day',
+          dateadd(day, 7, '2024-01-15 00:00:00'),
+          WINDOW_RECORD.TIME_POINT
+        ) / 7
+        WHEN WINDOW_RECORD.TIME_POINT >= date_trunc('day', dateadd(day, 63, '2024-01-15 00:00:00'))
+        AND WINDOW_RECORD.TIME_POINT < date_trunc('day', dateadd(day, 153, '2024-01-15 00:00:00')) THEN datediff(
+          'day',
+          dateadd(day, 63, '2024-01-15 00:00:00'),
+          WINDOW_RECORD.TIME_POINT
+        ) / 30
+      END AS TIME_IND,
+      CASE
+        WHEN WINDOW_RECORD.TIME_POINT >= date_trunc('day', dateadd(day, -7, '2024-01-15 00:00:00'))
+        AND WINDOW_RECORD.TIME_POINT < date_trunc('day', dateadd(day, 7, '2024-01-15 00:00:00')) THEN 'DAY'
+        WHEN WINDOW_RECORD.TIME_POINT >= date_trunc('day', dateadd(day, 7, '2024-01-15 00:00:00'))
+        AND WINDOW_RECORD.TIME_POINT < date_trunc('day', dateadd(day, 63, '2024-01-15 00:00:00')) THEN 'WEEK'
+        WHEN WINDOW_RECORD.TIME_POINT >= date_trunc('day', dateadd(day, 63, '2024-01-15 00:00:00'))
+        AND WINDOW_RECORD.TIME_POINT < date_trunc('day', dateadd(day, 153, '2024-01-15 00:00:00')) THEN 'MONTH'
+      END AS GRAIN
+    FROM
+      WINDOW_RECORD
+      LEFT JOIN BASELINE_RECORD ON WINDOW_RECORD.SITE_ID = BASELINE_RECORD.SITE_ID
+      AND WINDOW_RECORD.PRODUCT_ID = BASELINE_RECORD.PRODUCT_ID
+      AND WINDOW_RECORD.TIME_POINT = BASELINE_RECORD.TIME_POINT
+      JOIN SITES_TO_FILTER AS SF ON SF.SITE_ID = WINDOW_RECORD.SITE_ID
+      JOIN PRODUCTS_TO_FILTER AS PF ON PF.PRODUCT_ID = WINDOW_RECORD.PRODUCT_ID
+    WHERE
+      WINDOW_RECORD.TIME_POINT >= date_trunc('day', dateadd(day, -7, '2024-01-15 00:00:00'))
+      AND WINDOW_RECORD.TIME_POINT < date_trunc('day', dateadd(day, 153, '2024-01-15 00:00:00'))
+  )
+GROUP BY
+  SITE_ID,
+  PRODUCT_ID,
+  GRAIN,
+  TIME_IND
+ORDER BY
+  SITE_ID,
+  PRODUCT_ID,
+  GRAIN,
+  TIME_IND
