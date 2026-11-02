@@ -8,7 +8,7 @@ dependencies {
     api(project(":agentio-core"))
 
     // DuckDB JDBC
-    implementation("org.duckdb:duckdb_jdbc:1.5.2.0")
+    implementation("org.duckdb:duckdb_jdbc:2.0.0.1")
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

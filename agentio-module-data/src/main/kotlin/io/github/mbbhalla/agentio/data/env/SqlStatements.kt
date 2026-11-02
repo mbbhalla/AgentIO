@@ -13,13 +13,10 @@ data class SelectSqlStatement(
         require(result.isSuccess) {
             "Invalid SELECT SQL: ${(result as ExplainResult.Failure).error}"
         }
-        require(env.statementType(value) !in MUTATING_TYPES) {
-            "Not a SELECT statement — plan indicates a mutating operation"
+        // Fail closed: anything not positively identified as SELECT (DDL, COPY, MERGE, UNKNOWN) is rejected.
+        require(env.statementType(value) == StatementType.SELECT) {
+            "Not a SELECT statement"
         }
-    }
-
-    companion object {
-        private val MUTATING_TYPES = setOf(StatementType.INSERT, StatementType.UPDATE, StatementType.DELETE)
     }
 }
 

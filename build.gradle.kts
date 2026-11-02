@@ -45,12 +45,21 @@ subprojects {
     }
 }
 
+/** Delay between NVD API requests; NVD recommends >=6s without a key, keyed clients tolerate less. */
+val NVD_REQUEST_DELAY_MS = 8_000
+
+/** Retries per NVD request before the update is abandoned (plugin default is 10). */
+val NVD_MAX_RETRY_COUNT = 20
+
 dependencyCheck {
     failBuildOnCVSS = 7.0f
     failOnError = false
     formats = listOf("HTML", "JSON")
     analyzers.assemblyEnabled = false
     nvd.apiKey = System.getenv("NVD_API_KEY") ?: ""
+    // NVD frequently returns 503s under load; back off between requests and retry more before giving up.
+    nvd.delay = NVD_REQUEST_DELAY_MS
+    nvd.maxRetryCount = NVD_MAX_RETRY_COUNT
 
     // Only scan what actually ships: the runtime classpath. This excludes build-time tooling
     // (Kotlin compiler/daemon/scripting, ABI tools, Gradle buildscript deps) that dependency-check

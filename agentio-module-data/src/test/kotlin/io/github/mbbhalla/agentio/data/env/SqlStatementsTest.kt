@@ -88,6 +88,27 @@ class SqlStatementsTest {
     }
 
     @Test
+    fun `SelectSqlStatement rejects DDL`() {
+        assertThrows<IllegalArgumentException> {
+            SelectSqlStatement("DROP TABLE orders")
+        }
+    }
+
+    @Test
+    fun `SelectSqlStatement rejects COPY to file`() {
+        assertThrows<IllegalArgumentException> {
+            SelectSqlStatement("COPY orders TO 'orders.csv'")
+        }
+    }
+
+    @Test
+    fun `SelectSqlStatement rejects DELETE with RETURNING`() {
+        assertThrows<IllegalArgumentException> {
+            SelectSqlStatement("DELETE FROM orders RETURNING *")
+        }
+    }
+
+    @Test
     fun `SelectSqlStatement rejects empty string`() {
         assertThrows<IllegalArgumentException> {
             SelectSqlStatement("")

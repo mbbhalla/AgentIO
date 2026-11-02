@@ -28,5 +28,5 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.13")
     testRuntimeOnly("ch.qos.logback:logback-classic:1.5.12")
     // In-memory DuckDB used to verify that authorized SQL is semantically row-filtered
-    testImplementation("org.duckdb:duckdb_jdbc:1.5.2.0")
+    testImplementation("org.duckdb:duckdb_jdbc:2.0.0.1")
 }

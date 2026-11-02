@@ -23,6 +23,11 @@ import io.github.mbbhalla.agentio.data.model.VersionSet
 import io.github.mbbhalla.agentio.data.model.ViolationBehavior
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -42,8 +47,9 @@ class DuckDbDatabaseEnvironment private constructor(
         tableMetadata[tableName]
             ?: throw IllegalArgumentException("Table '${tableName.value}' not found")
 
-    override fun explain(sql: String): ExplainResult =
-        try {
+    override fun explain(sql: String): ExplainResult {
+        if (!isSingleStatement(sql)) return ExplainResult.Failure(MULTIPLE_STATEMENTS_ERROR)
+        return try {
             connection.createStatement().use { stmt ->
                 stmt.executeQuery("EXPLAIN $sql").close()
             }
@@ -51,22 +57,50 @@ class DuckDbDatabaseEnvironment private constructor(
         } catch (e: Exception) {
             ExplainResult.Failure(e.message ?: "Unknown SQL error")
         }
+    }
 
+    /**
+     * Classifies [sql] fail-closed: anything that is not provably a single SELECT, INSERT, UPDATE or
+     * DELETE (DDL, COPY, MERGE/upsert, multi-statement input, invalid SQL) is [StatementType.UNKNOWN].
+     *
+     * SELECT is decided by DuckDB's parser (`json_serialize_sql` only accepts SELECT statements), so it
+     * does not depend on the plan format. DML kinds are read from the structured JSON plan, scanning the
+     * whole operator tree because DuckDB may wrap the write (e.g. `DELETE ... RETURNING` has a PROJECTION
+     * root).
+     */
     override fun statementType(sql: String): StatementType =
-        try {
-            connection.createStatement().use { stmt ->
-                val rs = stmt.executeQuery("EXPLAIN $sql")
-                val plan =
-                    buildString {
-                        while (rs.next()) {
-                            append(rs.getString("explain_value"))
-                        }
-                    }
-                rs.close()
-                extractStatementType(plan)
-            }
-        } catch (_: Exception) {
+        if (!isSingleStatement(sql)) {
             StatementType.UNKNOWN
+        } else {
+            classifySingleStatement(sql)
+        }
+
+    private fun classifySingleStatement(sql: String): StatementType =
+        try {
+            if (isSingleSelect(sql)) StatementType.SELECT else dmlStatementType(jsonPlanOperatorNames(sql))
+        } catch (e: java.sql.SQLException) {
+            logger.debug("Statement classification failed; treating as UNKNOWN: {}", e.message)
+            StatementType.UNKNOWN
+        } catch (e: kotlinx.serialization.SerializationException) {
+            logger.warn("Unparseable DuckDB JSON plan; treating statement as UNKNOWN", e)
+            StatementType.UNKNOWN
+        }
+
+    private fun isSingleSelect(sql: String): Boolean =
+        connection.prepareStatement(IS_SELECT_QUERY).use { stmt ->
+            stmt.setString(1, sql)
+            stmt.executeQuery().use { rs -> rs.next() && rs.getBoolean(1) }
+        }
+
+    private fun jsonPlanOperatorNames(sql: String): Set<String> =
+        connection.createStatement().use { stmt ->
+            stmt.executeQuery("EXPLAIN (FORMAT JSON) $sql").use { rs ->
+                generateSequence { if (rs.next()) rs else null }
+                    .filter { it.getString("explain_key") == PHYSICAL_PLAN_KEY }
+                    .map { it.getString("explain_value") }
+                    .flatMap { collectOperatorNames(Json.parseToJsonElement(it)) }
+                    .toSet()
+            }
         }
 
     override fun executeQuery(sql: SelectSqlStatement): Dataset =
@@ -492,25 +526,54 @@ class DuckDbDatabaseEnvironment private constructor(
             }
         }
 
-        private fun extractStatementType(plan: String): StatementType {
-            val firstBoxContent =
-                plan
-                    .lines()
-                    .map {
-                        it
-                            .trim()
-                            .removePrefix("│")
-                            .removeSuffix("│")
-                            .trim()
-                    }.firstOrNull { it.isNotBlank() && !it.startsWith("┌") && !it.startsWith("└") && !it.startsWith("─") }
-                    ?: return StatementType.UNKNOWN
+        internal const val MULTIPLE_STATEMENTS_ERROR = "Multiple SQL statements are not allowed"
 
-            return when (firstBoxContent) {
-                "INSERT" -> StatementType.INSERT
-                "UPDATE" -> StatementType.UPDATE
-                "DELETE" -> StatementType.DELETE
-                else -> StatementType.SELECT
+        /**
+         * The DuckDB JDBC driver executes every statement in a multi-statement string — even via
+         * `prepareStatement` or behind an `EXPLAIN` prefix — so `EXPLAIN SELECT 1; DROP TABLE t` really drops
+         * `t`. DuckDB exposes no parse-only splitter over JDBC, so untrusted SQL is rejected unless its only
+         * `;` is trailing. `;` is DuckDB's sole statement separator, making this unbypassable; the cost is
+         * that a `;` inside a string literal or comment is also rejected (fail-closed).
+         */
+        internal fun isSingleStatement(sql: String): Boolean = ';' !in sql.trimEnd().removeSuffix(";")
+
+        /**
+         * True only for exactly one valid SELECT: `json_serialize_sql` sets `error` for non-SELECT or invalid
+         * input, and yields an empty `statements` array (without error) for blank input.
+         */
+        private const val IS_SELECT_QUERY =
+            "SELECT coalesce(NOT (j->>'error')::BOOLEAN AND json_array_length(j, '$.statements') = 1, false) " +
+                "FROM (SELECT json_serialize_sql(?::VARCHAR) AS j)"
+
+        /** `EXPLAIN` row holding the physical plan (other rows, if any, are ignored). */
+        private const val PHYSICAL_PLAN_KEY = "physical_plan"
+
+        /**
+         * DuckDB physical write operators → statement kind. Operator names vary across DuckDB versions
+         * (e.g. INSERT became BATCH_INSERT in 2.0), so all known spellings are listed. Unlisted write
+         * operators (MERGE_INTO, DROP, CREATE_*, COPY_TO_FILE, …) intentionally map to nothing → UNKNOWN.
+         */
+        private val DML_OPERATORS: Map<String, StatementType> =
+            mapOf(
+                "INSERT" to StatementType.INSERT,
+                "BATCH_INSERT" to StatementType.INSERT,
+                "UPDATE" to StatementType.UPDATE,
+                "DELETE" to StatementType.DELETE,
+            )
+
+        private fun collectOperatorNames(node: JsonElement): Sequence<String> =
+            when (node) {
+                is JsonArray -> node.asSequence().flatMap { collectOperatorNames(it) }
+                is JsonObject ->
+                    sequence {
+                        (node["name"] as? JsonPrimitive)?.takeIf { it.isString }?.let { yield(it.content) }
+                        node["children"]?.let { yieldAll(collectOperatorNames(it)) }
+                    }
+                else -> emptySequence()
             }
-        }
+
+        /** Exactly one DML kind in the plan → that kind; none or several → UNKNOWN. */
+        private fun dmlStatementType(operatorNames: Set<String>): StatementType =
+            operatorNames.mapNotNull { DML_OPERATORS[it] }.toSet().singleOrNull() ?: StatementType.UNKNOWN
     }
 }

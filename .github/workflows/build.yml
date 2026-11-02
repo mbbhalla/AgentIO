@@ -37,6 +37,10 @@ jobs:
         with:
           path: ~/.gradle/dependency-check-data
           key: owasp-db-${{ steps.date.outputs.week }}
+          # Fall back to the most recent prior DB so only an incremental NVD update is needed;
+          # without this every new week triggers a full (~45 min, failure-prone) NVD download.
+          restore-keys: |
+            owasp-db-
       - name: OWASP Dependency Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
