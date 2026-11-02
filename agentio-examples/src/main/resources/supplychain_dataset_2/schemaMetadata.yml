@@ -1,0 +1,774 @@
+tables:
+  - name: company
+    description: "Stores the name and location of your company."
+    columns:
+      - name: id
+        description: "Referred by other objects as 'company_id' unless explicitly stated."
+      - name: description
+        description: "Description of the company."
+      - name: address_1
+        description: "Company address."
+      - name: address_2
+        description: "Company address."
+      - name: address_3
+        description: "Company address."
+      - name: city
+        description: "City where the company is located."
+      - name: state_prov
+        description: "State where the company is located."
+      - name: postal_code
+        description: "Postal code of the company address."
+      - name: country
+        description: "Country where the company is located."
+      - name: phone_number
+        description: "Company's contact number."
+      - name: time_zone
+        description: "Time zone of company address e.g. US/Central."
+      - name: calendar_id
+        description: "Default Calendar that the company uses for planning."
+
+  - name: forecast
+    description: "Stores forecast over forecast horizon for product, product-site, or other combinations."
+    columns:
+      - name: snapshot_date
+        description: "Date upto when data was captured to generate forecasts."
+      - name: creation_date
+        description: "Date when forecast was created."
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: product_id
+        description: "Forecasts would be at one level — either most granular level (product) or product group level. *For 2022, we are expecting only product level forecasts."
+        foreignKey: "product.id"
+      - name: site_id
+        description: "Site ID that the forecast is generated for ."
+        foreignKey: "site.id"
+      - name: region_id
+        description: "Maps to company's geographical region aka geo_id."
+        foreignKey: "geography.id"
+      - name: product_group_id
+        description: "Product group ID."
+        foreignKey: "product_hierarchy.id"
+      - name: mean
+        description: "Mean value of forecast."
+      - name: p10
+        description: "P10 quantile of forecast."
+      - name: p50
+        description: "P50 quantile of forecast."
+      - name: p90
+        description: "P90 quantile of forecast."
+      - name: forecast_start_dttm
+        description: "Start date time for forecast."
+      - name: forecast_end_dttm
+        description: "End date time for forecast. When forecast end date is same as forecast start date of subsequent forecast (for same key), the forecast end date is treated as exclusive (i.e. less than)."
+
+  - name: geography
+    description: "Entity stores geographical hierarchy of your company."
+    columns:
+      - name: id
+        description: "Referred by other objects as 'geo_id' unless explicitly stated."
+      - name: description
+        description: "Geographical location."
+      - name: parent_geo_id
+        description: "If blank, this is the top level region in the company."
+        foreignKey: "geography.id"
+
+  - name: inbound_order
+    description: "Contains information about inbound orders into your companies locations. For example, for example, purchase orders (POs), blanket POs, production orders, or stock transfer orders)."
+    columns:
+      - name: id
+        description: "Referred by other objects as 'order_id' unless explicitly stated."
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: order_creation_date
+        description: "Order creation date."
+      - name: order_type
+        description: "Type of order. E.g. BlanketPO, ReplenishmentPO, StockTransfer, LongTermBuy (has no product), ProductionOrder 'Reserved' values for ASC 2022: “PO\": Purchase Order \"TO\": Transfer Order \"BO\": Blanket Order \"CO\": Consumption Order \"PR\": Purchase Requisition \"RFQ\": Request for Quote \"\": Null is also acceptable; Usage is determined by apps and customers Customers can also populate their own values. Notes on specific order types: consumption_order: a type of order that will be used to consume raw material in order to produce finished goods. Given ASC does not support MRP, these will be provided by customer and be used by ASC Inventory Projection to reduce inventory production_order: a type of order that represents finished goods produced, after consumption of raw material. These goods appear at the site."
+      - name: order_status
+        description: "Status of the order. E.g. Planned (not send to vendor), Submitted (sent to vendor), Confirmed, Complete 'Reserved' values for ASC 2022: \"Cancelled\" \"Open\" \"Closed\" \"InTransit\" \"Confirmed\" \"\": Null is also acceptable; Usage is determined by apps and customers Customers can also populate their own values."
+      - name: to_site_id
+        description: "Site into which order will arrive."
+        foreignKey: "site.id"
+      - name: tpartner_id
+        description: "Partner to which order is sent. E.g. for PO, this will be vendors. The value 'SCN_RESERVED_NO_VALUE_PROVIDED' means no value was provided; exclude it or treat it as NULL when filtering, counting, or joining. It is always the placeholder for order_type='TO'."
+        foreignKey: "trading_partner.id"
+      - name: order_currency_uom
+        description: "Currency UOM for Company."
+      - name: vendor_currency_uom
+        description: "Currency UOM of vendor."
+      - name: submitted_date
+        description: "Date and time when order was submitted to vendor."
+      - name: agreement_start_date
+        description: "If PO is associated with contract or agreement, then start datetime of contract."
+      - name: agreement_end_date
+        description: "If PO is associated with contract or agreement, then end datetime of contract."
+
+  - name: inbound_order_line
+    description: "Stores line level information for inbound_order, including product_id, and quantity."
+    columns:
+      - name: id
+        description: "Order line ID is not required — an order product can be specified by order ID, company and product ID."
+      - name: order_id
+        description: "Order line is defined by combination of order, company and product."
+        foreignKey: "inbound_order.id"
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: tpartner_id
+        description: "Partner that the order will be sent to. The value 'SCN_RESERVED_NO_VALUE_PROVIDED' means no value was provided; exclude it or treat it as NULL when filtering, counting, or joining. It is always the placeholder for order_type='TO'."
+        foreignKey: "trading_partner.id"
+      - name: line_creation_date
+        description: "Line creation date."
+      - name: product_id
+        description: "Product ID."
+        foreignKey: "product.id"
+      - name: product_group_id
+        description: "Product group ID."
+        foreignKey: "product_hierarchy.id"
+      - name: supplier_product_id
+        description: "Product number used by supplier."
+      - name: order_type
+        description: "Certain order types do not have header and line in SAP — only line. E.g. transfer order, manufacturing order. By adding order_type to line, we do not have to create a dummy header. We call it order_type and not order_line_type, because we are capturing what type of ‘order’ it is at the line level. 'Reserved' values for ASC 2022: “PO\": Purchase Order \"TO\": Transfer Order \"BO\": Blanket Order \"CO\": Consumption Order \"PR\": Purchase Requisition \"RFQ\": Request for Quote \"\": Null is also acceptable; Usage is determined by apps and customers Customers can also populate their own values."
+      - name: external_line_number
+        description: "Line number referred to in customer's system."
+      - name: status
+        description: "Status of line (e.g. submitted, confirmed) 'Reserved' values for ASC 2022: \"Cancelled\" \"Open\" \"Closed\" \"InTransit\" \"Confirmed\" \"\": Null is also acceptable; Usage is determined by apps and customers Customers can also populate their own values."
+      - name: from_site_id
+        description: "Relevant for orders where origin is known — e.g. transfer orders, or replenishment from company's DC to company's store. For order_type='PO' this holds the vendor's trading_partner.id (same as tpartner_id), not a site; for order_type='TO' it is a site.id. Filter on order_type before joining to site."
+        foreignKey: "site.id"
+      - name: to_site_id
+        description: "Site into which order will arrive."
+        foreignKey: "site.id"
+      - name: vendor_status
+        description: "Status of the line. E.g. NYP (not yet published, or on-order), BO (Back-order)"
+      - name: cost
+        description: "Cost of product in company's currency, after discount."
+      - name: cost_uom
+        description: "Cost UOM in company's currency."
+      - name: submitted_cost
+        description: "Cost of product at time of submission in company's currency."
+      - name: submitted_cost_vendor
+        description: "Cost of product at time of submission in vendor's currency."
+      - name: shipping_cost
+        description: "Inbound shipping cost from vendor to company."
+      - name: tax_cost
+        description: "Tax cost for the product."
+      - name: quantity_submitted
+        description: "Quantity submitted to vendor (for POs), or quantity for transfer (for transfer orders)"
+      - name: quantity_confirmed
+        description: "Quantity confirmed (e.g. by vendor)"
+      - name: quantity_received
+        description: "Quantity received into inventory at destination across all schedules."
+      - name: quantity_uom
+        description: "Quantity unit of measure for the order-line. Same UOM is assumed for schedule."
+      - name: submitted_date
+        description: "Date and time when order line was submitted to vendor."
+      - name: expected_delivery_date
+        description: "Date when the order is expected to be delivered."
+      - name: confirmation_date
+        description: "Date and time when order was confirmed by vendor. Data is relevant at line level — customer may give rolled up value here."
+      - name: earliest_ship_date
+        description: "Earliest date and time when vendor shipped products for this order-line."
+      - name: latest_ship_date
+        description: "Latest date and time when vendor shipped products for this order-line."
+      - name: earliest_delivery_date
+        description: "Earliest date and time when vendor would deliver products in this order-line to company location."
+      - name: latest_delivery_date
+        description: "Latest date and time when vendor would deliver products in this order-line to company location."
+
+  - name: inbound_order_line_schedule
+    description: "Stores schedule-line level data within an inbound_order_line and is relevant only when schedules are used."
+    columns:
+      - name: id
+        description: "Order line ID. The value must be unique."
+      - name: order_id
+        description: "ID of parent order."
+        foreignKey: "inbound_order.id"
+      - name: order_line_id
+        description: "ID of parent order line."
+        foreignKey: "inbound_order_line.id"
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: status
+        description: "Status of line (e.g. submitted, confirmed) 'Reserved' values for [Galaxy] 2022: \"Cancelled\" (populated in SAP mapping; also used for deleted) \"Open\" (not populated in SAP mapping) \"Closed\" (not populated in SAP mapping) \"InTransit\" (not populated in SAP mapping) \"Confirmed\" (not populated in SAP mapping) \"\": Null is also acceptable; Usage is determined by apps and customers Customers can also populate their own values."
+      - name: schedule_creation_date
+        description: "Schedule creation date."
+      - name: product_id
+        description: "Product ID."
+        foreignKey: "product.id"
+      - name: external_line_number
+        description: "External line number."
+      - name: expected_delivery_date
+        description: "Expected delivery date of the products."
+      - name: confirmation_date
+        description: "Date and time when the vendor confirmed the order line schedule, or order."
+      - name: goods_issue_date
+        description: "Date and time when material was available at origin to ship (typically for PO)"
+      - name: material_availability_date
+        description: "Date and time when material is available at origin to ship."
+      - name: ship_date
+        description: "Date and time when vendor would ship products for this order-line."
+      - name: delivery_date
+        description: "Date and time when vendor would deliver products in this order-line to company location."
+      - name: quantity_submitted
+        description: "Quantity submitted to vendor (for POs), or quantity for transfer (for transfer orders)"
+      - name: quantity_confirmed
+        description: "Quantity confirmed (e.g. by vendor)"
+      - name: quantity_received
+        description: "Quantity received into inventory at destination."
+
+  - name: inv_level
+    description: "A snapshot of the product’s inventory condition in each site. For example, snapshot date, on-hand inventory, condition of the product."
+    columns:
+      - name: snapshot_date
+        description: "Date and time when the inventory snapshot was taken."
+      - name: site_id
+        description: "Site ID of the inventory."
+        foreignKey: "site.id"
+      - name: product_id
+        description: "Product ID of the inventory displayed."
+        foreignKey: "product.id"
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: on_hand_inventory
+        description: "Inventory that is physically at the site; typically in eaches but marked as double in case customer deals in bulk goods (e.g. grain) Denotes quantity of inventory in a given inventory condition; if no inventory condition is specified, this is equivalent to 'unrestricted' inventory."
+      - name: allocated_inventory
+        description: "Inventory ear-marked for some outbound process (e.g. customer shipment), but specific products are not bound."
+      - name: bound_inventory
+        description: "Inventory bound to some process (e.g. inventory picked to fulfill an order)"
+      - name: quantity_uom
+        description: "Quantity unit of measure for inventory."
+      - name: inv_condition
+        description: "Condition of inventory (e.g. in QA, damaged). Inventory in different conditions will be in different rows. All values in different conditions are mutually exclusive 'Reserved' inventory condition values for [Galaxy] 2022: \"Unrestricted\" (inventory is available) \"Inspection\" (under quality or any other inspection) \"Returns\" (typically goes to returns area) \"Blocked\" (blocked for any reason) \"InTransfer\" (will be used when there are 2 step SAP stock transfer; implementation has to make sure there is no duplication with transfer orders) \"Restricted\" (Restricted for another reason — but not blocked) Usage is determined by apps and customers Customers can also populate their own values."
+      - name: lot_number
+        description: "Lot number of the inventory."
+
+  - name: inv_policy
+    description: "Contains inventory policies such as minimum and maximum safety stock policy, target inventory quantity, minimum or maximum order quantity and so on, for product, product-site, and other possible combinations."
+    columns:
+      - name: id
+        description: "Referred by other objects as 'policy_id' unless explicitly stated."
+      - name: site_id
+        description: "Overrides policies specified for the region for this node in product hierarchy."
+        foreignKey: "site.id"
+      - name: product_id
+        description: "Overrides policies specified for the product-group for this node in geo hierarchy."
+        foreignKey: "product.id"
+      - name: segment_id
+        description: "ID of segment associated with this inventory policy."
+      - name: company_id
+        description: "Sets default values at company level. Can be overridden at lower granularity."
+        foreignKey: "company.id"
+      - name: product_group_id
+        description: "Sets default values for product group. Can be overridden at lower granularity."
+        foreignKey: "product_hierarchy.id"
+      - name: dest_geo_id
+        description: "Sets default values at destination's geo level. Can be overridden at lower granularity."
+        foreignKey: "geography.id"
+      - name: vendor_tpartner_id
+        description: "Used when inventory policy needs to vary by Vendor — e.g. weekly for one vendor, monthly for another vendor. The value 'SCN_RESERVED_NO_VALUE_PROVIDED' means no value was provided; exclude it or treat it as NULL when filtering, counting, or joining. It is the placeholder for policies not tied to a vendor."
+        foreignKey: "trading_partner.id"
+      - name: status
+        description: "Status of inventory policy record — e.g. on-hold, active. Usage is determined by apps and customers Customers can also populate their own values."
+      - name: ss_policy
+        description: "Which safety stock policy is to be followed. Each is associated with corresponding data 1. Abs_level: Uses units specified in min/max safety stock (SS). Source will be customer system or external tool. Ordering will be suggested whenever inventory falls below min SS leve 2. DOC_dem: Uses days of cover computed from historical demand as target level of inventory, 3. DOC_fcst: Uses days of cover computed from forecast as target level of inventory 4. sl: Targets inventory between min and max service level for in-stock percentages; E.g. if min/max service level is 50% and 90%, ordering will be done to maintain inventory between these percentiles of forecast over plan horizon. 5. sl_fr: Targets inventory between min and max service level for fill-rate percentages; E.g. if min/max service level is 50% and 90%, ordering will be done to maintain inventory between these percentiles of forecast over plan horizon. 6. Future: eco_sl: Target inventory level determined by economic value — cost of under-stock / (cost of under-stock+cost of over-stock). This needs economic value of each item being overstock and understock."
+      - name: min_safety_stock
+        description: "For safety stock policy \"Abs_level\" — this is absolute value of minimum safety stock level."
+      - name: max_safety_stock
+        description: "For safety stock policy \"Abs_level\" — this is absolute value of maximum safety stock level."
+      - name: min_inventory_qty
+        description: "Minimum inventory level quantity threshold."
+      - name: max_inventory_qty
+        description: "Maximum inventory level quantity threshold."
+      - name: target_inventory_qty
+        description: "Target inventory level quantity."
+      - name: max_doc_limit
+        description: "For safety stock policies \"DOC_dem\" and \"DOC_fcst\", provides the maximum days of cover value."
+      - name: min_doc_limit
+        description: "For safety stock policies \"DOC_dem\" and \"DOC_fcst\", provides the minimum days of cover value."
+      - name: target_doc_limit
+        description: "Provides the target value for safety stock policies \"DOC_dem\" and \"DOC_fcst\"."
+      - name: target_sl
+        description: "Target service level used of policy sl."
+      - name: min_order_qty
+        description: "Minimum order quantity."
+      - name: max_order_qty
+        description: "Maximum order quantity."
+      - name: holding_cost_percent
+        description: "Annualized holding cost in percent. To be used to calculate holding cost of inventory Typically same value is used at country level."
+      - name: eff_start_date
+        description: "Dates from when the record is effective."
+      - name: eff_end_date
+        description: "Dates till when the record is effective."
+
+  - name: outbound_order_line
+    description: "Contains orders originating from your company and shipped to locations outside of the your network. Outbound_order_line contains order date, customer location, incoterms, and so on. It also includes product, price, discount, and units."
+    columns:
+      - name: id
+        description: "Order line ID is not required — an order product can be specified by order ID, company and product ID Referred by other objects as 'cust_order_line_id' unless explicitly stated."
+      - name: cust_order_id
+        description: "Denotes customer order ID."
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: order_date
+        description: "Date and time when customer order was placed."
+      - name: product_id
+        description: "Product ID."
+        foreignKey: "product.id"
+      - name: product_group_id
+        description: "Product group ID."
+        foreignKey: "product_hierarchy.id"
+      - name: customer_tpartner_id
+        description: "For companies where customers are stored in Trading Partner table, trading partner ID will be stored here. Customer IDs (CUST_*) are external and have no master table in this dataset, so they do not join to trading_partner. NULL for store replenishment orders, which ship to a SITE_STORE_* site."
+      - name: status
+        description: "Status of customer order Reserved' values for [Galaxy] 2022: \"Cancelled\" (populated in SAP mapping; also used for deleted) \"Open\" (not populated in SAP mapping) \"Closed\" (not populated in SAP mapping) \"InTransit\" (not populated in SAP mapping) \"Delivered\" (not populated in SAP mapping) \"\": Null is also acceptable; Usage is determined by apps and customers Customers can also populate their own values."
+      - name: init_quantity_requested
+        description: "Ordered quantity in units/eaches."
+      - name: final_quantity_requested
+        description: "Final quantity after any cancellations or changes."
+      - name: quantity_uom
+        description: "Quantity unit of measure for the order-line."
+      - name: requested_delivery_date
+        description: "Requested delivery date for order line."
+      - name: promised_delivery_date
+        description: "Delivery date promised for order lines."
+      - name: actual_delivery_date
+        description: "Actual delivery date for order line."
+      - name: list_price
+        description: "List price for product in order lines.."
+      - name: sold_price
+        description: "Selling price for product in order line, after any promotions, price changes, discounts, and so on."
+      - name: discount
+        description: "Discount applied for order line for this product."
+      - name: discount_code
+        description: "Discount code used on order line."
+      - name: currency_uom
+        description: "UUOM for currency."
+      - name: tax
+        description: "Tax applied to this order."
+      - name: ship_from_site_id
+        description: "Origin site ID for outbound orders, for cases when customers provide the data."
+        foreignKey: "site.id"
+      - name: ship_to_site_id
+        description: "Destination site ID for outbound orders; not expected to match to this company's side_id (as this order is going outside company network). Either a site.id (SITE_STORE_* for store replenishment) or an external customer address ID (CADDR_*) that has no master table in this dataset."
+      - name: ship_to_site_address_1
+        description: "Address of ship-to site."
+      - name: ship_to_site_address_2
+        description: "Address of ship-to site."
+      - name: ship_to_site_address_city
+        description: "City of ship-to site."
+      - name: ship_to_site_address_state
+        description: "State of ship-to site."
+      - name: ship_to_site_address_country
+        description: "Country of ship-to site."
+      - name: ship_to_site_address_zip
+        description: "Postal code of ship-to site."
+      - name: availability_status
+        description: "In stock availability status of product at time of order. E.g. OOS, In stock."
+      - name: quantity_promised
+        description: "Quantity promised on order line."
+      - name: quantity_delivered
+        description: "Quantity delivered against this order line."
+      - name: channel_id
+        description: "Information related to where customer placed order. In future we may connect to another object that can track customer journey."
+
+  - name: product
+    description: "Contains the key product attributes, including name, description, brand, codes, category, business group, and price."
+    columns:
+      - name: id
+        description: "All products are assumed to be discrete and in eaches; cases (and later cartons, pallets etc) are converted Referred by other objects as 'product_id' unless explicitly stated."
+      - name: description
+        description: "Displays the description of the product."
+      - name: company_id
+        description: "Displays the company ID."
+        foreignKey: "company.id"
+      - name: product_group_id
+        description: "Displays the product group ID that this product belongs to."
+        foreignKey: "product_hierarchy.id"
+      - name: product_type
+        description: "Type of product. E.g. 'Finished Good', 'Component', 'Service', 'Packaging' Can be user-defined."
+      - name: is_deleted
+        description: "Indicates whether product is deleted (\"true\") or active (\"false\")."
+      - name: brand_name
+        description: "Product brand name."
+      - name: parent_product_id
+        description: "If the product is part of a bundle, and links to a parent product, then list the parent id. Note that bundles are separate from product/product groups."
+        foreignKey: "product.id"
+      - name: base_uom
+        description: "Unit of measure for product."
+      - name: unit_cost
+        description: "Average unit cost of product. Measured in currency_uom per base_uom."
+      - name: unit_price
+        description: "Unit Price or standard price or MSRP of product. Note that in future, this may be extended as Price can vary based on marketplace, time-of-sale."
+      - name: inventory_holding_cost
+        description: "Average yearly holding cost of product. Measured in currency_uom per base_uom."
+      - name: currency_uom
+        description: "UOM for MSRP."
+      - name: product_available_day
+        description: "Date when product was available to be fulfilled. Can be after product was created."
+      - name: shipping_dimension
+        description: "Dimensional weight to be used by carrier. It is also derived from package length, width and height."
+      - name: unit_volume
+        description: "Volume of product per base_uom."
+      - name: pkg_length
+        description: "Packaged length of individual product."
+      - name: pkg_width
+        description: "Packaged width."
+      - name: pkg_height
+        description: "Packaged height."
+      - name: weight_uom
+        description: "Weight unit of measure."
+      - name: dim_uom
+        description: "Dimension unit of measure."
+      - name: demand_planning_enabled
+        description: "Used to identify parts are used for demand planning."
+
+  - name: product_hierarchy
+    description: "Contains the product categories and sub-categories."
+    columns:
+      - name: id
+        description: "Referred by other objects as 'product_group_id' unless explicitly stated."
+      - name: description
+        description: "Description of the product group."
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: parent_product_group_id
+        description: "Parent of this product group. If null, it indicates this record is a top level product group."
+        foreignKey: "product_hierarchy.id"
+
+  - name: shipment
+    description: "Stores shipment information like origin, carrier code, ship date, product, quantity, ship from site, expected delivery date, and actual delivery date, or inbound orders (PO,TO etc) including ship date, product, quantity, ship from site, expected delivery date, and actual delivery date."
+    columns:
+      - name: id
+        description: "Referred by other objects as 'shipment_id' unless explicitly stated."
+      - name: creation_date
+        description: "Creation date."
+      - name: supplier_tpartner_id
+        description: "Partner that is sending the shipment. E.g. shipments generated under POs, this will be vendors. The value 'SCN_RESERVED_NO_VALUE_PROVIDED' means no value was provided; exclude it or treat it as NULL when filtering, counting, or joining. It is always the placeholder for order_type='TO'."
+        foreignKey: "trading_partner.id"
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: ship_from_site_id
+        description: "Site_id for outbound shipments. For order_type='PO' this holds the vendor's trading_partner.id (same as supplier_tpartner_id), not a site; for order_type='TO' it is a site.id. Filter on order_type before joining to site."
+        foreignKey: "site.id"
+      - name: ship_to_site_id
+        description: "Site_id for inbound shipments."
+        foreignKey: "site.id"
+      - name: transportation_mode
+        description: "Air/Ocean/Truck/Rail etc."
+      - name: shipment_status
+        description: "'Reserved' values for [Galaxy] 2022: \"Cancelled\" (populated in SAP mapping; also used for deleted) \"Open\" (not populated in SAP mapping) \"Closed\" (not populated in SAP mapping) \"InTransit\" (not populated in SAP mapping) \"Delivered\" (not populated in SAP mapping) \"\": Null is also acceptable; Usage is determined by apps and customers Customers can also populate their own values."
+      - name: planned_ship_date
+        description: "Planned shipping date."
+      - name: actual_ship_date
+        description: "Actual shipping date."
+      - name: planned_delivery_date
+        description: "Planned delivery date."
+      - name: actual_delivery_date
+        description: "Actual delivery date."
+      - name: carrier_eta_date
+        description: "ETA date from the carrier."
+      - name: line_id
+        description: "Shipment line ID."
+      - name: product_id
+        description: "Product ID."
+        foreignKey: "product.id"
+      - name: units_shipped
+        description: "Units shipped."
+      - name: uom
+        description: "UOM."
+      - name: order_id
+        description: "Changed from \"order_number_reference\"."
+        foreignKey: "inbound_order.id"
+      - name: order_type
+        description: "Order type."
+      - name: order_line_id
+        description: "Changed from \"order_line_number_reference\"."
+        foreignKey: "inbound_order_line.id"
+      - name: package_id
+        description: "One shipment can have multiple packages in EDI."
+
+  - name: site
+    description: "Stores information for sites holding inventory such as Stores, Distribution Centres ,including ID, name, address, geographical region, and site type."
+    columns:
+      - name: id
+        description: "Referred by other objects as 'site_id' unless explicitly stated."
+      - name: description
+        description: "Description of the site."
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: geo_id
+        description: "If the site belongs to a geography, displays the ID of the geographical hierarchy."
+        foreignKey: "geography.id"
+      - name: country
+        description: "Country where the site is located."
+      - name: site_type
+        description: "Type of site. E.g. Warehouse, Cross-Dock, Delivery Station, DC, Factory, Store, MFC, Port etc. 'Reserved' values for ASC 2022: Commonly used values: “DC\": Warehouse/Distribution Center \"DS\": Delivery Station \"MFG\": Manufacturing/processing center/plant/factory \"ST\" Store \"XD\": Cross dock Others: \"CC\": Consolidation center \"CL\": Customer location \"CPP\": Customer pickup point \"HN\": Hybrid node; servers multiple purposes \"MNT\": Maintainence center \"PT\": Port \"RC\": Repair center \"RTN\": Return node \"RY\": Rail yard \"SPP\": Supplier pickup point — e.g. where product is picked up from supplier \"\": Null is also acceptable; Usage is determined by apps and customers Customers can also populate their own values."
+      - name: latitude
+        description: "Latitude of the site location."
+      - name: longitude
+        description: "Longitude of the site location."
+      - name: is_active
+        description: "Indicates whether site is deleted (\"true\") or active (\"false\")"
+      - name: open_date
+        description: "Date when facility started operations. E.g. a facility that will launch operations in the future may be part of future planning but not current planning."
+      - name: end_date
+        description: "Date when facility ended operations."
+
+  - name: sourcing_rules
+    description: "Defines rules at product-site level to specify the sourcing related attributes (for example, rule type, to and from site, transportation lane, minimum and maximum quantity, priority, ratio, and so on)."
+    columns:
+      - name: sourcing_rule_id
+        description: "Sourcing rule ID."
+      - name: company_id
+        description: "Displays the company ID."
+        foreignKey: "company.id"
+      - name: product_id
+        description: "ID of product to be sourced."
+        foreignKey: "product.id"
+      - name: to_site_id
+        description: "Site into which product will be sourced."
+        foreignKey: "site.id"
+      - name: from_site_id
+        description: "Site from where product will be sourced."
+        foreignKey: "site.id"
+      - name: product_group_id
+        description: "Product group ID."
+        foreignKey: "product_hierarchy.id"
+      - name: sourcing_rule_type
+        description: "Type of sourcing rule — e.g. transfer, buy, manufacture."
+      - name: tpartner_id
+        description: "Trading partner ID. Used depending on sourcing rule type. E.g. when sourcing rule is of type Buy, then this is vendor ID, and is to be used along with other attributes to find additional details from vendor_product and other entities."
+        foreignKey: "trading_partner.id"
+      - name: transportation_lane_id
+        description: "Transportation lane ID. Used depending on sourcing rule type. E.g. when sourcing is of type Transfer, then this ID is used along with other attributes to select the right transportation_lane."
+        foreignKey: "transportation_lane.id"
+      - name: sourcing_priority
+        description: "Priority of sourcing rule."
+      - name: sourcing_ratio
+        description: "Proportion of product to be sourced from this product/group, to_site, from_site/tpartner_id combination. All sources for a product, site should add to 1 for a specific time period (or application normalizes the ratio to 1)"
+      - name: qty_uom
+        description: "Quantity UOM associated with sourcing rule."
+      - name: min_qty
+        description: "Minimum quantity for sourcing rule."
+      - name: max_qty
+        description: "Maximum quantity for sourcing rule."
+      - name: qty_multiple
+        description: "Quantity is in multiples of this value."
+      - name: eff_start_date
+        description: "Date-time when sourcing rule becomes effective."
+      - name: eff_end_date
+        description: "Date-time till when sourcing rule is effective."
+
+  - name: sourcing_schedule
+    description: "Sourcing schedule determines when to source. For example, source from vendors or transfer between sites."
+    columns:
+      - name: sourcing_schedule_id
+        description: "ID of sourcing schedule."
+      - name: company_id
+        description: "Displays the company ID."
+        foreignKey: "company.id"
+      - name: tpartner_id
+        description: "ID of trading partner."
+        foreignKey: "trading_partner.id"
+      - name: status
+        description: "Status of supply schedule. E.g. Active, Inactive."
+      - name: from_site_id
+        description: "Origin site ID (e.g. hub, vendor)"
+        foreignKey: "site.id"
+      - name: to_site_id
+        description: "Destination site ID (e.g. hub, or a customer in the network)"
+        foreignKey: "site.id"
+      - name: schedule_type
+        description: "Type of schedule — e.g. Inbound Ordering, Outbound shipping."
+      - name: eff_start_date
+        description: "Date-time when schedule becomes effective."
+      - name: eff_end_date
+        description: "Date-time till when schedule is effective."
+
+  - name: sourcing_schedule_details
+    description: "Provides sourcing schedule details. For example, the days in a week, a product be sourced from a vendor."
+    columns:
+      - name: sourcing_schedule_detail_id
+        description: "Sourcing schedule detail ID."
+      - name: sourcing_schedule_id
+        description: "Sourcing schedule ID."
+        foreignKey: "sourcing_schedule.sourcing_schedule_id"
+      - name: day_of_week
+        description: "Day of week when supply schedule is active Values can be integer or string: Sun: 0 Mon: 1 Tue: 2 Wed: 3 Thu: 4 Fri: 5 Sat: 6."
+
+  - name: trading_partner
+    description: "Contains the partners that have trading relationship with your company, such as vendors, 3PLs, channel partners, or distributors."
+    columns:
+      - name: id
+        description: "Referred to by other objects as 'tpartner_id' unless explicitly stated."
+      - name: description
+        description: "Description of the trading partner."
+      - name: tpartner_type
+        description: "Type of partner: e.g. Vendor, Channel Partner, 3PL Reserved values for [Galaxy] 2022 \"Customer\": (will not be mapped from SAP in 2022) \"Vendor\": (will be mapped from SAP in 2022) \"Carrier\": (will not be mapped from SAP in 2022) \"ForwardingAgent\": (will not be mapped from SAP in 2022) \"3PL\": (will not be mapped from SAP in 2022) \"4PL\": (will not be mapped from SAP in 2022) \"Contractor\": Generic trading partner : (will not be mapped from SAP in 2022) \"Bank\": (will not be mapped from SAP in 2022) \"FinancialPartner\": (will not be mapped from SAP in 2022) \"Broker\": (will not be mapped from SAP in 2022) \"GovtAgency\": (will not be mapped from SAP in 2022) \"Approver\": (will not be mapped from SAP in 2022) \"VAN\": EDI message provider: (will not be mapped from SAP in 2022) \"IT\": IT provider (will not be mapped from SAP in 2022) \"\": Null is also acceptable; usage is determined by apps and customers Customers can also populate their own values."
+      - name: geo_id
+        description: "Optional — Region of company that trading partner is associated with."
+        foreignKey: "geography.id"
+      - name: eff_start_date
+        description: "When the TP relationship started. In future we can allow multiple depending on use case."
+      - name: eff_end_date
+        description: "When the TP relationship ended. In future we can allow multiple depending on use case."
+      - name: is_active
+        description: "High level indicator of whether TP is active or inactive at the moment."
+      - name: country
+        description: "The country corresponding to the trading partner."
+      - name: time_zone
+        description: "The trading partner's local time zone."
+      - name: latitude
+        description: "Latitude of trading partner location."
+      - name: longitude
+        description: "Longitude of trading partner location."
+
+  - name: trading_partner_poc
+    description: "Trading_partner_poc."
+    columns:
+      - name: tpartner_id
+        description: "Referred to by other objects as 'tpartner_id' unless explicitly stated."
+        foreignKey: "trading_partner.id"
+      - name: email
+        description: "Email of POC."
+      - name: poc_first_name
+        description: "Trading partner point person first name."
+      - name: poc_last_name
+        description: "Trading partner point person last name."
+      - name: poc_org_unit_name
+        description: "Name of team or internal organizational unit."
+      - name: poc_org_unit_description
+        description: "AWS profile or description of the team's role in an organization to be shared with the customer to describe their team."
+
+  - name: transportation_lane
+    description: "Contains information about transportation lanes, including from and to sites, transportation mode, and transit time."
+    columns:
+      - name: id
+        description: "Referred by other objects as 'lane_id' unless explicitly stated."
+      - name: from_site_id
+        description: "Can be omitted if from_geo_id is populated."
+        foreignKey: "site.id"
+      - name: to_site_id
+        description: "Can be omitted if to_geo_id is populated."
+        foreignKey: "site.id"
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: from_geo_id
+        description: "Provides a fallback; allows same values for lead-time, distance etc to be used for all sites originating from this geo_id till the destination site or geo."
+        foreignKey: "geography.id"
+      - name: to_geo_id
+        description: "Provides a fallback; allows same values for lead-time, distance etc to be used for all sites ending from this geo_id from the respective destination site or geo."
+        foreignKey: "geography.id"
+      - name: carrier_tpartner_id
+        description: "ID of trading partner who is performing role of carrier."
+        foreignKey: "trading_partner.id"
+      - name: trans_mode
+        description: "Transportation mode e.g. ship, water, truck, rail."
+      - name: service_type
+        description: "Provides info on carrier's shipping methods e.g. ground, express."
+      - name: product_group_id
+        description: "Lead times can vary depending on type of product. E.g. some lanes may be for furniture while others for mobile phones. The value 'SCN_RESERVED_NO_VALUE_PROVIDED' means no value was provided; exclude it or treat it as NULL when filtering, counting, or joining."
+        foreignKey: "product_hierarchy.id"
+      - name: transit_time
+        description: "Transit time of products."
+      - name: time_uom
+        description: "Unit of measure of transit time."
+      - name: distance
+        description: "Distance traveled on the lane."
+      - name: distance_uom
+        description: "Unit of measure (UOM) of distance."
+      - name: eff_start_date
+        description: "Date and time when this record becomes effective."
+      - name: eff_end_date
+        description: "Date and time till when this record becomes effective."
+      - name: cost_per_unit
+        description: "Basic cost per unit and weight measures. In future, this can be enhanced with tiered weights/dimensions."
+      - name: cost_per_weight
+        description: "Cost per weight UOM."
+      - name: cost_currency
+        description: "Currency UOM of costs."
+      - name: weight_uom
+        description: "Unit of measurement for weight."
+      - name: emissions_per_unit
+        description: "Carbon emissions emitted per unit or per weight, per distance uom."
+
+  - name: vendor_lead_time
+    description: "Contains the planned and actual lead times from the vendor."
+    columns:
+      - name: vendor_tpartner_id
+        description: "Trading Partner ID of vendor."
+        foreignKey: "trading_partner.id"
+      - name: product_id
+        description: "Product ID."
+        foreignKey: "product.id"
+      - name: product_group_id
+        description: "Vendor lead times can be set at product group level; product level values will override these. The value 'SCN_RESERVED_NO_VALUE_PROVIDED' means no value was provided; exclude it or treat it as NULL when filtering, counting, or joining."
+        foreignKey: "product_hierarchy.id"
+      - name: site_id
+        description: "Vendor lead times can be set at company's site level — these override region or company level values."
+        foreignKey: "site.id"
+      - name: region_id
+        description: "Maps to company's geographical region aka geo_id. Vendor lead times can be set at company's region level — these override company level values. The value 'SCN_RESERVED_NO_VALUE_PROVIDED' means no value was provided; exclude it or treat it as NULL when filtering, counting, or joining."
+        foreignKey: "geography.id"
+      - name: planned_lead_time
+        description: "Planned lead time from vendor into Company's site."
+      - name: actual_lead_time_mean
+        description: "Optional: Actual values of lead time computed based on transactional data (mean, standard-deviation, p50 and p90 values). These not only provide a handy comparison, but can also be used for planning or insights. Will need to be updated at periodic intervals for the effective dates Debate: Should we store this in output table, and report on that? Or make this data available within VLT tables so as not."
+      - name: actual_lead_time_sd
+        description: "Standard deviation of actual lead time."
+      - name: eff_start_date
+        description: "Date and time from when this record is effective."
+      - name: eff_end_date
+        description: "Date and time till when this record is effective."
+
+  - name: vendor_product
+    description: "Contains the product information per vendor, including price, lead-time, and inbound sites."
+    columns:
+      - name: company_id
+        description: "Company ID."
+        foreignKey: "company.id"
+      - name: vendor_tpartner_id
+        description: "Trading Partner ID of vendor."
+        foreignKey: "trading_partner.id"
+      - name: product_id
+        description: "Info on doc bug: Field was key in 1.3.2 but deleted from documentation. Added back in 1.3.4 in document."
+        foreignKey: "product.id"
+      - name: vendor_product_code
+        description: "Vendor's product identifier."
+      - name: vendor_product_desc
+        description: "Vendor description."
+      - name: vendor_cost
+        description: "Cost of product from this vendor."
+      - name: vendor_cost_uom
+        description: "Unit of measure (UOM) of the product cost from this vendor."
+      - name: status
+        description: "Status of product for vendor. E.g. NP (new product), OB (obsolete)"
+      - name: unit_volume
+        description: "Volume of one unit of product."
+      - name: volume_uom
+        description: "Unit of measure (UOM) for volume."
+      - name: unit_weight
+        description: "Weight of one unit of product."
+      - name: weight_uom
+        description: "Weight unit of measurement for weight."
+      - name: release_date
+        description: "Date when product was launched / released by the vendor."
+      - name: end_date
+        description: "Date when product was stopped being supplied by vendor."
+      - name: eff_start_date
+        description: "Displays the date and time from when the vendor's product is active."
+      - name: eff_end_date
+        description: "Displays the date and time till when the vendor's product will be active."
+      - name: min_order_unit
+        description: "Minimum order quantity for vendor for this product."
+      - name: country_of_origin
+        description: "Country of origin by product."
