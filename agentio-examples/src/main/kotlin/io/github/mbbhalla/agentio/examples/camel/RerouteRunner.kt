@@ -1,6 +1,7 @@
 package io.github.mbbhalla.agentio.examples.camel
 
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
+import io.github.mbbhalla.agentio.core.model.LLM
 import io.github.mbbhalla.agentio.data.model.DataValue
 import io.github.mbbhalla.agentio.examples.compass.ALL_SUPPLY_CHAIN_VARIABLES
 import io.github.mbbhalla.agentio.examples.compass.SupplyChainDatabase
@@ -82,12 +83,14 @@ internal object RerouteRunner {
                     AnalyzerAgenticFunction.create(
                         env = env,
                         problemDomain = "Supply Chain In-Transit Delay Analysis",
+                        llm = LLM.ANTHROPIC_CLAUDE_OPUS_5_5_CROSS_REGION_INFERENCE,
                     )
                 val constraintGenerator =
                     ConstraintGeneratorAgenticFunction.create(
                         env = env,
                         variables = ALL_SUPPLY_CHAIN_VARIABLES,
                         problemDomain = "Supply Chain Reroute Optimization (SMTLIB2 / Z3)",
+                        llm = LLM.ANTHROPIC_CLAUDE_OPUS_5_5_CROSS_REGION_INFERENCE,
                     )
                 analyzer to RerouteSolverAgenticFunction(constraintGenerator, SupplyChainDatabase.DATASET_NAME)
             }

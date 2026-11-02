@@ -1,6 +1,7 @@
 package io.github.mbbhalla.agentio.examples.compass
 
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
+import io.github.mbbhalla.agentio.core.model.LLM
 import io.github.mbbhalla.agentio.module.compass.function.AnalyzerAgenticFunction
 import io.github.mbbhalla.agentio.module.compass.function.ConstraintGeneratorAgenticFunction
 import io.github.mbbhalla.agentio.module.solver.Logic
@@ -20,6 +21,7 @@ internal object Runner {
                 AnalyzerAgenticFunction.create(
                     env = env,
                     problemDomain = "Supply Chain Analysis",
+                    llm = LLM.ANTHROPIC_CLAUDE_OPUS_5_5_CROSS_REGION_INFERENCE,
                 )
             val analysisTry =
                 analyzer.invoke(
@@ -43,6 +45,7 @@ internal object Runner {
                     env = env,
                     variables = ALL_SUPPLY_CHAIN_VARIABLES,
                     problemDomain = "Supply Chain Optimization (SMTLIB2 / Z3)",
+                    llm = LLM.ANTHROPIC_CLAUDE_OPUS_5_5_CROSS_REGION_INFERENCE,
                 )
             val formulaTry =
                 constraintGenerator.invoke(

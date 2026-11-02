@@ -111,7 +111,7 @@ class AnalyzerAgenticFunction internal constructor(
                     languageModelParameters =
                         LanguageModelParameters(
                             llm = llm,
-                            temperature = Temperature(TEMPERATURE),
+                            temperature = Temperature(TEMPERATURE).takeIf { llm.supportsSamplingParameters },
                         ),
                     bedrockRuntimeClient =
                         BedrockRuntimeClient {

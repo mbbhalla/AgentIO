@@ -34,6 +34,8 @@ enum class LLM(
     val maxOutputTokens: Int,
     // model specific config
     val additionalModelRequestFields: Map<String, JsonElement>,
+    // Whether the model accepts sampling parameters (temperature / topP). Newer models reject them with a 400.
+    val supportsSamplingParameters: Boolean = true,
 ) {
     /*
         Claude models:
@@ -45,6 +47,7 @@ enum class LLM(
         - Sonnet 4: DEPRECATED (retires June 15, 2026) — kept with warning
         - Opus 4.5: ACTIVE (EOL not sooner than Nov 24, 2026)
         - Opus 4.6: ACTIVE (EOL not sooner than Feb 5, 2027)
+        - Opus 5.5: ACTIVE (rejects temperature / topP)
      */
 
     @Deprecated("Sonnet 4 is deprecated by Anthropic and retires June 15, 2026. Migrate to Sonnet 4.6.")
@@ -75,6 +78,14 @@ enum class LLM(
         additionalModelRequestFields = emptyMap(),
     ),
 
+    ANTHROPIC_CLAUDE_OPUS_5_5_CROSS_REGION_INFERENCE(
+        id = "us.anthropic.claude-opus-5-5",
+        maxContextTokens = 1_000_000,
+        maxOutputTokens = 128_000,
+        additionalModelRequestFields = emptyMap(),
+        supportsSamplingParameters = false,
+    ),
+
     // add more as needed ...
 }
 
@@ -86,8 +97,14 @@ data class LanguageModelParameters(
     val maxOutputTokens: Int = llm.maxOutputTokens,
 ) {
     init {
-        require(temperature != null || topP != null) {
-            "At least one of temperature or topP must be specified"
+        if (llm.supportsSamplingParameters) {
+            require(temperature != null || topP != null) {
+                "At least one of temperature or topP must be specified for ${llm.name}"
+            }
+        } else {
+            require(temperature == null && topP == null) {
+                "${llm.name} does not support temperature or topP"
+            }
         }
     }
 }
