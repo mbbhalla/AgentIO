@@ -76,7 +76,7 @@ internal object RerouteRunner {
         LOG.info("Watching {} for carrier-event files; recommendations -> {}", eventsDir.absolutePath, outputDir.absolutePath)
 
         // Build both agentic functions once and register them under the names the route resolves.
-        val env = SupplyChainDatabase.environment
+        val env = SupplyChainDatabase.environment1
         val (etaAnalyzer, rerouteSolver) =
             runBlocking {
                 val analyzer =
@@ -92,7 +92,7 @@ internal object RerouteRunner {
                         problemDomain = "Supply Chain Reroute Optimization (SMTLIB2 / Z3)",
                         llm = LLM.ANTHROPIC_CLAUDE_OPUS_5_5_CROSS_REGION_INFERENCE,
                     )
-                analyzer to RerouteSolverAgenticFunction(constraintGenerator, SupplyChainDatabase.DATASET_NAME)
+                analyzer to RerouteSolverAgenticFunction(constraintGenerator, SupplyChainDatabase.DATASET_1_NAME)
             }
 
         val registry =
@@ -146,7 +146,7 @@ internal object RerouteRunner {
                         exchange.message.body =
                             AnalyzerAgenticFunction.Input(
                                 objective = buildAnalyzerObjective(shipmentId, events),
-                                datasetName = SupplyChainDatabase.DATASET_NAME,
+                                datasetName = SupplyChainDatabase.DATASET_1_NAME,
                             )
                     }.to("agentio:etaAnalyzer?maxConcurrency=$MAX_CONCURRENCY")
                     // Only shipments the grounded analysis flags as delayed proceed to the solver.

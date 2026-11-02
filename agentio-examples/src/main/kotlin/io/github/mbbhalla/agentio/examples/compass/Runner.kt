@@ -14,12 +14,16 @@ internal object Runner {
 
     fun run(objective: String) =
         runBlocking {
-            val env = SupplyChainDatabase.environment
+            val databaseEnvironment =
+                Pair(
+                    first = SupplyChainDatabase.environment2,
+                    second = SupplyChainDatabase.DATASET_2_NAME,
+                )
 
             LOG.info("=== STAGE 1: Analyzer — '{}'", objective)
             val analyzer =
                 AnalyzerAgenticFunction.create(
-                    env = env,
+                    env = databaseEnvironment.first,
                     problemDomain = "Supply Chain Analysis",
                     llm = LLM.ANTHROPIC_CLAUDE_OPUS_5_5_CROSS_REGION_INFERENCE,
                 )
@@ -27,7 +31,7 @@ internal object Runner {
                 analyzer.invoke(
                     AnalyzerAgenticFunction.Input(
                         objective = objective,
-                        datasetName = SupplyChainDatabase.DATASET_NAME,
+                        datasetName = databaseEnvironment.second,
                     ),
                 )
             check(analysisTry.isSuccess) { "Analyzer failed: ${analysisTry.exceptionOrNull()}" }
@@ -42,7 +46,7 @@ internal object Runner {
             LOG.info("=== STAGE 2: ConstraintGenerator")
             val constraintGenerator =
                 ConstraintGeneratorAgenticFunction.create(
-                    env = env,
+                    env = databaseEnvironment.first,
                     variables = ALL_SUPPLY_CHAIN_VARIABLES,
                     problemDomain = "Supply Chain Optimization (SMTLIB2 / Z3)",
                     llm = LLM.ANTHROPIC_CLAUDE_OPUS_5_5_CROSS_REGION_INFERENCE,
@@ -51,7 +55,7 @@ internal object Runner {
                 constraintGenerator.invoke(
                     ConstraintGeneratorAgenticFunction.Input(
                         analysisResult = analysisOutput.analysisResult,
-                        datasetName = SupplyChainDatabase.DATASET_NAME,
+                        datasetName = databaseEnvironment.second,
                     ),
                 )
             check(formulaTry.isSuccess) { "ConstraintGenerator failed: ${formulaTry.exceptionOrNull()}" }

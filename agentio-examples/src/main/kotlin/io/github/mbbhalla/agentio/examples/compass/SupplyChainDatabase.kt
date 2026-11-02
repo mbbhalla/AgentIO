@@ -11,15 +11,36 @@ import java.nio.file.Path
  * data are tolerated (logged, not thrown) since this is sample data with intentional dirty rows.
  */
 object SupplyChainDatabase {
-    const val DATASET_NAME = "supplychain_dataset_1"
+    const val DATASET_1_NAME = "supplychain_dataset_1"
+    const val DATASET_2_NAME = "supplychain_dataset_2"
 
-    val environment: DatabaseEnvironment by lazy {
+    val environment1: DatabaseEnvironment by lazy {
         val resourceDir =
             SupplyChainDatabase::class.java
-                .getResource("/$DATASET_NAME")
+                .getResource("/$DATASET_1_NAME")
                 ?.toURI()
                 ?.let { Path.of(it) }
-                ?: throw IllegalStateException("Dataset parquet resources not found on classpath at /$DATASET_NAME")
+                ?: throw IllegalStateException("Dataset parquet resources not found on classpath at /$DATASET_1_NAME")
+
+        DuckDbDatabaseEnvironment.fromParquet(
+            directory = resourceDir,
+            constraintStrategies =
+                ConstraintStrategies(
+                    onPrimaryKeyViolation = ViolationBehavior.IGNORE,
+                    onUniqueViolation = ViolationBehavior.IGNORE,
+                    onNotNullViolation = ViolationBehavior.IGNORE,
+                    onForeignKeyViolation = ViolationBehavior.IGNORE,
+                ),
+        )
+    }
+
+    val environment2: DatabaseEnvironment by lazy {
+        val resourceDir =
+            SupplyChainDatabase::class.java
+                .getResource("/$DATASET_2_NAME")
+                ?.toURI()
+                ?.let { Path.of(it) }
+                ?: throw IllegalStateException("Dataset parquet resources not found on classpath at /$DATASET_2_NAME")
 
         DuckDbDatabaseEnvironment.fromParquet(
             directory = resourceDir,
