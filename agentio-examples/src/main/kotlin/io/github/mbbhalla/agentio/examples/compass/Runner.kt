@@ -16,8 +16,8 @@ internal object Runner {
         runBlocking {
             val databaseEnvironment =
                 Pair(
-                    first = SupplyChainDatabase.environment2,
-                    second = SupplyChainDatabase.DATASET_2_NAME,
+                    first = SupplyChainDatabase.environment1,
+                    second = SupplyChainDatabase.DATASET_1_NAME,
                 )
 
             LOG.info("=== STAGE 1: Analyzer — '{}'", objective)
