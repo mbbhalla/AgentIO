@@ -1,431 +1,316 @@
 package io.github.mbbhalla.agentio.module.text2sql.authz
 
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.DataValue
-import net.sf.jsqlparser.parser.CCJSqlParserUtil
-import net.sf.jsqlparser.statement.Statement
-import net.sf.jsqlparser.statement.select.Select
-import net.sf.jsqlparser.util.TablesNamesFinder
-import org.junit.jupiter.api.Nested
+import io.github.mbbhalla.agentio.data.model.TableName
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
+import kotlin.io.path.createTempFile
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.writeText
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+/**
+ * Executes original and authorized SQL on an in-memory DuckDB. For each query, rows(authorized) must
+ * equal rows(the same query with the policy applied by hand to its base tables) and be a subset of
+ * rows(original).
+ */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SqlAuthorizerTest {
-    private val authorizer = SqlAuthorizer()
+    private lateinit var env: DuckDbDatabaseEnvironment
 
-    private val siteFilter =
+    private val txOrCa =
         Criteria.or(ColumnName("site") eq DataValue.StringValue("TX"), ColumnName("site") eq DataValue.StringValue("CA"))
+    private val context =
+        AuthorizationContext(
+            mapOf(
+                TableName("inventory") to txOrCa,
+                TableName("product") to (ColumnName("category") eq DataValue.StringValue("grocery")),
+                TableName("site") to Criteria.AllRows,
+                TableName("emp") to (ColumnName("site") eq DataValue.StringValue("TX")),
+            ),
+        )
 
-    private fun ref(
-        name: String,
-        schema: String? = null,
-    ) = RedshiftSqlDialect.tableReference(name = name, schema = schema)
+    /** `inventory` with [txOrCa] applied by hand. */
+    private val filteredInventory = "(SELECT * FROM inventory WHERE site IN ('TX', 'CA'))"
+
+    @BeforeAll
+    fun setUp() {
+        env =
+            DuckDbDatabaseEnvironment.fromStatements(
+                ddl =
+                    listOf(
+                        "CREATE TABLE site (id VARCHAR, site VARCHAR, region VARCHAR)",
+                        "CREATE TABLE product (id VARCHAR, category VARCHAR, name VARCHAR)",
+                        "CREATE TABLE inventory (site VARCHAR, product_id VARCHAR, qty BIGINT)",
+                        "CREATE TABLE emp (id INTEGER, mgr INTEGER, site VARCHAR)",
+                        "CREATE TABLE notes (site VARCHAR, body VARCHAR)",
+                        "CREATE TABLE secret (id VARCHAR, site VARCHAR)",
+                    ),
+                dml =
+                    listOf(
+                        "INSERT INTO site VALUES ('TX', 'TX', 'south'), ('CA', 'CA', 'west'), ('NY', 'NY', 'east'), ('WA', 'WA', 'west')",
+                        "INSERT INTO product VALUES ('p1', 'grocery', 'apple'), ('p2', 'grocery', 'bread'), ('p3', 'toys', 'ball')",
+                        "INSERT INTO inventory VALUES ('TX', 'p1', 10), ('TX', 'p3', 5), ('CA', 'p2', 7), ('CA', 'p3', 1), " +
+                            "('NY', 'p1', 99), ('NY', 'p2', 98), ('WA', 'p3', 50), ('WA', 'p1', 3)",
+                        "INSERT INTO emp VALUES (1, NULL, 'TX'), (2, 1, 'TX'), (3, 1, 'NY'), (4, 2, 'TX'), (5, 3, 'TX')",
+                        "INSERT INTO notes VALUES ('TX', 'O''Hare \\ path'), ('TX', 'other')",
+                        "INSERT INTO secret VALUES ('s1', 'TX')",
+                    ),
+                tableMetadata = emptySet(),
+            )
+    }
 
     private fun authorize(
         sql: String,
-        context: AuthorizationContext,
-    ): AuthorizedSql {
-        val result = authorizer.authorize(sql, context)
-        val authorized = result.getOrElse { throw AssertionError("Expected success, got: ${it.message}", it) }
-        CCJSqlParserUtil.parse(authorized.sql) // syntactic guarantee
-        return authorized
-    }
+        context: AuthorizationContext = this.context,
+    ): AuthorizedSql =
+        SqlAuthorizer
+            .authorize(SelectSqlStatement(sql), context)
+            .getOrElse { throw AssertionError("Expected success, got: ${it.message}", it) }
 
     private fun failure(
         sql: String,
-        context: AuthorizationContext,
-    ): SqlAuthorizationException {
-        val result = authorizer.authorize(sql, context)
-        assertTrue(result.isFailure, "Expected failure but got: ${result.getOrNull()?.sql}")
-        return assertIs<SqlAuthorizationException>(result.exceptionOrNull())
+        context: AuthorizationContext = this.context,
+    ): String {
+        val result = SqlAuthorizer.authorize(SelectSqlStatement(sql), context)
+        assertTrue(result.isFailure, "Expected failure but got: ${result.getOrNull()?.sql?.value}")
+        return assertIs<IllegalArgumentException>(result.exceptionOrNull()).message.orEmpty()
     }
 
-    private fun withItemNames(sql: String): List<String> = (CCJSqlParserUtil.parse(sql) as Select).withItemsList.map { it.aliasName }
+    private fun rows(sql: String): List<String> =
+        env
+            .executeQuery(SelectSqlStatement(sql))
+            .records
+            .map { it.toString() }
+            .sorted()
 
-    /** Base tables that remain *outside* any authz CTE in the output. */
-    private fun baseTablesOutsideCtes(sql: String): Set<String> {
-        val select = CCJSqlParserUtil.parse(sql) as Select
-        val cteBodies = select.withItemsList.orEmpty().filter { it.aliasName.startsWith("authz_") }
-        val tablesInsideCtes =
-            cteBodies.flatMap { TablesNamesFinder<Void?>().getTables(it.select as Statement) }.toSet()
-        val all = TablesNamesFinder<Void?>().getTables(select as Statement)
-        return all - tablesInsideCtes
+    private fun assertAuthorizedMatches(
+        sql: String,
+        expectedSql: String,
+        context: AuthorizationContext = this.context,
+        subsetOfOriginal: Boolean = true,
+    ) {
+        val authorized = authorize(sql, context).sql.value
+        val actual = rows(authorized)
+        assertEquals(rows(expectedSql), actual, authorized)
+        if (subsetOfOriginal) {
+            val original = rows(sql).groupingBy { it }.eachCount()
+            val filtered = actual.groupingBy { it }.eachCount()
+            assertTrue(filtered.all { (row, count) -> count <= (original[row] ?: 0) }, "authorized rows must be a subset")
+        }
     }
 
     @Test
-    fun `wraps a simple select in a filtering cte`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("inventory") to siteFilter))
-        val out = authorize("SELECT * FROM Inventory", ctx)
+    fun `simple select is row filtered`() {
+        assertAuthorizedMatches("SELECT * FROM Inventory", "SELECT * FROM $filteredInventory")
+        assertEquals(setOf(TableName("inventory")), authorize("SELECT * FROM Inventory").filteredTables)
+    }
 
-        assertEquals(
-            "WITH authz_inventory AS (SELECT * FROM Inventory WHERE ((\"site\" = 'TX') OR (\"site\" = 'CA'))) " +
-                "SELECT * FROM authz_inventory AS Inventory",
-            out.sql,
+    @Test
+    fun `join filters each operand before joining`() {
+        assertAuthorizedMatches(
+            sql = "SELECT i.site, p.name, i.qty FROM inventory i JOIN product p ON p.id = i.product_id JOIN site s ON s.id = i.site",
+            expectedSql =
+                "SELECT i.site, p.name, i.qty FROM $filteredInventory i " +
+                    "JOIN (SELECT * FROM product WHERE category = 'grocery') p ON p.id = i.product_id JOIN site s ON s.id = i.site",
         )
-        assertEquals(setOf(ref("inventory")), out.filteredTables)
-        assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
+    }
+
+    @Test
+    fun `aggregation sees only authorized rows`() {
+        assertAuthorizedMatches(
+            sql = "SELECT site, SUM(qty) AS total FROM inventory GROUP BY site",
+            expectedSql = "SELECT site, SUM(qty) AS total FROM $filteredInventory GROUP BY site",
+        )
+    }
+
+    @Test
+    fun `nested ctes derived tables and unions are filtered everywhere`() {
+        val sql =
+            """
+            WITH tx AS (
+                WITH raw AS (SELECT * FROM inventory) SELECT site, qty FROM raw WHERE site = 'TX'
+            ),
+            everything AS (SELECT site, qty FROM inventory)
+            SELECT site, qty FROM tx
+            UNION ALL
+            SELECT site, qty FROM (SELECT * FROM everything WHERE qty > 2) big
+            UNION ALL
+            SELECT site, qty FROM inventory WHERE product_id IN (SELECT id FROM product WHERE name <> 'none')
+            """.trimIndent()
+        val expected =
+            sql
+                .replace("FROM inventory", "FROM $filteredInventory inventory")
+                .replace("FROM product", "FROM (SELECT * FROM product WHERE category = 'grocery') product")
+        assertAuthorizedMatches(sql, expected)
+    }
+
+    @Test
+    fun `left join preserves outer rows but hides unauthorized matches`() {
+        assertAuthorizedMatches(
+            sql = "SELECT s.id, i.qty FROM site s LEFT JOIN inventory i ON i.site = s.id",
+            expectedSql = "SELECT s.id, i.qty FROM site s LEFT JOIN $filteredInventory i ON i.site = s.id",
+            // Outer joins legitimately emit (site, NULL) for sites whose inventory is hidden — not a subset.
+            subsetOfOriginal = false,
+        )
+    }
+
+    @Test
+    fun `no rows policy yields an empty result without failing`() {
+        val denyAll = AuthorizationContext(mapOf(TableName("inventory") to Criteria.NoRows))
+        val records = env.executeQuery(authorize("SELECT COUNT(*) AS n FROM inventory", denyAll).sql).records
+        assertEquals(listOf<DataValue?>(DataValue.LongValue(0)), records.map { it[ColumnName("n")] })
+    }
+
+    @Test
+    fun `string literals with quotes and backslashes survive the round trip`() {
+        val body = DataValue.StringValue("O'Hare \\ path")
+        val ctx = AuthorizationContext(mapOf(TableName("notes") to (ColumnName("body") eq body)))
+        val records = env.executeQuery(authorize("SELECT body FROM notes", ctx).sql).records
+        assertEquals(listOf<DataValue?>(body), records.map { it[ColumnName("body")] })
     }
 
     @Test
     fun `references to the same table share one cte`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("t") to siteFilter))
-        val out = authorize("SELECT a.x FROM t a JOIN t b ON a.id = b.parent_id UNION SELECT x FROM t", ctx)
-
-        assertEquals(1, withItemNames(out.sql).size)
-        assertEquals(3, Regex("authz_t").findAll(out.sql).count() - 1) // 3 uses + 1 declaration
-        assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
+        val sql = "SELECT a.site FROM inventory a JOIN inventory b ON a.site = b.site UNION SELECT site FROM inventory"
+        val authorized = authorize(sql).sql.value
+        assertEquals(1, Regex("authz_inventory AS \\(").findAll(authorized).count(), authorized)
+        assertAuthorizedMatches(
+            sql,
+            "SELECT a.site FROM $filteredInventory a JOIN $filteredInventory b ON a.site = b.site UNION SELECT site FROM $filteredInventory",
+        )
     }
 
     @Test
-    fun `existing with clause is kept after the authz ctes and its names stay resolvable`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("site", "supply") to siteFilter))
-        val sql = "WITH X AS (SELECT * FROM supply.Site) SELECT * FROM X JOIN supply.Site s ON s.id = X.id"
-        val out = authorize(sql, ctx)
-
-        assertEquals(listOf("authz_supply_site", "X"), withItemNames(out.sql))
-        assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
+    fun `existing with clause keeps resolving after the authz ctes are added`() {
+        assertAuthorizedMatches(
+            sql = "WITH x AS (SELECT * FROM inventory) SELECT x.site, x.qty, s.region FROM x JOIN site s ON s.id = x.site",
+            expectedSql = "WITH x AS (SELECT * FROM $filteredInventory) SELECT x.site, x.qty, s.region FROM x JOIN site s ON s.id = x.site",
+        )
     }
 
     @Test
     fun `inner cte cannot shadow a base table in an outer scope`() {
-        // `site` as a CTE is only visible inside the derived table; the outer FROM site is a base table.
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("site") to siteFilter))
-        val sql = "SELECT * FROM (WITH site AS (SELECT 1 AS id) SELECT * FROM site) d JOIN site ON site.id = d.id"
-        val out = authorize(sql, ctx)
-
-        assertContains(out.sql, "JOIN authz_site AS site ON")
-        assertContains(out.sql, "WITH site AS (SELECT 1 AS id) SELECT * FROM site)") // inner untouched
-        assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
+        // `inventory` as a CTE is only visible inside the derived table; the outer reference is the base table.
+        val inner = "(WITH inventory AS (SELECT 'XX' AS site) SELECT * FROM inventory) d"
+        assertAuthorizedMatches(
+            sql = "SELECT i.site, i.qty FROM $inner JOIN inventory i ON true",
+            expectedSql = "SELECT i.site, i.qty FROM $inner JOIN $filteredInventory i ON true",
+        )
     }
 
     @Test
     fun `cte is not visible to earlier siblings so a same-named base table there is filtered`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("site") to siteFilter))
-        val sql = "WITH a AS (SELECT * FROM site), site AS (SELECT 1 AS id) SELECT * FROM a"
-        val out = authorize(sql, ctx)
-
-        assertContains(out.sql, "a AS (SELECT * FROM authz_site AS site)")
-        assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
+        assertAuthorizedMatches(
+            sql = "WITH a AS (SELECT * FROM inventory), inventory AS (SELECT 'XX' AS site) SELECT * FROM a",
+            expectedSql = "SELECT * FROM $filteredInventory",
+        )
     }
 
     @Test
-    fun `recursive cte keeps RECURSIVE on the first with item and self reference unfiltered`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("emp") to siteFilter))
+    fun `recursive cte sees itself only in its recursive term`() {
+        val filteredEmp = "(SELECT * FROM emp WHERE site = 'TX')"
+        assertAuthorizedMatches(
+            sql =
+                "WITH RECURSIVE tree AS (SELECT id, mgr FROM emp WHERE mgr IS NULL " +
+                    "UNION ALL SELECT e.id, e.mgr FROM emp e JOIN tree ON tree.id = e.mgr) SELECT * FROM tree",
+            expectedSql =
+                "WITH RECURSIVE tree AS (SELECT id, mgr FROM $filteredEmp emp WHERE mgr IS NULL " +
+                    "UNION ALL SELECT e.id, e.mgr FROM $filteredEmp e JOIN tree ON tree.id = e.mgr) SELECT * FROM tree",
+        )
+        // In the anchor DuckDB resolves the CTE's own name to the base table, so it must be filtered.
+        assertAuthorizedMatches(
+            sql =
+                "WITH RECURSIVE inventory AS (SELECT * FROM inventory UNION ALL SELECT * FROM inventory WHERE false) " +
+                    "SELECT * FROM inventory",
+            expectedSql = "SELECT * FROM $filteredInventory",
+        )
+    }
+
+    @Test
+    fun `subqueries in the select list and where clause are rewritten`() {
         val sql =
-            "WITH RECURSIVE tree(id, mgr) AS (SELECT id, mgr FROM emp WHERE mgr IS NULL " +
-                "UNION ALL SELECT e.id, e.mgr FROM emp e JOIN tree ON tree.id = e.mgr) SELECT * FROM tree"
-        val out = authorize(sql, ctx)
-
-        assertTrue(out.sql.startsWith("WITH RECURSIVE authz_emp AS ("), out.sql)
-        assertEquals(1, Regex("RECURSIVE").findAll(out.sql).count())
-        assertContains(out.sql, "JOIN tree ON")
-        assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
+            "SELECT (SELECT MAX(qty) FROM inventory) AS m, id FROM site " +
+                "WHERE id IN (SELECT site FROM inventory) AND EXISTS (SELECT 1 FROM product WHERE name = 'apple')"
+        assertEquals(setOf(TableName("inventory"), TableName("site"), TableName("product")), authorize(sql).filteredTables)
+        assertAuthorizedMatches(
+            sql,
+            "SELECT (SELECT MAX(qty) FROM $filteredInventory) AS m, id FROM site WHERE id IN (SELECT site FROM $filteredInventory) " +
+                "AND EXISTS (SELECT 1 FROM (SELECT * FROM product WHERE category = 'grocery') product WHERE name = 'apple')",
+            // MAX(qty) over fewer rows is a different value, so these rows need not appear in the original.
+            subsetOfOriginal = false,
+        )
     }
 
     @Test
-    fun `subqueries in where and select list are rewritten`() {
-        val ctx =
-            AuthorizationContext(RedshiftSqlDialect, mapOf(ref("a") to siteFilter, ref("b") to Criteria.NoRows, ref("c") to siteFilter))
-        val sql = "SELECT (SELECT MAX(x) FROM c) m FROM a WHERE id IN (SELECT id FROM b) AND EXISTS (SELECT 1 FROM b)"
-        val out = authorize(sql, ctx)
-
-        assertEquals(3, out.filteredTables.size)
-        assertContains(out.sql, "authz_b AS (SELECT * FROM b WHERE (1 = 0))")
-        assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
+    fun `cte names never collide with names already in the query`() {
+        val sql = "WITH authz_inventory AS (SELECT 'XX' AS site) SELECT i.site, i.qty FROM authz_inventory a JOIN inventory i ON true"
+        assertContains(authorize(sql).sql.value, "authz_inventory_2")
+        assertAuthorizedMatches(sql, "SELECT site, qty FROM $filteredInventory")
     }
 
     @Test
-    fun `default schema resolves unqualified references to schema-level policies`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("site", "supply") to siteFilter), defaultSchema = "SUPPLY")
-        val out = authorize("SELECT * FROM site", ctx)
-        assertEquals(setOf(ref("site", "supply")), out.filteredTables)
-    }
-
-    @Test
-    fun `cte names never collide with identifiers already present`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("t") to siteFilter))
-        val out = authorize("WITH authz_t AS (SELECT 1 AS id) SELECT * FROM authz_t JOIN t ON t.id = authz_t.id", ctx)
-
-        assertContains(out.sql, "WITH authz_t_2 AS (SELECT * FROM t WHERE")
-        assertContains(out.sql, "JOIN authz_t_2 AS t ON")
-        assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
+    fun `quoted mixed-case and whitespace-split identifiers resolve to the same policy`() {
+        listOf(
+            "SELECT i.site, i.qty FROM\n\"main\"\n\n.\n\n\"Inventory\" AS i",
+            "SELECT Inventory.site, Inventory.qty FROM MAIN   .\n\nInventory",
+            "SELECT site, qty FROM memory.main.INVENTORY",
+        ).forEach { sql ->
+            assertEquals(setOf(TableName("inventory")), authorize(sql).filteredTables, sql)
+            assertAuthorizedMatches(sql, "SELECT site, qty FROM $filteredInventory")
+        }
     }
 
     @Test
     fun `allow-all-rows policy leaves unlisted tables untouched but reports them`() {
-        val ctx =
-            AuthorizationContext(
-                RedshiftSqlDialect,
-                mapOf(ref("a") to siteFilter),
-                unlistedTablePolicy = UnlistedTablePolicy.ALLOW_ALL_ROWS,
-            )
-        val out = authorize("SELECT * FROM a JOIN b ON a.id = b.id", ctx)
-
-        assertEquals(setOf(ref("a")), out.filteredTables)
-        assertEquals(setOf(ref("b")), out.unfilteredTables)
-        assertEquals(setOf("b"), baseTablesOutsideCtes(out.sql))
-    }
-
-    /**
-     * Ports of the "Test Redshift table replace - 1..5" cases from the original ANTLR-based
-     * implementation. Policies mirror the original geography / product-hierarchy IN / NOT IN
-     * criteria, expressed per table.
-     */
-    @Nested
-    inner class TableReplaceCases {
-        private val geographyIn =
-            ColumnName("geo_id") isIn
-                listOf(
-                    DataValue.StringValue("GEOGRAPHY-1"),
-                    DataValue.StringValue("GEOGRAPHY-2"),
-                    DataValue.StringValue("GEOGRAPHY-3"),
-                )
-        private val productHierarchyIn =
-            ColumnName("product_group_id") isIn
-                listOf(DataValue.StringValue("PRODUCT_HIERARCHY-1"), DataValue.StringValue("PRODUCT_HIERARCHY-2"))
-        private val productHierarchyNotIn =
-            ColumnName("product_group_id") notIn
-                listOf(DataValue.StringValue("PRODUCT_HIERARCHY-1"), DataValue.StringValue("PRODUCT_HIERARCHY-2"))
-
-        private val supplyChainContext =
-            AuthorizationContext(
-                RedshiftSqlDialect,
-                mapOf(
-                    ref("inventorylevel", "supply") to Criteria.and(geographyIn, productHierarchyIn),
-                    ref("site", "supply") to geographyIn,
-                    ref("product", "supply") to productHierarchyNotIn,
-                    ref("geography", "supply") to (ColumnName("id") isIn listOf(DataValue.StringValue("GEOGRAPHY-1"))),
-                    ref("producthierarchy", "supply") to (ColumnName("id") notIn listOf(DataValue.StringValue("PRODUCT_HIERARCHY-1"))),
-                    ref("projectedinventory", "analytics") to Criteria.and(geographyIn, productHierarchyNotIn),
-                ),
-            )
-
-        private fun resource(name: String): String = checkNotNull(javaClass.getResource("/authz/$name")).readText()
-
-        @Test
-        fun `case 1 - quoted identifiers split across whitespace and newlines`() {
-            val sql =
-                """
-                SELECT
-                    InventoryLevel.site_id,
-                    InventoryLevel.product_id,
-                    Site.geo_id AS region_id,
-                    Product.product_group_id AS product_category_id,
-                    'Site-123' AS some_column
-                FROM
-                "supply"
-
-                .
-
-                "InventoryLevel" AS InventoryLevel
-                JOIN "supply"."Site" AS Site
-                    ON Site.id = InventoryLevel.site_id
-                JOIN "supply"."Product" AS Product
-                    ON Product.id = InventoryLevel.product_id
-                WHERE InventoryLevel.site_id IN ('Site-123')
-                """.trimIndent()
-            val out = authorize(sql, supplyChainContext)
-
-            assertEquals(
-                listOf("authz_supply_inventorylevel", "authz_supply_site", "authz_supply_product"),
-                withItemNames(out.sql),
-            )
-            assertContains(out.sql, "FROM authz_supply_inventorylevel AS InventoryLevel JOIN authz_supply_site AS Site ON")
-            assertContains(out.sql, "JOIN authz_supply_product AS Product ON")
-            assertContains(out.sql, "authz_supply_inventorylevel AS (SELECT * FROM \"supply\".\"InventoryLevel\" WHERE")
-            assertContains(out.sql, "\"product_group_id\" IN ('PRODUCT_HIERARCHY-1', 'PRODUCT_HIERARCHY-2')")
-            assertContains(out.sql, "\"geo_id\" IN ('GEOGRAPHY-1', 'GEOGRAPHY-2', 'GEOGRAPHY-3')")
-            assertEquals(3, out.filteredTables.size)
-            assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
-        }
-
-        @Test
-        fun `case 2 - unquoted mixed-case identifiers with odd whitespace resolve to the same policies`() {
-            val sql =
-                """
-                SELECT
-                    InventoryLevel.site_id,
-                    InventoryLevel.product_id,
-                    Site.geo_id AS region_id,
-                    Product.product_group_id AS product_category_id,
-                    'Site-123' AS some_column
-                FROM
-                SUPPLY   .
-
-                InventoryLevel
-
-                AS InventoryLevel
-                JOIN Supply.Site AS Site
-                    ON Site.id = InventoryLevel.site_id
-                JOIN supply.Product AS Product
-                    ON Product.id = InventoryLevel.product_id
-                WHERE InventoryLevel.site_id IN ('Site-123')
-                """.trimIndent()
-            val out = authorize(sql, supplyChainContext)
-
-            assertEquals(
-                setOf(ref("inventorylevel", "supply"), ref("site", "supply"), ref("product", "supply")),
-                out.filteredTables,
-            )
-            assertContains(out.sql, "authz_supply_product AS (SELECT * FROM supply.Product WHERE (\"product_group_id\" NOT IN")
-            assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
-        }
-
-        @Test
-        fun `case 3 - production query with comments, quoted names, bare date units and left-joined ctes`() {
-            val out = authorize(resource("projected_inventory_for_sites_and_products.sql"), supplyChainContext)
-
-            assertEquals(
-                listOf(
-                    "authz_supply_geography",
-                    "authz_supply_site",
-                    "authz_supply_producthierarchy",
-                    "authz_supply_product",
-                    "authz_analytics_projectedinventory",
-                    "REGIONS_TO_FILTER",
-                    "SITES_TO_FILTER",
-                    "CATEGORIES_TO_FILTER",
-                    "PRODUCTS_TO_FILTER",
-                    "BASELINE_RECORD",
-                    "WINDOW_RECORD",
-                ),
-                withItemNames(out.sql),
-            )
-            // Both ProjectedInventory occurrences share one CTE and keep their PI alias.
-            assertEquals(2, Regex("FROM authz_analytics_projectedinventory AS PI WHERE").findAll(out.sql).count())
-            assertContains(out.sql, "FROM authz_supply_geography AS REGION)")
-            assertContains(out.sql, "FROM authz_supply_producthierarchy AS CATEGORY)")
-            // Redshift-isms survive the round trip.
-            assertContains(out.sql, "DATEADD(day, 153 + 1, '2024-01-15 00:00:00')")
-            assertContains(out.sql, "cast(MIN_SAFETY_STOCK AS float)") // keyword casing preserved
-            assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
-        }
-
-        @Test
-        fun `case 4 - with clauses nested inside ctes and inside derived tables`() {
-            val sql =
-                """
-                WITH X AS (
-                	WITH Y AS (
-                		SELECT * FROM supply.Site
-                	)
-                	SELECT col1, col2 FROM Y
-                )
-
-                SELECT * FROM (
-                	WITH R AS (SELECT * FROM X)
-                	SELECT * FROM R
-                )
-                """.trimIndent()
-            val out = authorize(sql, supplyChainContext)
-
-            assertEquals(listOf("authz_supply_site", "X"), withItemNames(out.sql))
-            assertContains(out.sql, "X AS (WITH Y AS (SELECT * FROM authz_supply_site AS Site) SELECT col1, col2 FROM Y)")
-            assertContains(out.sql, "SELECT * FROM (WITH R AS (SELECT * FROM X) SELECT * FROM R)")
-            assertEquals(setOf(ref("site", "supply")), out.filteredTables)
-            assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
-        }
-
-        @Test
-        fun `case 5 - production query with unions, nested derived tables, paginated cte and alias-less table`() {
-            val out = authorize(resource("site_summary_aggregates.sql"), supplyChainContext)
-
-            assertEquals(
-                listOf("authz_supply_geography", "authz_supply_site", "authz_supply_product", "authz_analytics_projectedinventory"),
-                withItemNames(out.sql).take(4),
-            )
-            assertEquals(4, out.filteredTables.size)
-            // Two distinct occurrences of analytics.ProjectedInventory: one aliased, one not.
-            assertContains(out.sql, "FROM authz_analytics_projectedinventory AS PI)")
-            assertContains(
-                out.sql,
-                "FROM authz_analytics_projectedinventory AS ProjectedInventory WHERE record_type = 'WINDOW'",
-            )
-            assertEquals(2, Regex("UNION").findAll(out.sql).count())
-            assertContains(out.sql, "LIMIT 25 OFFSET 0")
-            assertTrue(baseTablesOutsideCtes(out.sql).isEmpty())
-        }
-
-        @Test
-        fun `case 5 with a partial policy set fails closed on the unlisted table`() {
-            val partial =
-                AuthorizationContext(
-                    RedshiftSqlDialect,
-                    mapOf(
-                        ref("site", "supply") to geographyIn,
-                        ref("geography", "supply") to Criteria.AllRows,
-                    ),
-                )
-            val e = failure(resource("site_summary_aggregates.sql"), partial)
-            assertTrue(
-                "supply.product" in e.message.orEmpty() || "analytics.projectedinventory" in e.message.orEmpty(),
-                e.message,
-            )
-        }
+        val ctx = AuthorizationContext(mapOf(TableName("inventory") to txOrCa), UnlistedTablePolicy.ALLOW_ALL_ROWS)
+        val sql = "SELECT i.site, s.region FROM inventory i JOIN site s ON s.id = i.site"
+        val authorized = authorize(sql, ctx)
+        assertEquals(setOf(TableName("inventory")), authorized.filteredTables)
+        assertEquals(setOf(TableName("site")), authorized.unfilteredTables)
+        assertAuthorizedMatches(sql, "SELECT i.site, s.region FROM $filteredInventory i JOIN site s ON s.id = i.site", ctx)
     }
 
     // ------------------------------------------------------------------ error paths
 
     @Test
     fun `unlisted table is denied by default`() {
-        val e =
-            failure(
-                "SELECT * FROM a JOIN secret ON a.id = secret.id",
-                AuthorizationContext(
-                    RedshiftSqlDialect,
-                    mapOf(
-                        ref("a") to siteFilter,
-                    ),
-                ),
-            )
-        assertContains(e.message.orEmpty(), "secret")
+        assertContains(failure("SELECT * FROM inventory JOIN secret ON inventory.site = secret.site"), "'secret' is not authorized")
     }
 
     @Test
-    fun `non select statements are rejected`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("t") to siteFilter))
-        assertContains(failure("DELETE FROM t", ctx).message.orEmpty(), "Only SELECT")
-        assertContains(failure("UPDATE t SET x = 1", ctx).message.orEmpty(), "Only SELECT")
-        assertContains(failure("INSERT INTO t SELECT * FROM t", ctx).message.orEmpty(), "Only SELECT")
+    fun `table functions and SUMMARIZE are rejected because they read data without naming a table`() {
+        listOf(
+            "SELECT * FROM query_table('inventory')",
+            "SELECT * FROM query('SELECT * FROM inventory')",
+            "SELECT * FROM range(3)",
+            "SELECT * FROM (SUMMARIZE inventory)",
+        ).forEach { sql -> assertContains(failure(sql), "is not permitted", message = sql) }
     }
 
     @Test
-    fun `multiple statements are rejected`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("t") to siteFilter))
-        assertContains(failure("SELECT * FROM t; DROP TABLE t", ctx).message.orEmpty(), "Exactly one statement")
+    fun `files are rejected even when unlisted tables are allowed`() {
+        val csv = createTempFile(suffix = ".csv")
+        try {
+            csv.writeText("site,qty\nTX,1\n")
+            val allowAll = AuthorizationContext(emptyMap(), UnlistedTablePolicy.ALLOW_ALL_ROWS)
+            assertContains(failure("SELECT * FROM '$csv'", allowAll), "Invalid table name")
+            assertContains(failure("SELECT * FROM read_csv('$csv')", allowAll), "is not permitted")
+        } finally {
+            csv.deleteIfExists()
+        }
     }
 
     @Test
-    fun `select into and data-modifying ctes are rejected`() {
-        val ctx =
-            AuthorizationContext(
-                RedshiftSqlDialect,
-                mapOf(ref("t") to siteFilter),
-                unlistedTablePolicy = UnlistedTablePolicy.ALLOW_ALL_ROWS,
-            )
-        assertContains(failure("SELECT * INTO copy FROM t", ctx).message.orEmpty(), "INTO")
-        assertContains(
-            failure("WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d", ctx).message.orEmpty(),
-            "Data-modifying",
-        )
-    }
-
-    @Test
-    fun `malformed sql and blank sql fail with a parse error`() {
-        val ctx = AuthorizationContext(RedshiftSqlDialect, mapOf(ref("t") to siteFilter))
-        assertContains(failure("SELECT * FORM t", ctx).message.orEmpty(), "could not be parsed")
-        assertContains(failure("   ", ctx).message.orEmpty(), "blank")
-    }
-
-    @Test
-    fun `validator rejection is surfaced as an authorization failure`() {
-        val rejecting = SqlAuthorizer { Result.failure(IllegalStateException("boom")) }
-        val result = rejecting.authorize("SELECT * FROM t", AuthorizationContext(RedshiftSqlDialect, mapOf(ref("t") to siteFilter)))
-        assertFalse(result.isSuccess)
-        assertContains(result.exceptionOrNull()?.message.orEmpty(), "boom")
+    fun `a policy on a column the table lacks fails authorization`() {
+        val ctx = AuthorizationContext(mapOf(TableName("inventory") to (ColumnName("no_such_column") eq DataValue.LongValue(1))))
+        assertContains(failure("SELECT * FROM inventory", ctx), "no_such_column")
     }
 }

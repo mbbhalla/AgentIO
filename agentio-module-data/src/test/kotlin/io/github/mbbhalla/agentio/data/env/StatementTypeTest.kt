@@ -138,6 +138,11 @@ StatementTypeTest {
     }
 
     @Test
+    fun `SELECT that deletes through a CTE is identified as DELETE`() {
+        assertEquals(StatementType.DELETE, env.statementType("WITH d AS (DELETE FROM items WHERE id = 99 RETURNING *) SELECT * FROM d"))
+    }
+
+    @Test
     fun `DDL returns UNKNOWN`() {
         assertEquals(StatementType.UNKNOWN, env.statementType("DROP TABLE items"))
         assertEquals(StatementType.UNKNOWN, env.statementType("CREATE TABLE other (a INTEGER)"))

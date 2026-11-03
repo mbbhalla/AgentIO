@@ -109,6 +109,15 @@ class SqlStatementsTest {
     }
 
     @Test
+    fun `SelectSqlStatement rejects a SELECT that writes through a CTE`() {
+        listOf(
+            "WITH d AS (DELETE FROM orders RETURNING *) SELECT * FROM d",
+            "WITH i AS (INSERT INTO orders VALUES ('O-9', 1.0) RETURNING *) SELECT * FROM i",
+            "WITH u AS (UPDATE orders SET amount = 0 RETURNING *) SELECT * FROM u",
+        ).forEach { sql -> assertThrows<IllegalArgumentException>(sql) { SelectSqlStatement(sql) } }
+    }
+
+    @Test
     fun `SelectSqlStatement rejects empty string`() {
         assertThrows<IllegalArgumentException> {
             SelectSqlStatement("")

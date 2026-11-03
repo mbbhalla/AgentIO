@@ -3,11 +3,7 @@ package io.github.mbbhalla.agentio.module.text2sql.authz
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.DataValue
 
-/**
- * Binary comparison operators supported by [Criteria.Compare].
- *
- * The [symbol] is the dialect-neutral SQL spelling; every supported [SqlDialect] accepts it.
- */
+/** Binary comparison operators supported by [Criteria.Compare]; [symbol] is the SQL spelling. */
 enum class ComparisonOperator(
     val symbol: String,
 ) {
@@ -24,8 +20,8 @@ enum class ComparisonOperator(
  * A composable row-level predicate attached to a table by an [AuthorizationContext].
  *
  * Criteria are pure data: they describe *which rows* a caller may see and are rendered to a SQL
- * `WHERE` expression by [SqlAuthorizer] using the target [SqlDialect] for identifier quoting and
- * literal escaping. Because column names are [ColumnName]s and values are [DataValue]s, a
+ * `WHERE` expression by [SqlAuthorizer], which quotes identifiers and escapes literals.
+ * Because column names are [ColumnName]s and values are [DataValue]s, a
  * `Criteria` can never carry arbitrary SQL text — the rendered predicate is injection-safe by
  * construction.
  *

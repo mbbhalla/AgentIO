@@ -28,6 +28,12 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.putJsonArray
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -63,10 +69,10 @@ class DuckDbDatabaseEnvironment private constructor(
      * Classifies [sql] fail-closed: anything that is not provably a single SELECT, INSERT, UPDATE or
      * DELETE (DDL, COPY, MERGE/upsert, multi-statement input, invalid SQL) is [StatementType.UNKNOWN].
      *
-     * SELECT is decided by DuckDB's parser (`json_serialize_sql` only accepts SELECT statements), so it
-     * does not depend on the plan format. DML kinds are read from the structured JSON plan, scanning the
-     * whole operator tree because DuckDB may wrap the write (e.g. `DELETE ... RETURNING` has a PROJECTION
-     * root).
+     * SELECT is decided by DuckDB's parser via [parseSelect], so it does not depend on the plan format
+     * and a SELECT that writes through a CTE is not a SELECT. DML kinds are read from the structured
+     * JSON plan, scanning the whole operator tree because DuckDB may wrap the write (e.g.
+     * `DELETE ... RETURNING` has a PROJECTION root).
      */
     override fun statementType(sql: String): StatementType =
         if (!isSingleStatement(sql)) {
@@ -87,9 +93,43 @@ class DuckDbDatabaseEnvironment private constructor(
         }
 
     private fun isSingleSelect(sql: String): Boolean =
-        connection.prepareStatement(IS_SELECT_QUERY).use { stmt ->
-            stmt.setString(1, sql)
-            stmt.executeQuery().use { rs -> rs.next() && rs.getBoolean(1) }
+        try {
+            parseSelect(sql)
+            true
+        } catch (_: IllegalArgumentException) {
+            false
+        }
+
+    override fun parseSelect(sql: String): JsonObject {
+        val parsed = Json.parseToJsonElement(queryString("SELECT json_serialize_sql(?::VARCHAR)", sql)).jsonObject
+        val statements =
+            requireNotNull(parsed["statements"]?.jsonArray) {
+                "Invalid SELECT SQL: ${parsed["error_message"]?.jsonPrimitive?.content}"
+            }
+        require(statements.size == 1) { "Exactly one statement is required, found ${statements.size}" }
+        val statement = statements.single().jsonObject
+        val query = statement.getValue("node").jsonObject
+        val writes = queryNodeTypes(query).filterNot { it in READ_ONLY_QUERY_NODES }.toSet()
+        require(writes.isEmpty()) { "Data-modifying queries are not permitted: $writes" }
+        return query
+    }
+
+    override fun renderSelect(query: JsonObject): String =
+        queryString(
+            "SELECT json_deserialize_sql(?::JSON)",
+            buildJsonObject { putJsonArray("statements") { addJsonObject { put("node", query) } } }.toString(),
+        )
+
+    private fun queryString(
+        sql: String,
+        argument: String,
+    ): String =
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, argument)
+            stmt.executeQuery().use { rs ->
+                rs.next()
+                rs.getString(1)
+            }
         }
 
     private fun jsonPlanOperatorNames(sql: String): Set<String> =
@@ -538,12 +578,22 @@ class DuckDbDatabaseEnvironment private constructor(
         internal fun isSingleStatement(sql: String): Boolean = ';' !in sql.trimEnd().removeSuffix(";")
 
         /**
-         * True only for exactly one valid SELECT: `json_serialize_sql` sets `error` for non-SELECT or invalid
-         * input, and yields an empty `statements` array (without error) for blank input.
+         * Query nodes that only read. Every other kind writes: DuckDB parses `INSERT`, `UPDATE` and
+         * `DELETE` inside a CTE as `INSERT_QUERY_NODE`, `UPDATE_QUERY_NODE` and `DELETE_QUERY_NODE`.
          */
-        private const val IS_SELECT_QUERY =
-            "SELECT coalesce(NOT (j->>'error')::BOOLEAN AND json_array_length(j, '$.statements') = 1, false) " +
-                "FROM (SELECT json_serialize_sql(?::VARCHAR) AS j)"
+        private val READ_ONLY_QUERY_NODES = setOf("SELECT_NODE", "SET_OPERATION_NODE", "RECURSIVE_CTE_NODE")
+
+        /** The `type` of every query node in [tree]; query nodes are the objects that carry a `cte_map`. */
+        private fun queryNodeTypes(tree: JsonElement): Sequence<String> =
+            when (tree) {
+                is JsonArray -> tree.asSequence().flatMap { queryNodeTypes(it) }
+                is JsonObject ->
+                    sequence {
+                        if ("cte_map" in tree) yield(tree.getValue("type").jsonPrimitive.content)
+                        tree.values.forEach { yieldAll(queryNodeTypes(it)) }
+                    }
+                else -> emptySequence()
+            }
 
         /** `EXPLAIN` row holding the physical plan (other rows, if any, are ignored). */
         private const val PHYSICAL_PLAN_KEY = "physical_plan"

@@ -16,7 +16,7 @@ Every data type enforces validity in its `init` block. If an object exists, it i
 | `S3ObjectKey` | Non-blank, no leading `/` |
 | `S3Uri` | Valid `s3://bucket/key` format |
 | `MVELExpression` | Compiles via `MVEL.compileExpression()` — syntactically valid |
-| `SelectSqlStatement` | EXPLAIN passes + plan is SELECT |
+| `SelectSqlStatement` | EXPLAIN passes + DuckDB parses exactly one read-only SELECT (no writes inside CTEs) |
 | `InsertSqlStatement` | EXPLAIN passes + plan is INSERT |
 | `UpdateSqlStatement` | EXPLAIN passes + plan is UPDATE |
 | `DeleteSqlStatement` | EXPLAIN passes + plan is DELETE |
@@ -34,7 +34,7 @@ io.github.mbbhalla.agentio.data/
 │   ├── ExplainResult.kt    — sealed: Success | Failure
 │   └── MVELExpression.kt   — validated MVEL expression (compiled at construction)
 └── env/
-    ├── DatabaseEnvironment.kt        — abstract class with snapshot, companion holds active env
+    ├── DatabaseEnvironment.kt        — abstract class with snapshot, companion holds active env; parseSelect/renderSelect expose DuckDB's SELECT parse tree
     ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet(dir, constraintStrategies) + fromS3(timestamp, s3Uri, s3Client, constraintStrategies)
     └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
 ```
@@ -185,6 +185,7 @@ val dataset = env.executeQuery(stmt)
 SelectSqlStatement("SELECT * FROM nonexistent_table")  // fails: EXPLAIN rejects
 InsertSqlStatement("not sql at all")                   // fails: EXPLAIN rejects
 SelectSqlStatement("INSERT INTO orders VALUES (1)")    // fails: plan type is INSERT, not SELECT
+SelectSqlStatement("WITH d AS (DELETE FROM orders RETURNING *) SELECT * FROM d")  // fails: writes through a CTE
 ```
 
 ### Access query results with typed columns

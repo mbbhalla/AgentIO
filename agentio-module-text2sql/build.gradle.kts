@@ -6,10 +6,7 @@ dependencies {
     api(project(":agentio-core"))
     api(project(":agentio-module-data"))
 
-    // SQL parsing / AST rewriting for SQL authorization (JSqlParser is Apache-2.0 / LGPL dual licensed)
-    implementation("com.github.jsqlparser:jsqlparser:5.3")
-
-    // Kotlinx Serialization
+    // Kotlinx Serialization (also the JSON parse tree used by SQL authorization)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // AWS SDK for Bedrock Runtime
@@ -27,6 +24,4 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test:2.2.0")
     testImplementation("io.mockk:mockk:1.13.13")
     testRuntimeOnly("ch.qos.logback:logback-classic:1.5.12")
-    // In-memory DuckDB used to verify that authorized SQL is semantically row-filtered
-    testImplementation("org.duckdb:duckdb_jdbc:2.0.0.1")
 }

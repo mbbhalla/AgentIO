@@ -1,7 +1,10 @@
 package io.github.mbbhalla.agentio.module.text2sql.authz
 
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.DataValue
+import io.github.mbbhalla.agentio.data.model.TableName
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
@@ -9,23 +12,25 @@ import kotlin.test.assertEquals
 class ReadmeExampleTest {
     @Test
     fun `readme example output is exact`() {
-        val authorizer = SqlAuthorizer()
+        DuckDbDatabaseEnvironment.fromStatements(
+            ddl = listOf("CREATE TABLE inventory (site VARCHAR, qty BIGINT)", "CREATE TABLE site (id VARCHAR)"),
+            dml = emptyList(),
+            tableMetadata = emptySet(),
+        )
         val context =
             AuthorizationContext(
-                dialect = RedshiftSqlDialect,
                 policies =
                     mapOf(
-                        RedshiftSqlDialect.tableReference(name = "inventory", schema = "supply") to
+                        TableName("inventory") to
                             (ColumnName("site") isIn listOf(DataValue.StringValue("TX"), DataValue.StringValue("CA"))),
-                        RedshiftSqlDialect.tableReference(name = "site", schema = "supply") to Criteria.AllRows,
+                        TableName("site") to Criteria.AllRows,
                     ),
-                defaultSchema = "supply",
+                unlistedTablePolicy = UnlistedTablePolicy.DENY,
             )
-        val sql = authorizer.authorize("SELECT * FROM Inventory", context).getOrThrow().sql
+        val result: Result<AuthorizedSql> = SqlAuthorizer.authorize(SelectSqlStatement("SELECT * FROM Inventory"), context)
         assertEquals(
-            "WITH authz_supply_inventory AS (SELECT * FROM Inventory WHERE (\"site\" IN ('TX', 'CA'))) " +
-                "SELECT * FROM authz_supply_inventory AS Inventory",
-            sql,
+            "WITH authz_inventory AS (SELECT * FROM inventory WHERE (site IN ('TX', 'CA'))) SELECT * FROM authz_inventory AS Inventory",
+            result.getOrThrow().sql.value,
         )
     }
 }

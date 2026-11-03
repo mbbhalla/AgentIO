@@ -1,27 +1,25 @@
 package io.github.mbbhalla.agentio.module.text2sql.authz
 
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.DataValue
-import org.junit.jupiter.api.AfterAll
+import io.github.mbbhalla.agentio.data.model.TableName
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import java.sql.Connection
-import java.sql.DriverManager
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Executes the two production-shaped Redshift queries (ported from the original ANTLR suite) on an
- * in-memory DuckDB populated with a small supply-chain dataset, and checks that the authorized SQL
- * returns exactly the rows of the same query with the policy applied by hand to each base table.
- *
- * DuckDB lacks Redshift's `DATEADD`; a macro shim with the same signature is defined for the test.
+ * Executes two production-shaped queries (ported from the original ANTLR suite; the fixture defines a
+ * `dateadd` macro for them) on an in-memory DuckDB populated with a small supply-chain dataset, and
+ * checks that the authorized SQL returns exactly the rows of the same query with the policy applied
+ * by hand to each base table.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SqlAuthorizerProductionQueriesSemanticTest {
-    private lateinit var connection: Connection
-    private val authorizer = SqlAuthorizer()
+    private lateinit var env: DuckDbDatabaseEnvironment
 
     private val eastOnly = ColumnName("geo_id") eq DataValue.StringValue("GEO-1")
     private val noGreenOlives = ColumnName("id") notEq DataValue.StringValue("OLIVE-GR")
@@ -29,21 +27,15 @@ class SqlAuthorizerProductionQueriesSemanticTest {
 
     private val context =
         AuthorizationContext(
-            DuckDbSqlDialect,
             mapOf(
-                table("supply", "geography") to Criteria.AllRows,
-                table("supply", "site") to eastOnly,
-                table("supply", "producthierarchy") to Criteria.AllRows,
-                table("supply", "product") to noGreenOlives,
-                table("analytics", "projectedinventory") to
+                TableName("geography") to Criteria.AllRows,
+                TableName("site") to eastOnly,
+                TableName("producthierarchy") to Criteria.AllRows,
+                TableName("product") to noGreenOlives,
+                TableName("projectedinventory") to
                     Criteria.and(onlyOliveProducts, ColumnName("site_id") notEq DataValue.StringValue("CH-001")),
             ),
         )
-
-    private fun table(
-        schema: String,
-        name: String,
-    ) = DuckDbSqlDialect.tableReference(name = name, schema = schema)
 
     /** Hand-applied equivalents of [context] — the oracle the authorizer is checked against. */
     private val manualFilters =
@@ -56,34 +48,25 @@ class SqlAuthorizerProductionQueriesSemanticTest {
 
     @BeforeAll
     fun setUp() {
-        connection = DriverManager.getConnection("jdbc:duckdb:")
-        connection.createStatement().use { st ->
-            checkNotNull(javaClass.getResource("/authz/supply_chain_fixture.sql"))
-                .readText()
+        val fixture =
+            resource("supply_chain_fixture.sql")
                 .lineSequence()
                 .filterNot { it.trimStart().startsWith("--") }
                 .joinToString("\n")
                 .split(";")
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
-                .forEach { st.execute(it) }
-        }
-    }
-
-    @AfterAll
-    fun tearDown() {
-        connection.close()
+        env = DuckDbDatabaseEnvironment.fromStatements(ddl = fixture, dml = emptyList(), tableMetadata = emptySet())
     }
 
     private fun resource(name: String): String = checkNotNull(javaClass.getResource("/authz/$name")).readText()
 
-    private fun rows(sql: String): List<List<Any?>> =
-        connection.createStatement().use { st ->
-            st.executeQuery(sql).use { rs ->
-                val n = rs.metaData.columnCount
-                generateSequence { if (rs.next()) (1..n).map { rs.getObject(it) } else null }.toList()
-            }
-        }
+    private fun rows(sql: String): List<String> =
+        env
+            .executeQuery(SelectSqlStatement(sql))
+            .records
+            .map { it.toString() }
+            .sorted()
 
     /**
      * Builds the oracle query by substituting every base-table reference (any quoting / casing) with
@@ -101,15 +84,15 @@ class SqlAuthorizerProductionQueriesSemanticTest {
 
     private fun assertAuthorizedMatchesOracle(resourceName: String) {
         val sql = resource(resourceName)
-        val authorized = authorizer.authorize(sql, context).getOrThrow()
+        val authorized = SqlAuthorizer.authorize(SelectSqlStatement(sql), context).getOrThrow()
 
         val expected = rows(manuallyFiltered(sql))
-        val actual = rows(authorized.sql)
+        val actual = rows(authorized.sql.value)
         val original = rows(sql)
 
         assertTrue(original.size > actual.size, "fixture must make the policy observable")
         assertTrue(actual.isNotEmpty(), "fixture must leave authorized rows")
-        assertEquals(expected.sortedBy { it.toString() }, actual.sortedBy { it.toString() }, authorized.sql)
+        assertEquals(expected, actual, authorized.sql.value)
     }
 
     @Test
@@ -124,12 +107,16 @@ class SqlAuthorizerProductionQueriesSemanticTest {
 
     @Test
     fun `no-rows policy on a leaf table empties the whole production query`() {
-        val denyInventory =
-            AuthorizationContext(
-                DuckDbSqlDialect,
-                context.policies + (table("analytics", "projectedinventory") to Criteria.NoRows),
-            )
-        val authorized = authorizer.authorize(resource("site_summary_aggregates.sql"), denyInventory).getOrThrow()
-        assertEquals(emptyList(), rows(authorized.sql))
+        val denyInventory = context.copy(policies = context.policies + (TableName("projectedinventory") to Criteria.NoRows))
+        val authorized = SqlAuthorizer.authorize(SelectSqlStatement(resource("site_summary_aggregates.sql")), denyInventory).getOrThrow()
+        assertEquals(emptyList(), env.executeQuery(authorized.sql).records)
+    }
+
+    @Test
+    fun `a partial policy set fails closed on an unlisted table`() {
+        val partial = AuthorizationContext(mapOf(TableName("site") to eastOnly, TableName("geography") to Criteria.AllRows))
+        val result = SqlAuthorizer.authorize(SelectSqlStatement(resource("site_summary_aggregates.sql")), partial)
+        val message = result.exceptionOrNull()?.message.orEmpty()
+        assertTrue("'product' is not authorized" in message || "'projectedinventory' is not authorized" in message, message)
     }
 }
