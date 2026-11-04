@@ -24,7 +24,7 @@ import kotlin.time.Duration.Companion.minutes
  * Translates an English problem statement, posed against a tabular dataset, into a grounded
  * [AnalysisResult] — every result item carries the SQL that produces its value from the
  * underlying dataset. Domain-agnostic: the analyzer discovers schema via tools and grounds
- * arithmetic in SQL queries against the active [DatabaseEnvironment].
+ * arithmetic in SQL queries against the [DatabaseEnvironment] it was created with.
  */
 class AnalyzerAgenticFunction internal constructor(
     agentConfiguration: AgentConfiguration,
@@ -97,8 +97,6 @@ class AnalyzerAgenticFunction internal constructor(
             problemDomain: String,
             llm: LLM = LLM.ANTHROPIC_CLAUDE_OPUS_4_6_V1_CROSS_REGION_INFERENCE,
         ): AnalyzerAgenticFunction {
-            DatabaseEnvironment.activate(env)
-
             val server = AnalyzerMcpServer(env)
             val exchange = server.pipedStreamsExchange()
             val mcpClient = Client(clientInfo = Implementation(name = "compass-analyzer-client", version = "1.0.0"))

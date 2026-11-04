@@ -7,16 +7,18 @@ import io.github.mbbhalla.agentio.data.model.DataValue
 import io.github.mbbhalla.agentio.data.model.TableName
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 
 /** Keeps the README example honest. */
 class ReadmeExampleTest {
     @Test
     fun `readme example output is exact`() {
-        DuckDbDatabaseEnvironment.fromStatements(
-            ddl = listOf("CREATE TABLE inventory (site VARCHAR, qty BIGINT)", "CREATE TABLE site (id VARCHAR)"),
-            dml = emptyList(),
-            tableMetadata = emptySet(),
-        )
+        val env =
+            DuckDbDatabaseEnvironment.fromStatements(
+                ddl = listOf("CREATE TABLE inventory (site VARCHAR, qty BIGINT)", "CREATE TABLE site (id VARCHAR)"),
+                dml = emptyList(),
+                tableMetadata = emptySet(),
+            )
         val context =
             AuthorizationContext(
                 policies =
@@ -27,10 +29,12 @@ class ReadmeExampleTest {
                     ),
                 unlistedTablePolicy = UnlistedTablePolicy.DENY,
             )
-        val result: Result<AuthorizedSql> = SqlAuthorizer.authorize(SelectSqlStatement("SELECT * FROM Inventory"), context)
+        val sql: SelectSqlStatement = env.selectStatement("SELECT * FROM Inventory").getOrThrow()
+        val result: Result<AuthorizedSql> = SqlAuthorizer.authorize(sql, context)
         assertEquals(
             "WITH authz_inventory AS (SELECT * FROM inventory WHERE (site IN ('TX', 'CA'))) SELECT * FROM authz_inventory AS Inventory",
             result.getOrThrow().sql.value,
         )
+        assertSame(env, result.getOrThrow().sql.environment)
     }
 }

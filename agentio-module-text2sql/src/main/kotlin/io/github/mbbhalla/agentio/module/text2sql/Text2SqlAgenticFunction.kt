@@ -13,7 +13,6 @@ import io.github.mbbhalla.agentio.core.model.LLM
 import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
 import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
-import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.serialization.Serializable
@@ -25,6 +24,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class Text2SqlAgenticFunction internal constructor(
     agentConfiguration: AgentConfiguration,
+    private val env: DatabaseEnvironment,
 ) : AbstractAgenticFunction<
         Text2SqlAgenticFunction.Input,
         Text2SqlAgenticFunction.Output,
@@ -45,15 +45,14 @@ class Text2SqlAgenticFunction internal constructor(
     data class Output(
         @field:Description("Generated DuckDB SQL SELECT statement")
         val sql: String,
-    ) {
-        init {
-            SelectSqlStatement(sql)
-        }
-    }
+    )
 
     override fun getInputKClass() = Input::class
 
     override fun getOutputKClass() = Output::class
+
+    /** A successful invocation always returns SQL that is a valid `SELECT` on [env]. */
+    override fun validateOutput(output: Output): Result<Output> = env.selectStatement(output.sql).map { output }
 
     companion object {
         private const val TEMPERATURE = 0.3f
@@ -63,8 +62,6 @@ class Text2SqlAgenticFunction internal constructor(
             env: DatabaseEnvironment,
             llm: LLM = LLM.ANTHROPIC_CLAUDE_OPUS_4_6_V1_CROSS_REGION_INFERENCE,
         ): Text2SqlAgenticFunction {
-            DatabaseEnvironment.activate(env)
-
             val mcpServer = Text2SqlMcpServer(env)
             val exchange = mcpServer.pipedStreamsExchange()
             val mcpClient = Client(clientInfo = Implementation(name = "text2sql_client", version = "1.0.0"))
@@ -115,6 +112,7 @@ class Text2SqlAgenticFunction internal constructor(
                     delayBetweenTurns = 0.seconds,
                     problemDomain = "Text-to-SQL",
                 ),
+                env,
             )
         }
     }

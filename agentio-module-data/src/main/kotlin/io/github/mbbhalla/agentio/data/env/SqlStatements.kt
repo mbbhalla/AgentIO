@@ -1,75 +1,35 @@
 package io.github.mbbhalla.agentio.data.env
 
-import io.github.mbbhalla.agentio.data.model.ExplainResult
-
-data class SelectSqlStatement(
+/**
+ * A single read-only `SELECT` that [environment] has validated. Created only by
+ * [DatabaseEnvironment.selectStatement], and executable only on [environment].
+ */
+@ConsistentCopyVisibility
+data class SelectSqlStatement internal constructor(
     val value: String,
-) {
-    init {
-        val env =
-            DatabaseEnvironment.current
-                ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
-        val result = env.explain(value)
-        require(result.isSuccess) {
-            "Invalid SELECT SQL: ${(result as ExplainResult.Failure).error}"
-        }
-        // Fail closed: anything not positively identified as SELECT (DDL, COPY, MERGE, UNKNOWN) is rejected.
-        require(env.statementType(value) == StatementType.SELECT) {
-            "Not a SELECT statement"
-        }
-    }
-}
+    val environment: DatabaseEnvironment,
+)
 
-data class InsertSqlStatement(
+/** A single `INSERT` that [environment] has validated. Created only by [DatabaseEnvironment.insertStatement]. */
+@ConsistentCopyVisibility
+data class InsertSqlStatement internal constructor(
     val value: String,
-) {
-    init {
-        val env =
-            DatabaseEnvironment.current
-                ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
-        val result = env.explain(value)
-        require(result.isSuccess) {
-            "Invalid INSERT SQL: ${(result as ExplainResult.Failure).error}"
-        }
-        require(env.statementType(value) == StatementType.INSERT) {
-            "Not an INSERT statement"
-        }
-    }
-}
+    val environment: DatabaseEnvironment,
+)
 
-data class UpdateSqlStatement(
+/** A single `UPDATE` that [environment] has validated. Created only by [DatabaseEnvironment.updateStatement]. */
+@ConsistentCopyVisibility
+data class UpdateSqlStatement internal constructor(
     val value: String,
-) {
-    init {
-        val env =
-            DatabaseEnvironment.current
-                ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
-        val result = env.explain(value)
-        require(result.isSuccess) {
-            "Invalid UPDATE SQL: ${(result as ExplainResult.Failure).error}"
-        }
-        require(env.statementType(value) == StatementType.UPDATE) {
-            "Not an UPDATE statement"
-        }
-    }
-}
+    val environment: DatabaseEnvironment,
+)
 
-data class DeleteSqlStatement(
+/** A single `DELETE` that [environment] has validated. Created only by [DatabaseEnvironment.deleteStatement]. */
+@ConsistentCopyVisibility
+data class DeleteSqlStatement internal constructor(
     val value: String,
-) {
-    init {
-        val env =
-            DatabaseEnvironment.current
-                ?: throw IllegalStateException("No active DatabaseEnvironment — cannot validate SQL")
-        val result = env.explain(value)
-        require(result.isSuccess) {
-            "Invalid DELETE SQL: ${(result as ExplainResult.Failure).error}"
-        }
-        require(env.statementType(value) == StatementType.DELETE) {
-            "Not a DELETE statement"
-        }
-    }
-}
+    val environment: DatabaseEnvironment,
+)
 
 enum class StatementType {
     SELECT,

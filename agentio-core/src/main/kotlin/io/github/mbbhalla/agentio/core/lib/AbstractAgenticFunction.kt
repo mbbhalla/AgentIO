@@ -75,6 +75,17 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
 
     abstract fun getOutputKClass(): KClass<O>
 
+    /**
+     * Checks a decoded output before [invoke] reports success. A failure fails the invocation, so a
+     * successful [AgentOutput] always holds an output that passed this check, and an
+     * [io.github.mbbhalla.agentio.core.lib.eval.AgenticFunctionEvaluator] trial that fails it does not
+     * take part in selection.
+     *
+     * Runs after the conversation has ended, so the model never sees the error. Override it for checks
+     * that need state the output type cannot hold, such as the database a generated query must run on.
+     */
+    protected open fun validateOutput(output: O): Result<O> = Result.success(output)
+
     @Suppress("TooGenericExceptionCaught")
     final override suspend fun invoke(input: I): Result<AgentOutput<O>> =
         withContext(Dispatchers.IO) {
@@ -249,7 +260,7 @@ abstract class AbstractAgenticFunction<I : Instructible.WithInstruction, O : Any
 
         val outputConversation = conversationFlow.take(agentConfiguration.maxTurnLimit).last().conversation
 
-        val output = extractAndValidateOutput(outputConversation, outputSchemaJson)
+        val output = validateOutput(extractAndValidateOutput(outputConversation, outputSchemaJson)).getOrThrow()
 
         persistConversation(input, outputConversation)
 

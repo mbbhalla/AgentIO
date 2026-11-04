@@ -14,6 +14,7 @@ import kotlin.io.path.writeText
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -72,21 +73,23 @@ class SqlAuthorizerTest {
         context: AuthorizationContext = this.context,
     ): AuthorizedSql =
         SqlAuthorizer
-            .authorize(SelectSqlStatement(sql), context)
+            .authorize(statement(sql), context)
             .getOrElse { throw AssertionError("Expected success, got: ${it.message}", it) }
 
     private fun failure(
         sql: String,
         context: AuthorizationContext = this.context,
     ): String {
-        val result = SqlAuthorizer.authorize(SelectSqlStatement(sql), context)
+        val result = SqlAuthorizer.authorize(statement(sql), context)
         assertTrue(result.isFailure, "Expected failure but got: ${result.getOrNull()?.sql?.value}")
         return assertIs<IllegalArgumentException>(result.exceptionOrNull()).message.orEmpty()
     }
 
+    private fun statement(sql: String): SelectSqlStatement = env.selectStatement(sql).getOrThrow()
+
     private fun rows(sql: String): List<String> =
         env
-            .executeQuery(SelectSqlStatement(sql))
+            .executeQuery(statement(sql))
             .records
             .map { it.toString() }
             .sorted()
@@ -312,5 +315,20 @@ class SqlAuthorizerTest {
     fun `a policy on a column the table lacks fails authorization`() {
         val ctx = AuthorizationContext(mapOf(TableName("inventory") to (ColumnName("no_such_column") eq DataValue.LongValue(1))))
         assertContains(failure("SELECT * FROM inventory", ctx), "no_such_column")
+    }
+
+    @Test
+    fun `authorization runs on the environment that validated the statement, not the newest one`() {
+        val statement = statement("SELECT * FROM Inventory")
+        DuckDbDatabaseEnvironment.fromStatements(
+            ddl = listOf("CREATE TABLE unrelated (id INTEGER)"),
+            dml = emptyList(),
+            tableMetadata = emptySet(),
+        )
+
+        val authorized = SqlAuthorizer.authorize(statement, context).getOrThrow()
+
+        assertSame(env, authorized.sql.environment)
+        assertEquals(rows("SELECT * FROM $filteredInventory"), rows(authorized.sql.value))
     }
 }

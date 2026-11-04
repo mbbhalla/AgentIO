@@ -4,7 +4,7 @@ Data environment module for AgentIO. Provides typed data models, SQL statement v
 
 ## Core Principle: Correctness at Construction
 
-Every data type enforces validity in its `init` block. If an object exists, it is correct. Invalid state cannot propagate.
+Every data type enforces validity when it is created: in its `init` block, or, for SQL statements, in the environment method that is the only way to create one. If an object exists, it is correct. Invalid state cannot propagate.
 
 | Type | Guarantee |
 |------|-----------|
@@ -16,10 +16,10 @@ Every data type enforces validity in its `init` block. If an object exists, it i
 | `S3ObjectKey` | Non-blank, no leading `/` |
 | `S3Uri` | Valid `s3://bucket/key` format |
 | `MVELExpression` | Compiles via `MVEL.compileExpression()` — syntactically valid |
-| `SelectSqlStatement` | EXPLAIN passes + DuckDB parses exactly one read-only SELECT (no writes inside CTEs) |
-| `InsertSqlStatement` | EXPLAIN passes + plan is INSERT |
-| `UpdateSqlStatement` | EXPLAIN passes + plan is UPDATE |
-| `DeleteSqlStatement` | EXPLAIN passes + plan is DELETE |
+| `SelectSqlStatement` | Created only by `env.selectStatement(sql)`: EXPLAIN passes on `env` + DuckDB parses exactly one read-only SELECT (no writes inside CTEs). Records `env`; `executeQuery` on any other environment fails |
+| `InsertSqlStatement` | Created only by `env.insertStatement(sql)`: EXPLAIN passes on `env` + plan is INSERT |
+| `UpdateSqlStatement` | Created only by `env.updateStatement(sql)`: EXPLAIN passes on `env` + plan is UPDATE |
+| `DeleteSqlStatement` | Created only by `env.deleteStatement(sql)`: EXPLAIN passes on `env` + plan is DELETE |
 | `DuckDbDatabaseEnvironment` | DDL/DML executed successfully at construction |
 
 ## Package Structure
@@ -34,7 +34,7 @@ io.github.mbbhalla.agentio.data/
 │   ├── ExplainResult.kt    — sealed: Success | Failure
 │   └── MVELExpression.kt   — validated MVEL expression (compiled at construction)
 └── env/
-    ├── DatabaseEnvironment.kt        — abstract class with snapshot, companion holds active env; parseSelect/renderSelect expose DuckDB's SELECT parse tree
+    ├── DatabaseEnvironment.kt        — abstract class with snapshot; selectStatement/insertStatement/updateStatement/deleteStatement create validated statements; parseSelect/renderSelect expose DuckDB's SELECT parse tree
     ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet(dir, constraintStrategies) + fromS3(timestamp, s3Uri, s3Client, constraintStrategies)
     └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
 ```
@@ -176,22 +176,27 @@ val env = DuckDbDatabaseEnvironment.fromS3(
 
 ### Typed SQL — cannot construct invalid SQL
 
+A statement is created by the environment that validates it, and can only run on that environment.
+
 ```kotlin
-// Valid — object constructed
-val stmt = SelectSqlStatement("SELECT * FROM orders WHERE amount > 10")
+// Valid — Result.success
+val stmt: SelectSqlStatement = env.selectStatement("SELECT * FROM orders WHERE amount > 10").getOrThrow()
 val dataset = env.executeQuery(stmt)
 
-// Invalid — throws IllegalArgumentException at construction
-SelectSqlStatement("SELECT * FROM nonexistent_table")  // fails: EXPLAIN rejects
-InsertSqlStatement("not sql at all")                   // fails: EXPLAIN rejects
-SelectSqlStatement("INSERT INTO orders VALUES (1)")    // fails: plan type is INSERT, not SELECT
-SelectSqlStatement("WITH d AS (DELETE FROM orders RETURNING *) SELECT * FROM d")  // fails: writes through a CTE
+// Invalid — Result.failure(IllegalArgumentException)
+env.selectStatement("SELECT * FROM nonexistent_table")  // fails: EXPLAIN rejects
+env.insertStatement("not sql at all")                   // fails: EXPLAIN rejects
+env.selectStatement("INSERT INTO orders VALUES (1)")    // fails: plan type is INSERT, not SELECT
+env.selectStatement("WITH d AS (DELETE FROM orders RETURNING *) SELECT * FROM d")  // fails: writes through a CTE
+
+// A statement validated by one environment cannot run on another
+otherEnv.executeQuery(stmt)                              // throws IllegalArgumentException
 ```
 
 ### Access query results with typed columns
 
 ```kotlin
-val dataset = env.executeQuery(SelectSqlStatement("SELECT id, amount FROM orders"))
+val dataset = env.executeQuery(env.selectStatement("SELECT id, amount FROM orders").getOrThrow())
 val firstRecord = dataset.records[0]
 val id = firstRecord[ColumnName("id")]         // DataValue.StringValue("O-1")
 val amount = firstRecord[ColumnName("amount")] // DataValue.DoubleValue(42.0)
@@ -203,7 +208,7 @@ SQL produces a `Dataset`, MVEL evaluates over it to a boolean. The `Dataset` is 
 
 ```kotlin
 val dataset = env.executeQuery(
-    SelectSqlStatement("SELECT * FROM orders WHERE amount < 10")
+    env.selectStatement("SELECT * FROM orders WHERE amount < 10").getOrThrow()
 )
 
 // Default: non-empty result = true
@@ -224,7 +229,7 @@ val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
 ## Design Decisions
 
 - **DuckDB is the engine.** Customer data arrives as Parquet (local or S3) or DDL+INSERT. DuckDB validates and executes. No JDBC driver matrix.
-- **`DatabaseEnvironment.current`** — singleton reference used by typed SQL statements for validation. Set by factory methods via `activate()`.
+- **No global environment.** Every environment is an ordinary object you inject. Statements are created by the environment that validates them (`env.selectStatement(sql)`) and record it, and `executeQuery` rejects a statement from another environment, so any number of environments can coexist in one JVM without affecting each other.
 - **`DatabaseEnvironment.snapshot`** — optional provenance metadata. Non-null for S3-loaded environments (fully constructed with timestamp + resolved VersionSet). Null for filesystem/DDL-based environments.
 - **`schemaMetadata.yml` — dbt-inspired sidecar metadata.** Parquet carries data + physical schema but no descriptions, constraints, or relationships. A YAML sidecar file (optional, loaded from local directory or S3) enriches `TableInfo`/`ColumnInfo` with descriptions and declares PK/UNIQUE/NOT NULL/FK constraints. Format follows dbt `schema.yml` conventions for familiarity.
 - **Constraints are enforced at load time.** Data that violates declared constraints is invalid state. By default, `fromParquet`/`fromS3` throw `IllegalStateException` on violation. `ConstraintStrategies` allows callers to downgrade specific constraint types to IGNORE (log + continue) for exploratory workflows.

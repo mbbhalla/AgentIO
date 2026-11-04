@@ -321,6 +321,63 @@ internal class AbstractAgenticFunctionTest {
         }
 
     @Test
+    fun `should fail the invocation when validateOutput rejects the decoded output`() =
+        runBlocking {
+            // Given — a function whose output check rejects outputs that report success = false
+            val rejecting =
+                object : AbstractAgenticFunction<TestInput, TestOutput>(agentConfiguration) {
+                    override fun getInputKClass(): KClass<TestInput> = TestInput::class
+
+                    override fun getOutputKClass(): KClass<TestOutput> = TestOutput::class
+
+                    override fun validateOutput(output: TestOutput): Result<TestOutput> =
+                        if (output.success) {
+                            Result.success(output)
+                        } else {
+                            Result.failure(IllegalArgumentException("success must be true"))
+                        }
+                }
+
+            val mockResponse =
+                mockk<ConverseResponse> {
+                    every { output } returns
+                        mockk {
+                            every { asMessageOrNull() } returns
+                                Message {
+                                    role = ConversationRole.Assistant
+                                    content =
+                                        listOf(
+                                            ContentBlock.Text(
+                                                """
+                                                <JSON>
+                                                {"result": "done", "success": false}
+                                                </JSON>
+                                                """.trimIndent(),
+                                            ),
+                                        )
+                                }
+                        }
+                    every { usage } returns
+                        TokenUsage {
+                            inputTokens = 100
+                            outputTokens = 50
+                            totalTokens = 150
+                        }
+                    every { stopReason } returns StopReason.EndTurn
+                }
+
+            coEvery { mockToolsProvider.listTools() } returns emptyList()
+            coEvery { mockBedrockClient.converse(any()) } returns mockResponse
+
+            // When — the output matches the schema, so only validateOutput can fail it
+            val result = rejecting.invoke(TestInput(id = "test-rejected", instruction = "Generate output"))
+
+            // Then
+            assertTrue(result.isFailure)
+            assertEquals("success must be true", result.exceptionOrNull()?.message)
+        }
+
+    @Test
     fun `should report schema validation errors when output JSON violates the output schema`() =
         runBlocking {
             // Given

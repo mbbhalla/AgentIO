@@ -156,7 +156,7 @@ An agent that converts natural language questions into valid DuckDB SQL. Two dat
 
 ### Key Patterns
 
-- **Correctness at construction** — `Output.init` validates SQL via DuckDB `EXPLAIN`; invalid SQL cannot be instantiated
+- **Validated output** — `validateOutput` checks the final SQL with `env.selectStatement` (DuckDB `EXPLAIN` on the agent's own environment); an invocation that returns invalid SQL fails, so it never wins the majority vote
 - **Agent reinforcement loop** — `ExecuteSqlTool` validates and returns errors to the agent for self-correction
 - **Two data-loading strategies** — SQL statements (RetailDB) vs Parquet files (EmployeeDB)
 - **Domain-agnostic models** — `DataValue`, `Dataset`, `ExplainResult`, `ColumnType` in `model/` package are reusable across domains
@@ -167,7 +167,7 @@ An agent that converts natural language questions into valid DuckDB SQL. Two dat
 ┌─────────────────────────────────────────────┐
 │         Text2SqlAgenticFunction             │
 │  Input: natural language query              │
-│  Output: validated SQL (init block proves)  │
+│  Output: SQL valid on env (validateOutput)  │
 └────────────────────┬────────────────────────┘
                      │ tools
         ┌────────────┼────────────┐
@@ -240,7 +240,7 @@ constraint-programming model.
   `nameFormat` like `V_MODIFY_PO_LI_QTY:::<id>:::<order_id>:::<product_id>`,
   ensuring variable names are anchored to real entities in the dataset.
 - **Two MCP servers, one DB env** — `AnalyzerMcpServer` and
-  `ConstraintGeneratorMcpServer` share an active `DatabaseEnvironment`
+  `ConstraintGeneratorMcpServer` are given the same `DatabaseEnvironment`
   but expose different tool sets (analyzer gets the result-validator,
   constraint generator gets the SMTLIB2 syntax checker).
 

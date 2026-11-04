@@ -4,7 +4,6 @@ import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
 import io.github.mbbhalla.agentio.core.lib.tool.AbstractMcpTool
 import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
-import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.data.model.DataValue
 import io.github.mbbhalla.agentio.module.compass.model.AnalysisResult
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
@@ -89,7 +88,8 @@ class AnalysisResultValidatorTool(
 
     private fun validateResultItem(item: AnalysisResult.ResultItem) {
         val select =
-            runCatching { SelectSqlStatement(item.sql) }
+            env
+                .selectStatement(item.sql)
                 .getOrElse { throw IllegalArgumentException("ResultItem '${item.key}': SQL is not a valid SELECT — ${it.message}") }
 
         val dataset = env.executeQuery(select)

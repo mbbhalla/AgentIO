@@ -8,7 +8,6 @@ import io.github.mbbhalla.agentio.core.lib.eval.MetricAgentOutputSelector
 import io.github.mbbhalla.agentio.core.lib.eval.MostFrequentAgentOutputSelector
 import io.github.mbbhalla.agentio.core.lib.eval.SelectionMode
 import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
-import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.examples.text2sql.data.EmployeeDatabase
 import io.github.mbbhalla.agentio.examples.text2sql.data.RetailDatabase
 import io.github.mbbhalla.agentio.module.text2sql.Text2SqlAgenticFunction
@@ -94,7 +93,7 @@ internal object Runner {
                 }.onSuccess { agentOutput ->
                     LOG.info("Selected SQL: ${agentOutput.output.sql}")
                     LOG.info("Results:")
-                    val validated = SelectSqlStatement(agentOutput.output.sql)
+                    val validated = env.selectStatement(agentOutput.output.sql).getOrThrow()
                     LOG.info(JsonSchemaUtil.json.encodeToString(env.executeQuery(validated)))
                 }
         }

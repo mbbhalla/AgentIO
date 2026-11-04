@@ -23,11 +23,12 @@ import kotlinx.serialization.json.jsonPrimitive
  * ```
  *
  * DuckDB itself parses the query and renders the rewrite ([DatabaseEnvironment.parseSelect],
- * [DatabaseEnvironment.renderSelect]) on the active environment — the one [SelectSqlStatement]
- * validates against — so the tables the rewrite filters are exactly the tables DuckDB reads.
+ * [DatabaseEnvironment.renderSelect]) on the environment that validated the input statement, so the
+ * tables the rewrite filters are exactly the tables DuckDB reads.
  *
  * Guarantees:
- *  - the output is a [SelectSqlStatement], so it binds on the active environment;
+ *  - the output is a [SelectSqlStatement] of that same environment, so it binds there and
+ *    [DatabaseEnvironment.executeQuery] refuses to run it anywhere else;
  *  - every read of a base table sees only the rows its policy allows: filtering is applied at the
  *    base-table boundary, before any join, aggregation or set operation;
  *  - a table without a policy fails the request unless the context opts into
@@ -47,8 +48,7 @@ object SqlAuthorizer {
         context: AuthorizationContext,
     ): Result<AuthorizedSql> =
         try {
-            val env = checkNotNull(DatabaseEnvironment.current) { "No active DatabaseEnvironment" }
-            Result.success(rewrite(sql, context, env))
+            Result.success(rewrite(sql, context))
         } catch (e: IllegalArgumentException) {
             Result.failure(e)
         }
@@ -56,8 +56,8 @@ object SqlAuthorizer {
     private fun rewrite(
         sql: SelectSqlStatement,
         context: AuthorizationContext,
-        env: DatabaseEnvironment,
     ): AuthorizedSql {
+        val env: DatabaseEnvironment = sql.environment
         val query = env.parseSelect(sql.value)
         val namesInQuery = strings(query).toSet()
         val cteNames = linkedMapOf<List<String>, String>() // lower-cased table path -> CTE that filters it
@@ -77,8 +77,9 @@ object SqlAuthorizer {
             cteNames.map { (path, name) ->
                 env.parseSelect(cteSql(name, path, context.policies.getValue(tableOf(path)))).cteEntries().single()
             }
+        val rendered = env.renderSelect(rewritten.withCteEntries(filteringCtes + rewritten.cteEntries()))
         return AuthorizedSql(
-            sql = SelectSqlStatement(env.renderSelect(rewritten.withCteEntries(filteringCtes + rewritten.cteEntries()))),
+            sql = env.selectStatement(rendered).getOrThrow(),
             filteredTables = cteNames.keys.map(::tableOf).toSet(),
             unfilteredTables = unfiltered,
         )

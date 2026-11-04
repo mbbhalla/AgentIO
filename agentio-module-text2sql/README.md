@@ -24,28 +24,31 @@ val context = AuthorizationContext(
     unlistedTablePolicy = UnlistedTablePolicy.DENY,      // fail closed (default)
 )
 
-val result: Result<AuthorizedSql> = SqlAuthorizer.authorize(SelectSqlStatement("SELECT * FROM Inventory"), context)
+val sql: SelectSqlStatement = env.selectStatement("SELECT * FROM Inventory").getOrThrow()
+val result: Result<AuthorizedSql> = SqlAuthorizer.authorize(sql, context)
 result.getOrThrow().sql.value
 // WITH authz_inventory AS (SELECT * FROM inventory WHERE (site IN ('TX', 'CA')))
 // SELECT * FROM authz_inventory AS Inventory
 ```
 
 DuckDB does the parsing: the query is parsed with `json_serialize_sql`, the parse tree is rewritten, and
-`json_deserialize_sql` renders it back to SQL, all on the active `DatabaseEnvironment`. The tables the
-rewrite filters are therefore exactly the tables DuckDB reads. The output is DuckDB's normalized SQL;
-comments and syntactic sugar such as `FROM x SELECT ...` are not preserved, but the meaning is.
+`json_deserialize_sql` renders it back to SQL, all on the environment that validated the input
+statement. The tables the rewrite filters are therefore exactly the tables DuckDB reads. The output is
+DuckDB's normalized SQL; comments and syntactic sugar such as `FROM x SELECT ...` are not preserved,
+but the meaning is.
 
 ### Guarantees
 
-- **Output is a valid `SELECT`.** `AuthorizedSql.sql` is a `SelectSqlStatement`, so DuckDB has bound
-  it (`EXPLAIN`) on the active environment and it can be passed straight to `executeQuery`.
+- **Output is a valid `SELECT` on the same environment.** `AuthorizedSql.sql` is a `SelectSqlStatement`
+  created by the environment that validated the input, so DuckDB has bound it (`EXPLAIN`) there, it
+  can be passed straight to that environment's `executeQuery`, and any other environment rejects it.
 - **Output honours the policy.** Filters are applied at the base-table boundary, before any join,
   aggregation, set operation or window function, so no later clause can widen what a table yields.
 - **Fail closed.** A table with no policy fails the request unless the context explicitly opts into
   `UnlistedTablePolicy.ALLOW_ALL_ROWS`. Sources that read data without naming a table are always
   rejected: table functions (`query_table`, `query`, `read_csv`, ...), `SUMMARIZE` / `DESCRIBE`, and
   file paths (`FROM 'data.csv'`). Data-modifying CTEs never reach the authorizer, because
-  `SelectSqlStatement` rejects them.
+  `selectStatement` rejects them.
 - **Scope-correct CTE resolution.** CTE names are resolved per scope the way DuckDB resolves them
   (later siblings, nested bodies, and a recursive CTE's own name only in its recursive term), so an
   inner `WITH inventory AS (...)` cannot shadow the `inventory` base table to escape its policy.
@@ -77,8 +80,10 @@ A small infix DSL is provided: `ColumnName("site") eq StringValue("TX")`, `isIn`
 
 `Text2SqlAgenticFunction.create(agentId, env)` builds an agent that converts natural language into a
 DuckDB `SELECT` using the `list_tables` / `get_tables` / `execute_sql` tools exposed by
-`Text2SqlMcpServer` over in-process piped streams. See the top-level README for the agentic function
-model.
+`Text2SqlMcpServer` over in-process piped streams. The tools and the final answer all use `env`: a
+successful invocation always returns SQL that is a valid `SELECT` on `env` (checked by
+`validateOutput`), and a trial that returns anything else fails, so it is excluded from an
+`AgenticFunctionEvaluator` vote. See the top-level README for the agentic function model.
 
 ## Testing
 

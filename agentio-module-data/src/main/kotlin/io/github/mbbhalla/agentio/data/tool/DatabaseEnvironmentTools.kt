@@ -3,7 +3,6 @@ package io.github.mbbhalla.agentio.data.tool
 import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.lib.tool.AbstractMcpTool
 import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
-import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.data.model.ColumnType
 import io.github.mbbhalla.agentio.data.model.Dataset
 import io.github.mbbhalla.agentio.data.model.ForeignKeyRef
@@ -160,5 +159,5 @@ class ExecuteSqlTool(
         return Input(sql = sql)
     }
 
-    override fun invoke(input: Input): Output = Output(resultSet = env.executeQuery(SelectSqlStatement(input.sql)))
+    override fun invoke(input: Input): Output = Output(resultSet = env.executeQuery(env.selectStatement(input.sql).getOrThrow()))
 }

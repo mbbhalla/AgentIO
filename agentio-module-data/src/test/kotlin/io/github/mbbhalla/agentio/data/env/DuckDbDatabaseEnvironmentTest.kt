@@ -177,7 +177,7 @@ class DuckDbDatabaseEnvironmentTest {
 
         @Test
         fun `executeQuery returns typed dataset`() {
-            val sql = SelectSqlStatement("SELECT product_id, unit_price FROM product ORDER BY product_id")
+            val sql = env.selectStatement("SELECT product_id, unit_price FROM product ORDER BY product_id").getOrThrow()
             val dataset = env.executeQuery(sql)
             assertEquals(2, dataset.columns.size)
             assertEquals(2, dataset.records.size)
@@ -188,9 +188,10 @@ class DuckDbDatabaseEnvironmentTest {
         @Test
         fun `executeQuery with join`() {
             val sql =
-                SelectSqlStatement(
-                    "SELECT p.product_name, i.quantity FROM product p JOIN inventory i ON p.product_id = i.product_id ORDER BY p.product_id",
-                )
+                env
+                    .selectStatement(
+                        "SELECT p.product_name, i.quantity FROM product p JOIN inventory i ON p.product_id = i.product_id ORDER BY p.product_id",
+                    ).getOrThrow()
             val dataset = env.executeQuery(sql)
             assertEquals(2, dataset.records.size)
             assertEquals(DataValue.StringValue("Widget"), dataset.records[0][ColumnName("product_name")])
@@ -198,8 +199,31 @@ class DuckDbDatabaseEnvironmentTest {
         }
 
         @Test
-        fun `environment is set as current`() {
-            assertEquals(env, DatabaseEnvironment.current)
+        fun `creating another environment does not change how this one validates`() {
+            val other =
+                DuckDbDatabaseEnvironment.fromStatements(
+                    ddl = listOf("CREATE TABLE items (id VARCHAR)"),
+                    dml = emptyList(),
+                    tableMetadata = emptySet(),
+                )
+
+            assertTrue(env.selectStatement("SELECT * FROM product").isSuccess)
+            assertTrue(other.selectStatement("SELECT * FROM product").isFailure)
+            assertTrue(other.selectStatement("SELECT * FROM items").isSuccess)
+        }
+
+        @Test
+        fun `executeQuery rejects a statement validated by another environment`() {
+            val other =
+                DuckDbDatabaseEnvironment.fromStatements(
+                    ddl = listOf("CREATE TABLE product (product_id VARCHAR)"),
+                    dml = emptyList(),
+                    tableMetadata = emptySet(),
+                )
+            val foreign = other.selectStatement("SELECT * FROM product").getOrThrow()
+
+            val error = assertThrows<IllegalArgumentException> { env.executeQuery(foreign) }
+            assertEquals("SelectSqlStatement was validated by a different DatabaseEnvironment", error.message)
         }
 
         @Test
@@ -262,9 +286,8 @@ class DuckDbDatabaseEnvironmentTest {
             createParquetFile("items")
 
             val env = DuckDbDatabaseEnvironment.fromParquet(tempDir)
-            DatabaseEnvironment.activate(env)
 
-            val sql = SelectSqlStatement("SELECT name, price FROM items WHERE price > 15")
+            val sql = env.selectStatement("SELECT name, price FROM items WHERE price > 15").getOrThrow()
             val dataset = env.executeQuery(sql)
 
             assertEquals(1, dataset.records.size)
@@ -582,9 +605,8 @@ class DuckDbDatabaseEnvironmentTest {
                         s3Uri = S3Uri("s3://my-bucket/data"),
                         s3Client = s3Client,
                     )
-                DatabaseEnvironment.activate(env)
 
-                val sql = SelectSqlStatement("SELECT name, price FROM orders WHERE price > 15")
+                val sql = env.selectStatement("SELECT name, price FROM orders WHERE price > 15").getOrThrow()
                 val dataset = env.executeQuery(sql)
 
                 assertEquals(1, dataset.records.size)

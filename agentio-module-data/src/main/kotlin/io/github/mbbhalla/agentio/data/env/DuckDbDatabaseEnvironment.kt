@@ -143,9 +143,9 @@ class DuckDbDatabaseEnvironment private constructor(
             }
         }
 
-    override fun executeQuery(sql: SelectSqlStatement): Dataset =
+    override fun executeValidatedQuery(sql: String): Dataset =
         connection.createStatement().use { stmt ->
-            Dataset.from(stmt.executeQuery(sql.value))
+            Dataset.from(stmt.executeQuery(sql))
         }
 
     companion object {
@@ -160,9 +160,7 @@ class DuckDbDatabaseEnvironment private constructor(
                 ddl.forEach { stmt.execute(it) }
                 dml.forEach { stmt.execute(it) }
             }
-            val env = DuckDbDatabaseEnvironment(connection, tableMetadata.associateBy { it.name }, snapshot = null)
-            activate(env)
-            return env
+            return DuckDbDatabaseEnvironment(connection, tableMetadata.associateBy { it.name }, snapshot = null)
         }
 
         fun fromParquet(
@@ -287,9 +285,7 @@ class DuckDbDatabaseEnvironment private constructor(
                 }
             }
 
-            val env = DuckDbDatabaseEnvironment(connection, tableMetadata, snapshot = snapshot)
-            activate(env)
-            return env
+            return DuckDbDatabaseEnvironment(connection, tableMetadata, snapshot = snapshot)
         }
 
         private fun applyComments(

@@ -120,7 +120,6 @@ class ConstraintGeneratorAgenticFunction internal constructor(
             llm: LLM = LLM.ANTHROPIC_CLAUDE_OPUS_4_6_V1_CROSS_REGION_INFERENCE,
         ): ConstraintGeneratorAgenticFunction {
             require(variables.isNotEmpty()) { "variables must not be empty" }
-            DatabaseEnvironment.activate(env)
 
             val server = ConstraintGeneratorMcpServer(env)
             val exchange = server.pipedStreamsExchange()

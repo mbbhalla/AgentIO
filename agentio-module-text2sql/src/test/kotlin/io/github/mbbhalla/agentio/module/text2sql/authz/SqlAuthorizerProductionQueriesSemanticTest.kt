@@ -61,9 +61,11 @@ class SqlAuthorizerProductionQueriesSemanticTest {
 
     private fun resource(name: String): String = checkNotNull(javaClass.getResource("/authz/$name")).readText()
 
+    private fun statement(sql: String): SelectSqlStatement = env.selectStatement(sql).getOrThrow()
+
     private fun rows(sql: String): List<String> =
         env
-            .executeQuery(SelectSqlStatement(sql))
+            .executeQuery(statement(sql))
             .records
             .map { it.toString() }
             .sorted()
@@ -84,7 +86,7 @@ class SqlAuthorizerProductionQueriesSemanticTest {
 
     private fun assertAuthorizedMatchesOracle(resourceName: String) {
         val sql = resource(resourceName)
-        val authorized = SqlAuthorizer.authorize(SelectSqlStatement(sql), context).getOrThrow()
+        val authorized = SqlAuthorizer.authorize(statement(sql), context).getOrThrow()
 
         val expected = rows(manuallyFiltered(sql))
         val actual = rows(authorized.sql.value)
@@ -108,14 +110,14 @@ class SqlAuthorizerProductionQueriesSemanticTest {
     @Test
     fun `no-rows policy on a leaf table empties the whole production query`() {
         val denyInventory = context.copy(policies = context.policies + (TableName("projectedinventory") to Criteria.NoRows))
-        val authorized = SqlAuthorizer.authorize(SelectSqlStatement(resource("site_summary_aggregates.sql")), denyInventory).getOrThrow()
+        val authorized = SqlAuthorizer.authorize(statement(resource("site_summary_aggregates.sql")), denyInventory).getOrThrow()
         assertEquals(emptyList(), env.executeQuery(authorized.sql).records)
     }
 
     @Test
     fun `a partial policy set fails closed on an unlisted table`() {
         val partial = AuthorizationContext(mapOf(TableName("site") to eastOnly, TableName("geography") to Criteria.AllRows))
-        val result = SqlAuthorizer.authorize(SelectSqlStatement(resource("site_summary_aggregates.sql")), partial)
+        val result = SqlAuthorizer.authorize(statement(resource("site_summary_aggregates.sql")), partial)
         val message = result.exceptionOrNull()?.message.orEmpty()
         assertTrue("'product' is not authorized" in message || "'projectedinventory' is not authorized" in message, message)
     }
