@@ -11,7 +11,7 @@ import io.github.mbbhalla.agentio.core.model.AgentConfiguration
 import io.github.mbbhalla.agentio.core.model.LLM
 import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.module.compass.model.AnalysisResult
 import io.github.mbbhalla.agentio.module.compass.server.AnalyzerMcpServer
 import io.modelcontextprotocol.kotlin.sdk.client.Client
@@ -24,7 +24,7 @@ import kotlin.time.Duration.Companion.minutes
  * Translates an English problem statement, posed against a tabular dataset, into a grounded
  * [AnalysisResult] — every result item carries the SQL that produces its value from the
  * underlying dataset. Domain-agnostic: the analyzer discovers schema via tools and grounds
- * arithmetic in SQL queries against the [DatabaseEnvironment] it was created with.
+ * arithmetic in SQL queries against the [DuckDbDatabaseEnvironment] it was created with.
  */
 class AnalyzerAgenticFunction internal constructor(
     agentConfiguration: AgentConfiguration,
@@ -93,7 +93,7 @@ class AnalyzerAgenticFunction internal constructor(
         private const val AGENT_ID = "compass-analyzer"
 
         suspend fun create(
-            env: DatabaseEnvironment,
+            env: DuckDbDatabaseEnvironment,
             problemDomain: String,
             llm: LLM = LLM.ANTHROPIC_CLAUDE_OPUS_4_6_V1_CROSS_REGION_INFERENCE,
         ): AnalyzerAgenticFunction {

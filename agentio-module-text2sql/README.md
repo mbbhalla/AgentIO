@@ -56,7 +56,7 @@ but the meaning is.
   — and rendered with quoted identifiers and escaped literals.
 - **Only the authorizer creates `AuthorizedSql`**; its constructor is internal.
 
-Tables are identified by `TableName`, the same type `DatabaseEnvironment.listTables()` returns. A
+Tables are identified by `TableName`, the same type `DuckDbDatabaseEnvironment.listTables()` returns. A
 reference such as `"Main"."Inventory"` or `memory.main.inventory` resolves to `TableName("inventory")`.
 Aliases are preserved; when a table had none, its written name is installed as the alias so that
 qualified column references (`inventory.site`) keep resolving.

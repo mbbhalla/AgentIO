@@ -1,6 +1,5 @@
 package io.github.mbbhalla.agentio.examples.text2sql.data
 
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
 import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.data.model.ColumnInfo
 import io.github.mbbhalla.agentio.data.model.ColumnName
@@ -10,7 +9,7 @@ import io.github.mbbhalla.agentio.data.model.TableInfo
 import io.github.mbbhalla.agentio.data.model.TableName
 
 object RetailDatabase {
-    val environment: DatabaseEnvironment by lazy {
+    val environment: DuckDbDatabaseEnvironment by lazy {
         DuckDbDatabaseEnvironment.fromStatements(
             ddl = DDL_STATEMENTS,
             dml = INSERTS,

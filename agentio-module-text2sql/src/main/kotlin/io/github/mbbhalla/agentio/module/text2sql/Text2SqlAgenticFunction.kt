@@ -12,7 +12,7 @@ import io.github.mbbhalla.agentio.core.model.AgentConfiguration
 import io.github.mbbhalla.agentio.core.model.LLM
 import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.serialization.Serializable
@@ -24,7 +24,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class Text2SqlAgenticFunction internal constructor(
     agentConfiguration: AgentConfiguration,
-    private val env: DatabaseEnvironment,
+    private val env: DuckDbDatabaseEnvironment,
 ) : AbstractAgenticFunction<
         Text2SqlAgenticFunction.Input,
         Text2SqlAgenticFunction.Output,
@@ -59,7 +59,7 @@ class Text2SqlAgenticFunction internal constructor(
 
         suspend fun create(
             agentId: String,
-            env: DatabaseEnvironment,
+            env: DuckDbDatabaseEnvironment,
             llm: LLM = LLM.ANTHROPIC_CLAUDE_OPUS_4_6_V1_CROSS_REGION_INFERENCE,
         ): Text2SqlAgenticFunction {
             val mcpServer = Text2SqlMcpServer(env)

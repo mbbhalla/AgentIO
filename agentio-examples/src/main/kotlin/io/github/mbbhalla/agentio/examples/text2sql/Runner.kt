@@ -7,7 +7,7 @@ import io.github.mbbhalla.agentio.core.lib.eval.ConversationMetrics
 import io.github.mbbhalla.agentio.core.lib.eval.MetricAgentOutputSelector
 import io.github.mbbhalla.agentio.core.lib.eval.MostFrequentAgentOutputSelector
 import io.github.mbbhalla.agentio.core.lib.eval.SelectionMode
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.examples.text2sql.data.EmployeeDatabase
 import io.github.mbbhalla.agentio.examples.text2sql.data.RetailDatabase
 import io.github.mbbhalla.agentio.module.text2sql.Text2SqlAgenticFunction
@@ -36,7 +36,7 @@ internal object Runner {
     private val LOG = LoggerFactory.getLogger(Runner::class.java)
 
     fun run(
-        env: DatabaseEnvironment,
+        env: DuckDbDatabaseEnvironment,
         query: String,
     ): Result<AgentOutput<Text2SqlAgenticFunction.Output>> =
         runBlocking {

@@ -3,7 +3,7 @@ package io.github.mbbhalla.agentio.module.compass.tool
 import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
 import io.github.mbbhalla.agentio.core.lib.tool.AbstractMcpTool
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.data.model.DataValue
 import io.github.mbbhalla.agentio.module.compass.model.AnalysisResult
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory
  * - The returned scalar must match the ResultItem.value (numerically, ignoring Long↔Double).
  */
 class AnalysisResultValidatorTool(
-    private val env: DatabaseEnvironment,
+    private val env: DuckDbDatabaseEnvironment,
 ) : AbstractMcpTool<AnalysisResultValidatorTool.Input, AnalysisResultValidatorTool.Output>() {
     @Serializable
     data class Input(

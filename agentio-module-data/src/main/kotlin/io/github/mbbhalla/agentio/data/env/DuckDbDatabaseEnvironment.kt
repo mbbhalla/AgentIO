@@ -42,18 +42,71 @@ import java.sql.DriverManager
 
 private val logger = LoggerFactory.getLogger(DuckDbDatabaseEnvironment::class.java)
 
+/**
+ * An in-process DuckDB database that agents and tools read, together with the table metadata they
+ * discover it through. Create one with [fromStatements], [fromParquet] or [fromS3] and inject it where
+ * it is used. Statements are validated by an environment and can only be executed on that same
+ * environment, so any number of environments can coexist in one JVM.
+ */
 class DuckDbDatabaseEnvironment private constructor(
     private val connection: Connection,
     private val tableMetadata: Map<TableName, TableInfo>,
-    override val snapshot: DatabaseEnvironmentSnapshot?,
-) : DatabaseEnvironment() {
-    override fun listTables(): Set<TableName> = tableMetadata.keys
+    val snapshot: DatabaseEnvironmentSnapshot?,
+) {
+    fun listTables(): Set<TableName> = tableMetadata.keys
 
-    override fun getTableInfo(tableName: TableName): TableInfo =
+    fun getTableInfo(tableName: TableName): TableInfo =
         tableMetadata[tableName]
             ?: throw IllegalArgumentException("Table '${tableName.value}' not found")
 
-    override fun explain(sql: String): ExplainResult {
+    /**
+     * The only way to obtain a [SelectSqlStatement]: [sql] must pass `EXPLAIN` on this environment and
+     * be exactly one read-only `SELECT`. Fails with [IllegalArgumentException] otherwise.
+     */
+    fun selectStatement(sql: String): Result<SelectSqlStatement> = validate(sql, StatementType.SELECT).map { SelectSqlStatement(it, this) }
+
+    /** The only way to obtain an [InsertSqlStatement]; see [selectStatement]. */
+    fun insertStatement(sql: String): Result<InsertSqlStatement> = validate(sql, StatementType.INSERT).map { InsertSqlStatement(it, this) }
+
+    /** The only way to obtain an [UpdateSqlStatement]; see [selectStatement]. */
+    fun updateStatement(sql: String): Result<UpdateSqlStatement> = validate(sql, StatementType.UPDATE).map { UpdateSqlStatement(it, this) }
+
+    /** The only way to obtain a [DeleteSqlStatement]; see [selectStatement]. */
+    fun deleteStatement(sql: String): Result<DeleteSqlStatement> = validate(sql, StatementType.DELETE).map { DeleteSqlStatement(it, this) }
+
+    /**
+     * Runs [sql] on this environment.
+     *
+     * @throws IllegalArgumentException if [sql] was validated by a different environment
+     */
+    fun executeQuery(sql: SelectSqlStatement): Dataset {
+        require(sql.environment === this) { "SelectSqlStatement was validated by a different environment" }
+        return connection.createStatement().use { stmt ->
+            Dataset.from(stmt.executeQuery(sql.value))
+        }
+    }
+
+    private fun validate(
+        sql: String,
+        expected: StatementType,
+    ): Result<String> {
+        val explained = explain(sql)
+        return when {
+            explained is ExplainResult.Failure ->
+                Result.failure(IllegalArgumentException("Invalid ${expected.name} SQL: ${explained.error}"))
+            statementType(sql) != expected ->
+                Result.failure(IllegalArgumentException("Not ${expected.withArticle()} statement"))
+            else -> Result.success(sql)
+        }
+    }
+
+    private fun StatementType.withArticle(): String =
+        when (this) {
+            StatementType.INSERT, StatementType.UPDATE, StatementType.UNKNOWN -> "an $name"
+            StatementType.SELECT, StatementType.DELETE -> "a $name"
+        }
+
+    internal fun explain(sql: String): ExplainResult {
         if (!isSingleStatement(sql)) return ExplainResult.Failure(MULTIPLE_STATEMENTS_ERROR)
         return try {
             connection.createStatement().use { stmt ->
@@ -74,7 +127,7 @@ class DuckDbDatabaseEnvironment private constructor(
      * JSON plan, scanning the whole operator tree because DuckDB may wrap the write (e.g.
      * `DELETE ... RETURNING` has a PROJECTION root).
      */
-    override fun statementType(sql: String): StatementType =
+    internal fun statementType(sql: String): StatementType =
         if (!isSingleStatement(sql)) {
             StatementType.UNKNOWN
         } else {
@@ -100,7 +153,14 @@ class DuckDbDatabaseEnvironment private constructor(
             false
         }
 
-    override fun parseSelect(sql: String): JsonObject {
+    /**
+     * Parses [sql] with DuckDB's own parser (`json_serialize_sql`) and returns the parse tree of its
+     * single read-only `SELECT`. Nothing is bound or executed, so the tables it names need not exist.
+     *
+     * @throws IllegalArgumentException if [sql] is not exactly one `SELECT`, or if it contains a
+     *   data-modifying query such as `WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d`
+     */
+    fun parseSelect(sql: String): JsonObject {
         val parsed = Json.parseToJsonElement(queryString("SELECT json_serialize_sql(?::VARCHAR)", sql)).jsonObject
         val statements =
             requireNotNull(parsed["statements"]?.jsonArray) {
@@ -114,7 +174,8 @@ class DuckDbDatabaseEnvironment private constructor(
         return query
     }
 
-    override fun renderSelect(query: JsonObject): String =
+    /** Renders a parse tree in the form returned by [parseSelect] back to SQL (`json_deserialize_sql`). */
+    fun renderSelect(query: JsonObject): String =
         queryString(
             "SELECT json_deserialize_sql(?::JSON)",
             buildJsonObject { putJsonArray("statements") { addJsonObject { put("node", query) } } }.toString(),
@@ -141,11 +202,6 @@ class DuckDbDatabaseEnvironment private constructor(
                     .flatMap { collectOperatorNames(Json.parseToJsonElement(it)) }
                     .toSet()
             }
-        }
-
-    override fun executeValidatedQuery(sql: String): Dataset =
-        connection.createStatement().use { stmt ->
-            Dataset.from(stmt.executeQuery(sql))
         }
 
     companion object {

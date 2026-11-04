@@ -223,7 +223,7 @@ class DuckDbDatabaseEnvironmentTest {
             val foreign = other.selectStatement("SELECT * FROM product").getOrThrow()
 
             val error = assertThrows<IllegalArgumentException> { env.executeQuery(foreign) }
-            assertEquals("SelectSqlStatement was validated by a different DatabaseEnvironment", error.message)
+            assertEquals("SelectSqlStatement was validated by a different environment", error.message)
         }
 
         @Test

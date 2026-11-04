@@ -1,6 +1,6 @@
 package io.github.mbbhalla.agentio.module.text2sql.authz
 
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.data.model.TableName
 import kotlinx.serialization.json.JsonArray
@@ -22,13 +22,13 @@ import kotlinx.serialization.json.jsonPrimitive
  * ) SELECT * FROM authz_inventory AS inventory
  * ```
  *
- * DuckDB itself parses the query and renders the rewrite ([DatabaseEnvironment.parseSelect],
- * [DatabaseEnvironment.renderSelect]) on the environment that validated the input statement, so the
+ * DuckDB itself parses the query and renders the rewrite ([DuckDbDatabaseEnvironment.parseSelect],
+ * [DuckDbDatabaseEnvironment.renderSelect]) on the environment that validated the input statement, so the
  * tables the rewrite filters are exactly the tables DuckDB reads.
  *
  * Guarantees:
  *  - the output is a [SelectSqlStatement] of that same environment, so it binds there and
- *    [DatabaseEnvironment.executeQuery] refuses to run it anywhere else;
+ *    [DuckDbDatabaseEnvironment.executeQuery] refuses to run it anywhere else;
  *  - every read of a base table sees only the rows its policy allows: filtering is applied at the
  *    base-table boundary, before any join, aggregation or set operation;
  *  - a table without a policy fails the request unless the context opts into
@@ -57,7 +57,7 @@ object SqlAuthorizer {
         sql: SelectSqlStatement,
         context: AuthorizationContext,
     ): AuthorizedSql {
-        val env: DatabaseEnvironment = sql.environment
+        val env: DuckDbDatabaseEnvironment = sql.environment
         val query = env.parseSelect(sql.value)
         val namesInQuery = strings(query).toSet()
         val cteNames = linkedMapOf<List<String>, String>() // lower-cased table path -> CTE that filters it

@@ -2,7 +2,7 @@ package io.github.mbbhalla.agentio.data.tool
 
 import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.lib.tool.AbstractMcpTool
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.data.model.ColumnType
 import io.github.mbbhalla.agentio.data.model.Dataset
 import io.github.mbbhalla.agentio.data.model.ForeignKeyRef
@@ -13,10 +13,10 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Lists all table names in the given [DatabaseEnvironment].
+ * Lists all table names in the given [DuckDbDatabaseEnvironment].
  */
 class ListTablesTool(
-    private val env: DatabaseEnvironment,
+    private val env: DuckDbDatabaseEnvironment,
 ) : AbstractMcpTool<Unit, ListTablesTool.Output>() {
     @Serializable
     data class Output(
@@ -43,7 +43,7 @@ class ListTablesTool(
  * Retrieves schema information (columns, types, keys, descriptions) for a set of tables.
  */
 class GetTablesTool(
-    private val env: DatabaseEnvironment,
+    private val env: DuckDbDatabaseEnvironment,
 ) : AbstractMcpTool<GetTablesTool.Input, GetTablesTool.Output>() {
     @Serializable
     data class Input(
@@ -122,10 +122,10 @@ class GetTablesTool(
 }
 
 /**
- * Executes a SELECT SQL statement against the [DatabaseEnvironment] and returns the result set.
+ * Executes a SELECT SQL statement against the [DuckDbDatabaseEnvironment] and returns the result set.
  */
 class ExecuteSqlTool(
-    private val env: DatabaseEnvironment,
+    private val env: DuckDbDatabaseEnvironment,
 ) : AbstractMcpTool<ExecuteSqlTool.Input, ExecuteSqlTool.Output>() {
     @Serializable
     data class Input(

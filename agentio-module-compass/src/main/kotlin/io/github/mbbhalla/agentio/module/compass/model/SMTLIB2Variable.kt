@@ -1,6 +1,6 @@
 package io.github.mbbhalla.agentio.module.compass.model
 
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.data.model.ColumnName
 import io.github.mbbhalla.agentio.data.model.TableName
 
@@ -31,7 +31,7 @@ abstract class SMTLIB2Variable {
     abstract val associatedDataTable: TableName
     abstract val keyColumns: List<ColumnName>
 
-    fun nameFormat(env: DatabaseEnvironment): String {
+    fun nameFormat(env: DuckDbDatabaseEnvironment): String {
         val info = env.getTableInfo(associatedDataTable)
         val tableColumns = info.columns.map { it.name.value }.toSet()
         val missing = keyColumns.filterNot { it.value in tableColumns }
@@ -44,7 +44,7 @@ abstract class SMTLIB2Variable {
         ) { "<${it.value}>" }
     }
 
-    fun serialize(env: DatabaseEnvironment): String =
+    fun serialize(env: DuckDbDatabaseEnvironment): String =
         """
         {
           "type": "$type",

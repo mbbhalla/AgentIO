@@ -240,7 +240,7 @@ constraint-programming model.
   `nameFormat` like `V_MODIFY_PO_LI_QTY:::<id>:::<order_id>:::<product_id>`,
   ensuring variable names are anchored to real entities in the dataset.
 - **Two MCP servers, one DB env** — `AnalyzerMcpServer` and
-  `ConstraintGeneratorMcpServer` are given the same `DatabaseEnvironment`
+  `ConstraintGeneratorMcpServer` are given the same `DuckDbDatabaseEnvironment`
   but expose different tool sets (analyzer gets the result-validator,
   constraint generator gets the SMTLIB2 syntax checker).
 

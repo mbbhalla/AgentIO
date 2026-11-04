@@ -1,6 +1,6 @@
 package io.github.mbbhalla.agentio.examples.camel
 
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.examples.text2sql.data.RetailDatabase
 import io.github.mbbhalla.agentio.module.text2sql.Text2SqlAgenticFunction
 import kotlinx.coroutines.runBlocking
@@ -42,7 +42,7 @@ internal object Runner {
     private const val MAX_CONCURRENCY = 2
 
     fun run(
-        env: DatabaseEnvironment,
+        env: DuckDbDatabaseEnvironment,
         queriesFile: File,
     ) {
         val queries = readQueries(queriesFile)

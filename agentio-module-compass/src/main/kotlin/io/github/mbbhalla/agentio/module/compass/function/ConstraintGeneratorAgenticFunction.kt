@@ -11,7 +11,7 @@ import io.github.mbbhalla.agentio.core.model.AgentConfiguration
 import io.github.mbbhalla.agentio.core.model.LLM
 import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
+import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.module.compass.model.AnalysisResult
 import io.github.mbbhalla.agentio.module.compass.model.SMTLIB2Variable
 import io.github.mbbhalla.agentio.module.compass.server.ConstraintGeneratorMcpServer
@@ -114,7 +114,7 @@ class ConstraintGeneratorAgenticFunction internal constructor(
         private const val AGENT_ID = "compass-constraint-generator"
 
         suspend fun create(
-            env: DatabaseEnvironment,
+            env: DuckDbDatabaseEnvironment,
             variables: Set<SMTLIB2Variable>,
             problemDomain: String,
             llm: LLM = LLM.ANTHROPIC_CLAUDE_OPUS_4_6_V1_CROSS_REGION_INFERENCE,

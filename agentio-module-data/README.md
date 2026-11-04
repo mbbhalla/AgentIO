@@ -34,8 +34,7 @@ io.github.mbbhalla.agentio.data/
 │   ├── ExplainResult.kt    — sealed: Success | Failure
 │   └── MVELExpression.kt   — validated MVEL expression (compiled at construction)
 └── env/
-    ├── DatabaseEnvironment.kt        — abstract class with snapshot; selectStatement/insertStatement/updateStatement/deleteStatement create validated statements; parseSelect/renderSelect expose DuckDB's SELECT parse tree
-    ├── DuckDbDatabaseEnvironment.kt  — fromStatements() + fromParquet(dir, constraintStrategies) + fromS3(timestamp, s3Uri, s3Client, constraintStrategies)
+    ├── DuckDbDatabaseEnvironment.kt  — the environment: fromStatements() + fromParquet(dir, constraintStrategies) + fromS3(timestamp, s3Uri, s3Client, constraintStrategies); selectStatement/insertStatement/updateStatement/deleteStatement create validated statements; parseSelect/renderSelect expose DuckDB's SELECT parse tree
     └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
 ```
 
@@ -229,8 +228,9 @@ val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
 ## Design Decisions
 
 - **DuckDB is the engine.** Customer data arrives as Parquet (local or S3) or DDL+INSERT. DuckDB validates and executes. No JDBC driver matrix.
+- **One concrete environment class, no engine abstraction.** `DuckDbDatabaseEnvironment` is a final class. AgentIO targets DuckDB only, and the contract is DuckDB throughout (statement SQL, the parse tree from `parseSelect`, plan-based `statementType`), so an engine-neutral supertype would promise portability it cannot deliver. If a second engine is ever needed, extract an interface from two real implementations.
 - **No global environment.** Every environment is an ordinary object you inject. Statements are created by the environment that validates them (`env.selectStatement(sql)`) and record it, and `executeQuery` rejects a statement from another environment, so any number of environments can coexist in one JVM without affecting each other.
-- **`DatabaseEnvironment.snapshot`** — optional provenance metadata. Non-null for S3-loaded environments (fully constructed with timestamp + resolved VersionSet). Null for filesystem/DDL-based environments.
+- **`DuckDbDatabaseEnvironment.snapshot`** — optional provenance metadata. Non-null for S3-loaded environments (fully constructed with timestamp + resolved VersionSet). Null for filesystem/DDL-based environments.
 - **`schemaMetadata.yml` — dbt-inspired sidecar metadata.** Parquet carries data + physical schema but no descriptions, constraints, or relationships. A YAML sidecar file (optional, loaded from local directory or S3) enriches `TableInfo`/`ColumnInfo` with descriptions and declares PK/UNIQUE/NOT NULL/FK constraints. Format follows dbt `schema.yml` conventions for familiarity.
 - **Constraints are enforced at load time.** Data that violates declared constraints is invalid state. By default, `fromParquet`/`fromS3` throw `IllegalStateException` on violation. `ConstraintStrategies` allows callers to downgrade specific constraint types to IGNORE (log + continue) for exploratory workflows.
 - **UNIQUE via `CREATE UNIQUE INDEX`** — DuckDB does not support `ALTER TABLE ADD UNIQUE`. Indexes create dependencies that prevent further `ALTER TABLE`, so constraint application order is: NOT NULL → PRIMARY KEY → UNIQUE INDEX.

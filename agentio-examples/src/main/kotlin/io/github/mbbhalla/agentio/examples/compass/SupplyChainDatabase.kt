@@ -1,6 +1,5 @@
 package io.github.mbbhalla.agentio.examples.compass
 
-import io.github.mbbhalla.agentio.data.env.DatabaseEnvironment
 import io.github.mbbhalla.agentio.data.env.DuckDbDatabaseEnvironment
 import io.github.mbbhalla.agentio.data.model.ConstraintStrategies
 import io.github.mbbhalla.agentio.data.model.ViolationBehavior
@@ -14,7 +13,7 @@ object SupplyChainDatabase {
     const val DATASET_1_NAME = "supplychain_dataset_1"
     const val DATASET_2_NAME = "supplychain_dataset_2"
 
-    val environment1: DatabaseEnvironment by lazy {
+    val environment1: DuckDbDatabaseEnvironment by lazy {
         val resourceDir =
             SupplyChainDatabase::class.java
                 .getResource("/$DATASET_1_NAME")
@@ -34,7 +33,7 @@ object SupplyChainDatabase {
         )
     }
 
-    val environment2: DatabaseEnvironment by lazy {
+    val environment2: DuckDbDatabaseEnvironment by lazy {
         val resourceDir =
             SupplyChainDatabase::class.java
                 .getResource("/$DATASET_2_NAME")

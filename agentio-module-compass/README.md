@@ -172,7 +172,7 @@ DB tools (`list_tables`, `get_tables`, `execute_sql`) live in
 ## Dependencies
 
 - `agentio-core` (re-exports MCP SDK)
-- `agentio-module-data` (`DatabaseEnvironment`, `DataValue`, db tools)
+- `agentio-module-data` (`DuckDbDatabaseEnvironment`, `DataValue`, db tools)
 - `agentio-module-solver` (`SMTLIBv2Formula`, `Z3SolverFacade`)
 - AWS SDK for Kotlin (Bedrock Runtime)
 - Kotlinx Serialization
