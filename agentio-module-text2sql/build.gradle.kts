@@ -6,7 +6,7 @@ dependencies {
     api(project(":agentio-core"))
     api(project(":agentio-module-data"))
 
-    // Kotlinx Serialization (also the JSON parse tree used by SQL authorization)
+    // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // AWS SDK for Bedrock Runtime

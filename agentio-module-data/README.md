@@ -1,6 +1,6 @@
 # agentio-module-data
 
-Data environment module for AgentIO. Provides typed data models, SQL statement validation, and database environment abstraction backed by DuckDB.
+Data environment module for AgentIO. Provides typed data models, SQL statement validation, row-level SQL authorization, and database environment abstraction backed by DuckDB.
 
 ## Core Principle: Correctness at Construction
 
@@ -33,9 +33,14 @@ io.github.mbbhalla.agentio.data/
 │   ├── S3Models.kt         — S3ObjectKey, S3Uri, Version, VersionSet, DatabaseEnvironmentSnapshot
 │   ├── ExplainResult.kt    — sealed: Success | Failure
 │   └── MVELExpression.kt   — validated MVEL expression (compiled at construction)
-└── env/
-    ├── DuckDbDatabaseEnvironment.kt  — the environment: fromStatements() + fromParquet(dir, constraintStrategies) + fromS3(timestamp, s3Uri, s3Client, constraintStrategies); selectStatement/insertStatement/updateStatement/deleteStatement create validated statements; parseSelect/renderSelect expose DuckDB's SELECT parse tree
-    └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
+├── env/
+│   ├── DuckDbDatabaseEnvironment.kt  — the environment: fromStatements() + fromParquet(dir, constraintStrategies) + fromS3(timestamp, s3Uri, s3Client, constraintStrategies); selectStatement/insertStatement/updateStatement/deleteStatement create validated statements; internal parseSelect/renderSelect give the authorizer DuckDB's SELECT parse tree
+│   └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
+└── authz/
+    ├── SqlAuthorizer.kt              — rewrites a SelectSqlStatement so every base table it reads is filtered by the caller's Criteria
+    ├── AuthorizationContext.kt       — AuthorizationContext (table → Criteria), UnlistedTablePolicy, AuthorizedSql
+    ├── Criteria.kt                   — composable row-level predicate tree + infix DSL (eq, isIn, like, ...)
+    └── CriteriaRenderer.kt           — internal: renders Criteria as a DuckDB expression with quoted identifiers and escaped literals
 ```
 
 ## Usage
@@ -225,6 +230,78 @@ val belowThreshold = dataset.evaluate(
 val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
 ```
 
+## SQL authorization
+
+Row-level security applied by rewriting SQL rather than by trusting the query author. The types are in
+`io.github.mbbhalla.agentio.data.authz`.
+
+`SqlAuthorizer` takes a `SelectSqlStatement` written by anyone (an LLM, a user, another service) and an
+`AuthorizationContext` describing which rows the caller may see in each table. It returns a query in
+which every base-table reference has been replaced by a common table expression that applies the
+caller's filter.
+
+```kotlin
+val context = AuthorizationContext(
+    policies = mapOf(
+        TableName("inventory") to
+            (ColumnName("site") isIn listOf(DataValue.StringValue("TX"), DataValue.StringValue("CA"))),
+        TableName("site") to Criteria.AllRows,
+    ),
+    unlistedTablePolicy = UnlistedTablePolicy.DENY,      // fail closed (default)
+)
+
+val sql: SelectSqlStatement = env.selectStatement("SELECT * FROM Inventory").getOrThrow()
+val result: Result<AuthorizedSql> = SqlAuthorizer.authorize(sql, context)
+result.getOrThrow().sql.value
+// WITH authz_inventory AS (SELECT * FROM inventory WHERE (site IN ('TX', 'CA')))
+// SELECT * FROM authz_inventory AS Inventory
+```
+
+DuckDB does the parsing: the query is parsed with `json_serialize_sql`, the parse tree is rewritten, and
+`json_deserialize_sql` renders it back to SQL, all on the environment that validated the input
+statement. The tables the rewrite filters are therefore exactly the tables DuckDB reads. The output is
+DuckDB's normalized SQL; comments and syntactic sugar such as `FROM x SELECT ...` are not preserved,
+but the meaning is.
+
+### Guarantees
+
+- **Output is a valid `SELECT` on the same environment.** `AuthorizedSql.sql` is a `SelectSqlStatement`
+  created by the environment that validated the input, so DuckDB has bound it (`EXPLAIN`) there, it
+  can be passed straight to that environment's `executeQuery`, and any other environment rejects it.
+- **Output honours the policy.** Filters are applied at the base-table boundary, before any join,
+  aggregation, set operation or window function, so no later clause can widen what a table yields.
+- **Fail closed.** A table with no policy fails the request unless the context explicitly opts into
+  `UnlistedTablePolicy.ALLOW_ALL_ROWS`. Sources that read data without naming a table are always
+  rejected: table functions (`query_table`, `query`, `read_csv`, ...), `SUMMARIZE` / `DESCRIBE`, and
+  file paths (`FROM 'data.csv'`). Data-modifying CTEs never reach the authorizer, because
+  `selectStatement` rejects them.
+- **Scope-correct CTE resolution.** CTE names are resolved per scope the way DuckDB resolves them
+  (later siblings, nested bodies, and a recursive CTE's own name only in its recursive term), so an
+  inner `WITH inventory AS (...)` cannot shadow the `inventory` base table to escape its policy.
+- **Injection-safe predicates.** Criteria are built from `ColumnName` and `DataValue` — never raw SQL
+  — and rendered with quoted identifiers and escaped literals.
+- **Only the authorizer creates `AuthorizedSql`**; its constructor is internal.
+
+Tables are identified by `TableName`, the same type `DuckDbDatabaseEnvironment.listTables()` returns. A
+reference such as `"Main"."Inventory"` or `memory.main.inventory` resolves to `TableName("inventory")`.
+Aliases are preserved; when a table had none, its written name is installed as the alias so that
+qualified column references (`inventory.site`) keep resolving.
+
+### Criteria
+
+`Criteria` is a sealed, composable predicate tree:
+
+| Node | SQL |
+|------|-----|
+| `AllRows` / `NoRows` | `(1 = 1)` / `(1 = 0)` |
+| `Compare(column, op, value)` | `("col" = 'v')`, `<>`, `<`, `<=`, `>`, `>=`, `LIKE` |
+| `In(column, values, negated)` | `("col" [NOT] IN (...))` |
+| `IsNull(column, negated)` | `("col" IS [NOT] NULL)` |
+| `And` / `Or` / `Not` | combinators |
+
+A small infix DSL is provided: `ColumnName("site") eq StringValue("TX")`, `isIn`, `notIn`, `gte`,
+`like`, `isNull()`, etc. Values are the same `DataValue`s that `Dataset` records hold.
+
 ## Design Decisions
 
 - **DuckDB is the engine.** Customer data arrives as Parquet (local or S3) or DDL+INSERT. DuckDB validates and executes. No JDBC driver matrix.
@@ -258,3 +335,8 @@ val breach = dataset.evaluate(MVELExpression(MVELExpression.DEFAULT))
 ./gradlew :agentio-module-data:build
 ./gradlew :agentio-module-data:test
 ```
+
+Authorization tests run every case on an in-memory DuckDB and compare the authorized rows with the
+same query filtered by hand: nested `WITH`, derived tables, joins, unions, recursive CTEs,
+quoted/mixed-case identifiers, name collisions, two 200–300-line production queries, and the rejected
+sources and error paths listed under [SQL authorization](#sql-authorization).

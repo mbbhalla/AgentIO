@@ -28,7 +28,7 @@ internal object Runner {
     private const val AGENT_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
     /** Number of independent SQL generations to vote across. */
-    private const val NUM_TRIALS = 5
+    private const val NUM_TRIALS = 1
 
     /** How many trials may run concurrently. */
     private const val MAX_PARALLELISM = 3

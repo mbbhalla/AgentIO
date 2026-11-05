@@ -160,7 +160,7 @@ class DuckDbDatabaseEnvironment private constructor(
      * @throws IllegalArgumentException if [sql] is not exactly one `SELECT`, or if it contains a
      *   data-modifying query such as `WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d`
      */
-    fun parseSelect(sql: String): JsonObject {
+    internal fun parseSelect(sql: String): JsonObject {
         val parsed = Json.parseToJsonElement(queryString("SELECT json_serialize_sql(?::VARCHAR)", sql)).jsonObject
         val statements =
             requireNotNull(parsed["statements"]?.jsonArray) {
@@ -175,7 +175,7 @@ class DuckDbDatabaseEnvironment private constructor(
     }
 
     /** Renders a parse tree in the form returned by [parseSelect] back to SQL (`json_deserialize_sql`). */
-    fun renderSelect(query: JsonObject): String =
+    internal fun renderSelect(query: JsonObject): String =
         queryString(
             "SELECT json_deserialize_sql(?::JSON)",
             buildJsonObject { putJsonArray("statements") { addJsonObject { put("node", query) } } }.toString(),

@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.module.text2sql.authz
+package io.github.mbbhalla.agentio.data.authz
 
 import io.github.mbbhalla.agentio.data.env.SelectSqlStatement
 import io.github.mbbhalla.agentio.data.model.TableName
