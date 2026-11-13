@@ -23,7 +23,7 @@ AgentIO/
 ├── agentio-module-text2sql/       Text2SQL module — NL-to-SQL agentic function, MCP server
 ├── agentio-module-solver/         SMTLIB2 + Z3 solver facade with correctness-at-construction
 ├── agentio-module-compass/        Constraint optimization via multi-agent problem analysis + solver synthesis
-├── agentio-module-patterns/       Agent design patterns (Adversarial, Orchestration) with runnable Runners
+├── agentio-module-patterns/       Agent design patterns (Adversarial, Orchestration, GOAP, Plan-and-Execute, Routing, Handoff, Cascade, HITL)
 └── agentio-examples/              Example agents (Hacker News, Git Analyzer, Text2SQL, etc.)
 ```
 
@@ -228,10 +228,11 @@ val agentConfiguration = AgentConfiguration(
 ./gradlew :agentio-examples:RunHackerNewsAgenticFunction
 ```
 
-Agent design patterns (Adversarial, Orchestration) live in [`agentio-module-patterns`](agentio-module-patterns/README.md):
+Agent design patterns (Adversarial, Orchestration, GOAP, Plan-and-Execute, Routing, Handoff, Model Cascade, Human-in-the-Loop) live in [`agentio-module-patterns`](agentio-module-patterns/README.md):
 
 ```bash
 ./gradlew :agentio-module-patterns:RunAdversarialAgenticFunction
+./gradlew :agentio-module-patterns:RunGoapAgenticFunction
 ```
 
 ## Architecture Benefits
