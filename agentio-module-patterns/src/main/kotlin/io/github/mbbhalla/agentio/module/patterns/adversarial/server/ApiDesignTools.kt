@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.examples.adversarial.server
+package io.github.mbbhalla.agentio.module.patterns.adversarial.server
 
 import io.github.mbbhalla.agentio.core.common.Description
 import io.github.mbbhalla.agentio.core.lib.tool.AbstractMcpTool

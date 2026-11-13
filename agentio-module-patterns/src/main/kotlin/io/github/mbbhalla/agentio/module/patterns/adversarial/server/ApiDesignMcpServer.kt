@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.examples.adversarial.server
+package io.github.mbbhalla.agentio.module.patterns.adversarial.server
 
 import io.github.mbbhalla.agentio.core.lib.server.AbstractMcpServer
 import io.modelcontextprotocol.kotlin.sdk.server.RegisteredTool

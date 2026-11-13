@@ -23,6 +23,7 @@ AgentIO/
 ├── agentio-module-text2sql/       Text2SQL module — NL-to-SQL agentic function, MCP server
 ├── agentio-module-solver/         SMTLIB2 + Z3 solver facade with correctness-at-construction
 ├── agentio-module-compass/        Constraint optimization via multi-agent problem analysis + solver synthesis
+├── agentio-module-patterns/       Agent design patterns (Adversarial, Orchestration) with runnable Runners
 └── agentio-examples/              Example agents (Hacker News, Git Analyzer, Text2SQL, etc.)
 ```
 
@@ -35,6 +36,7 @@ io.github.mbbhalla:agentio-module-data
 io.github.mbbhalla:agentio-module-text2sql
 io.github.mbbhalla:agentio-module-solver
 io.github.mbbhalla:agentio-module-compass
+io.github.mbbhalla:agentio-module-patterns
 io.github.mbbhalla:agentio-examples
 ```
 
@@ -43,6 +45,7 @@ io.github.mbbhalla:agentio-examples
 ```
 agentio-examples ──────────────→ agentio-core + agentio-module-camel + agentio-module-data
                                   + agentio-module-text2sql + agentio-module-solver + agentio-module-compass
+agentio-module-patterns ──────→ agentio-core
 agentio-module-compass ───────→ agentio-core + agentio-module-data + agentio-module-solver
 agentio-module-solver ────────→ agentio-core + agentio-module-data
 agentio-module-text2sql ──────→ agentio-core + agentio-module-data
@@ -223,6 +226,12 @@ val agentConfiguration = AgentConfiguration(
 
 ```bash
 ./gradlew :agentio-examples:RunHackerNewsAgenticFunction
+```
+
+Agent design patterns (Adversarial, Orchestration) live in [`agentio-module-patterns`](agentio-module-patterns/README.md):
+
+```bash
+./gradlew :agentio-module-patterns:RunAdversarialAgenticFunction
 ```
 
 ## Architecture Benefits

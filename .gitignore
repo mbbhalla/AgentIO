@@ -22,5 +22,6 @@ agentio-examples/bin/
 agentio-module-camel/bin/
 agentio-module-compass/bin/
 agentio-module-data/bin/
+agentio-module-patterns/bin/
 agentio-module-solver/bin/
 agentio-module-text2sql/bin/

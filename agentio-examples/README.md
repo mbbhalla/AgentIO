@@ -10,8 +10,6 @@ Example agents built with AgentIO, demonstrating how to use the SDK for real-wor
 | Fetch | External (uvx) | `RunFetchAgenticFunction` | Technical content analysis from URLs |
 | Git Analyzer | In-process | `RunGitAnalyzerAgenticFunction` | `AbstractMcpServer` + `PipedStreamsExchange` + custom tools |
 | Code Metrics | In-process | `RunCodeMetricsAgenticFunction` | `AbstractMcpServer` + `EventListener` for observability |
-| Adversarial | In-process | `RunAdversarialAgenticFunction` | Agent ↔ CriticAgent iterative refinement pattern |
-| Orchestration | In-process | `RunOrchestrationAgenticFunction` | Orchestrator + parallel Workers pattern |
 | Text2SQL (Retail) | In-process | `RunText2SqlAgenticFunction-RetailDB` | DuckDB from SQL statements + correctness-at-construction |
 | Text2SQL (Employee) | In-process | `RunText2SqlAgenticFunction-EmployeeDB` | DuckDB from Parquet files + correctness-at-construction |
 | COMPASS | In-process | `RunCompassAgenticFunction` | Multi-agent, domain-agnostic: NL problem → grounded analysis → SMTLIB2 formula → Z3 solver models (sample run uses supply-chain data) |
@@ -32,12 +30,6 @@ All examples are self-sufficient — no API keys or tokens required.
 
 # Code Metrics — analyze codebase complexity with full event observability
 ./gradlew :agentio-examples:RunCodeMetricsAgenticFunction
-
-# Adversarial — designer agent iterates with a critic agent until API design is approved
-./gradlew :agentio-examples:RunAdversarialAgenticFunction
-
-# Orchestration — orchestrator dispatches parallel workers and synthesizes results
-./gradlew :agentio-examples:RunOrchestrationAgenticFunction
 
 # Text2SQL (Retail) — NL to SQL against in-memory DuckDB retail database (from SQL statements)
 ./gradlew :agentio-examples:RunText2SqlAgenticFunction-RetailDB
@@ -96,56 +88,6 @@ An agent that analyzes source code complexity, dependency structure, and produce
 - **`EventListener`** — logs every agent lifecycle event (LLM calls, tool calls, latency, token usage)
 - **Custom tools** — `list_source_files`, `file_complexity`, `dependency_graph`
 - Runs against the AgentIO repository itself
-
-## Adversarial Agent (Designer ↔ Critic)
-
-Two agents iterating on an API design: a Designer proposes, a Critic reviews adversarially, and the Designer revises based on feedback until the Critic approves (max 3 iterations).
-
-### Key Patterns
-
-- **Multi-agent communication** — Designer output feeds into Critic input, Critic feedback loops back to Designer
-- **Iterative refinement** — bounded loop with convergence condition (`verdict == "APPROVED"`)
-- **Shared MCP tooling** — both agents use the same `ApiDesignMcpServer` for schema validation and security checks
-- **Custom tools** — `parse_requirements`, `validate_schema_consistency`, `check_security_patterns`
-
-### Architecture
-
-```
-┌────────────┐   design JSON   ┌──────────────┐
-│  Designer  │ ──────────────▶ │    Critic    │
-│   Agent    │ ◀────────────── │    Agent     │
-└────────────┘   feedback      └──────────────┘
-     │                               │
-     └───── ApiDesignMcpServer ──────┘
-```
-
-## Orchestration Agent (Orchestrator + Workers)
-
-An Orchestrator dispatches three Worker agents in parallel, each with a focused responsibility, then synthesizes their reports into a unified project health assessment.
-
-### Key Patterns
-
-- **Parallel worker dispatch** — `coroutineScope { async { ... } }` for concurrent execution
-- **Separation of concerns** — each worker has its own `AbstractMcpServer` with domain-specific tools
-- **Orchestrator has no tools** — purely synthesizes worker outputs using LLM reasoning
-- **Worker isolation** — workers execute their responsibility and do NOT orchestrate
-
-### Architecture
-
-```
-                ┌──────────────────┐
-                │   Orchestrator   │  (no tools, synthesis only)
-                └────────┬─────────┘
-           ┌─────────────┼─────────────┐
-           ▼             ▼             ▼
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│   Security   │ │   Quality    │ │    Docs      │
-│    Worker    │ │    Worker    │ │    Worker    │
-└──────┬───────┘ └──────┬───────┘ └──────┬───────┘
-       │                │                │
-  scan_deps     test_coverage +     scan_docs
-                complexity
-```
 
 ## Text2SQL Agent
 
@@ -336,14 +278,6 @@ io.github.mbbhalla.agentio.examples/
 │   ├── Runner.kt
 │   ├── function/CodeMetricsAgenticFunction.kt
 │   └── server/CodeMetricsMcpServer.kt, CodeMetricsTools.kt
-├── adversarial/
-│   ├── Runner.kt
-│   ├── function/AdversarialAgenticFunctions.kt
-│   └── server/ApiDesignMcpServer.kt, ApiDesignTools.kt
-├── orchestration/
-│   ├── Runner.kt
-│   ├── function/OrchestrationAgenticFunctions.kt
-│   └── server/OrchestrationMcpServers.kt, OrchestrationTools.kt
 ├── text2sql/
 │   ├── Runner.kt
 │   └── data/RetailDatabase.kt, EmployeeDatabase.kt

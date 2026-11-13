@@ -1,9 +1,9 @@
-package io.github.mbbhalla.agentio.examples.adversarial
+package io.github.mbbhalla.agentio.module.patterns.adversarial
 
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
-import io.github.mbbhalla.agentio.examples.adversarial.function.AdversarialAgenticFunctionProvider
-import io.github.mbbhalla.agentio.examples.adversarial.function.CriticAgenticFunction
-import io.github.mbbhalla.agentio.examples.adversarial.function.DesignerAgenticFunction
+import io.github.mbbhalla.agentio.module.patterns.adversarial.function.AdversarialAgenticFunctionProvider
+import io.github.mbbhalla.agentio.module.patterns.adversarial.function.CriticAgenticFunction
+import io.github.mbbhalla.agentio.module.patterns.adversarial.function.DesignerAgenticFunction
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 

@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.examples.adversarial.function
+package io.github.mbbhalla.agentio.module.patterns.adversarial.function
 
 import aws.sdk.kotlin.services.bedrockruntime.BedrockRuntimeClient
 import io.github.mbbhalla.agentio.core.common.Description
@@ -16,7 +16,7 @@ import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
 import io.github.mbbhalla.agentio.core.model.event.Event
 import io.github.mbbhalla.agentio.core.model.event.EventPayload
-import io.github.mbbhalla.agentio.examples.adversarial.server.ApiDesignMcpServer
+import io.github.mbbhalla.agentio.module.patterns.adversarial.server.ApiDesignMcpServer
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.serialization.Serializable

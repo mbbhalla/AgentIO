@@ -1,11 +1,11 @@
-package io.github.mbbhalla.agentio.examples.orchestration
+package io.github.mbbhalla.agentio.module.patterns.orchestration
 
 import io.github.mbbhalla.agentio.core.common.JsonSchemaUtil
-import io.github.mbbhalla.agentio.examples.orchestration.function.DocumentationWorkerAgenticFunction
-import io.github.mbbhalla.agentio.examples.orchestration.function.OrchestrationAgenticFunctionProvider
-import io.github.mbbhalla.agentio.examples.orchestration.function.OrchestratorAgenticFunction
-import io.github.mbbhalla.agentio.examples.orchestration.function.QualityWorkerAgenticFunction
-import io.github.mbbhalla.agentio.examples.orchestration.function.SecurityWorkerAgenticFunction
+import io.github.mbbhalla.agentio.module.patterns.orchestration.function.DocumentationWorkerAgenticFunction
+import io.github.mbbhalla.agentio.module.patterns.orchestration.function.OrchestrationAgenticFunctionProvider
+import io.github.mbbhalla.agentio.module.patterns.orchestration.function.OrchestratorAgenticFunction
+import io.github.mbbhalla.agentio.module.patterns.orchestration.function.QualityWorkerAgenticFunction
+import io.github.mbbhalla.agentio.module.patterns.orchestration.function.SecurityWorkerAgenticFunction
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking

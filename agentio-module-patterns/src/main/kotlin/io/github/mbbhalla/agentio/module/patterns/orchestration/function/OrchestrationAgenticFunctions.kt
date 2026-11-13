@@ -1,4 +1,4 @@
-package io.github.mbbhalla.agentio.examples.orchestration.function
+package io.github.mbbhalla.agentio.module.patterns.orchestration.function
 
 import aws.sdk.kotlin.services.bedrockruntime.BedrockRuntimeClient
 import io.github.mbbhalla.agentio.core.common.Description
@@ -16,9 +16,9 @@ import io.github.mbbhalla.agentio.core.model.LanguageModelParameters
 import io.github.mbbhalla.agentio.core.model.Temperature
 import io.github.mbbhalla.agentio.core.model.event.Event
 import io.github.mbbhalla.agentio.core.model.event.EventPayload
-import io.github.mbbhalla.agentio.examples.orchestration.server.DocumentationWorkerMcpServer
-import io.github.mbbhalla.agentio.examples.orchestration.server.QualityWorkerMcpServer
-import io.github.mbbhalla.agentio.examples.orchestration.server.SecurityWorkerMcpServer
+import io.github.mbbhalla.agentio.module.patterns.orchestration.server.DocumentationWorkerMcpServer
+import io.github.mbbhalla.agentio.module.patterns.orchestration.server.QualityWorkerMcpServer
+import io.github.mbbhalla.agentio.module.patterns.orchestration.server.SecurityWorkerMcpServer
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.serialization.Serializable

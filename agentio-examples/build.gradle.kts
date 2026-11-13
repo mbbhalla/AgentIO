@@ -105,44 +105,6 @@ tasks.register<JavaExec>("RunCodeMetricsAgenticFunction") {
         )
 }
 
-tasks.register<JavaExec>("RunAdversarialAgenticFunction") {
-    mainClass.set("io.github.mbbhalla.agentio.examples.adversarial.RunnerKt")
-    classpath = sourceSets["main"].runtimeClasspath
-    debug = false
-    debugOptions {
-        server = true
-        suspend = true
-        host = "localhost"
-        port = 5015
-    }
-    args =
-        listOf(
-            project.findProperty("requirements")?.toString()
-                ?: """
-                    |Build a task management API with users, projects, tasks, and comments.
-                    | Users authenticate via OAuth2. Tasks have priorities and due dates.
-                    | Support filtering and pagination.
-                """.trimMargin(),
-        )
-}
-
-tasks.register<JavaExec>("RunOrchestrationAgenticFunction") {
-    mainClass.set("io.github.mbbhalla.agentio.examples.orchestration.RunnerKt")
-    classpath = sourceSets["main"].runtimeClasspath
-    debug = false
-    debugOptions {
-        server = true
-        suspend = true
-        host = "localhost"
-        port = 5016
-    }
-    args =
-        listOf(
-            rootProject.projectDir.absolutePath,
-            "kt",
-        )
-}
-
 tasks.register<JavaExec>("RunText2SqlAgenticFunction-RetailDB") {
     mainClass.set("io.github.mbbhalla.agentio.examples.text2sql.RunnerKt")
     classpath = sourceSets["main"].runtimeClasspath
