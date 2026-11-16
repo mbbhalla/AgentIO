@@ -1,0 +1,879 @@
+# The university domain model as an Open Data Contract Standard (ODCS v3.2) document: 17 tables with
+# keys, relationships, enumerations and value bounds. Only the schema section is read by the model;
+# the rest is contract metadata. See ../Manifest.md for the mapping and what the fixture exercises.
+apiVersion: v3.2.0
+kind: DataContract
+id: university-domain-model
+name: University
+version: 1.0.0
+status: active
+domain: education
+dataProduct: university
+description:
+  purpose: "Target domain model for onboarding a university's data: campuses, academics, people and finance."
+  usage: "Build an empty, constraint-enforcing DuckDB target environment; agents map source data into it."
+tags: [university, target-model]
+team:
+  name: registrar-data
+  description: Owns the university target model
+  members:
+    - username: registrar
+      role: Owner
+support:
+  - channel: '#university-data'
+    tool: slack
+    scope: issues
+schema:
+  - id: academic_calendar
+    name: academic_calendar
+    physicalType: table
+    description: "One row per calendar day of a term, saying what kind of day it is"
+    tags: [academics]
+    dataGranularityDescription: One row per term per calendar day
+    properties:
+      - id: academic_calendar_term_code
+        name: term_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 1
+        relationships:
+          - to: term.term_code
+      - id: academic_calendar_date
+        name: date
+        logicalType: date
+        physicalType: DATE
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: "The calendar day"
+      - id: academic_calendar_day_type
+        name: day_type
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: "What kind of day this is for teaching purposes"
+        enum:
+          - value: CLASS
+            label: Teaching day
+          - value: EXAM
+            label: Examination day
+          - value: HOLIDAY
+            label: Holiday
+            description: No classes and no exams
+          - value: READING
+            label: Reading day
+            description: Study time before exams; no classes
+      - id: academic_calendar_note
+        name: note
+        logicalType: string
+        physicalType: VARCHAR
+  - id: award
+    name: award
+    physicalType: table
+    description: "A scholarship paid to a student for one term"
+    tags: [finance]
+    properties:
+      - id: award_student_id
+        name: student_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 1
+        relationships:
+          - to: student.student_id
+      - id: award_scholarship_id
+        name: scholarship_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 2
+        relationships:
+          - to: scholarship.scholarship_id
+      - id: award_term_code
+        name: term_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 3
+        relationships:
+          - to: term.term_code
+      - id: award_amount
+        name: amount
+        logicalType: number
+        physicalType: DOUBLE
+        required: true
+        description: "Paid this term; may be less than the scholarship's annual amount"
+        logicalTypeOptions:
+          minimum: 0
+      - id: award_awarded_at
+        name: awarded_at
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        required: true
+  - id: building
+    name: building
+    physicalType: table
+    description: "A building on a campus"
+    tags: [places]
+    properties:
+      - id: building_building_id
+        name: building_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+      - id: building_campus_id
+        name: campus_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: "Campus the building stands on"
+        relationships:
+          - to: campus.campus_id
+      - id: building_name
+        name: name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: building_floors
+        name: floors
+        logicalType: integer
+        physicalType: INTEGER
+        logicalTypeOptions:
+          minimum: 1
+      - id: building_year_built
+        name: year_built
+        logicalType: integer
+        physicalType: INTEGER
+        logicalTypeOptions:
+          minimum: 1800
+          maximum: 2100
+  - id: campus
+    name: campus
+    physicalType: table
+    description: "A physical campus of the university. Buildings, departments and students' home campus all point here."
+    tags: [places]
+    businessName: Campuses
+    properties:
+      - id: campus_campus_id
+        name: campus_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        description: "Identity of the campus"
+      - id: campus_code
+        name: code
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: "Short code printed on transcripts. Not unique: a code may be reused after a campus closes"
+        logicalTypeOptions:
+          minLength: 2
+          maxLength: 4
+          pattern: '^[A-Z]+$'
+        examples: [NTH, STH]
+      - id: campus_name
+        name: name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: campus_city
+        name: city
+        logicalType: string
+        physicalType: VARCHAR
+      - id: campus_time_zone
+        name: time_zone
+        logicalType: string
+        physicalType: VARCHAR
+        description: "IANA zone such as America/New_York"
+        examples: [America/New_York, Europe/London]
+      - id: campus_opened_on
+        name: opened_on
+        logicalType: date
+        physicalType: DATE
+        logicalTypeOptions:
+          minimum: "1800-01-01"
+      - id: campus_is_main
+        name: is_main
+        logicalType: boolean
+        physicalType: BOOLEAN
+        required: true
+        description: "Exactly one campus is the main campus; the model does not enforce this"
+        quality:
+          - type: sql
+            description: Exactly one campus is the main campus
+            query: SELECT count(*) FROM campus WHERE is_main
+            mustBe: 1
+  - id: course
+    name: course
+    physicalType: table
+    description: "A course in the catalogue, independent of when it is taught"
+    tags: [academics]
+    properties:
+      - id: course_course_code
+        name: course_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        description: "Catalogue code: a department prefix and a three-digit number"
+        logicalTypeOptions:
+          pattern: '^[A-Z]{2,4}[0-9]{3}$'
+        examples: [CS101, MATH210]
+      - id: course_department_id
+        name: department_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        relationships:
+          - to: department.department_id
+      - id: course_title
+        name: title
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: course_description
+        name: description
+        logicalType: string
+        physicalType: VARCHAR
+      - id: course_credits
+        name: credits
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+        logicalTypeOptions:
+          minimum: 1
+          maximum: 30
+      - id: course_level
+        name: level
+        logicalType: integer
+        physicalType: INTEGER
+        description: "Year of study the course is pitched at: 100 first year, 200 second year, and so on"
+        enum:
+          - value: 100
+          - value: 200
+          - value: 300
+          - value: 400
+  - id: department
+    name: department
+    physicalType: table
+    description: "An academic department. Owns programs, courses and faculty."
+    tags: [academics]
+    properties:
+      - id: department_department_id
+        name: department_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+      - id: department_name
+        name: name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: department_campus_id
+        name: campus_id
+        logicalType: string
+        physicalType: VARCHAR
+        description: "Home campus; null for departments spread across campuses"
+        relationships:
+          - to: campus.campus_id
+      - id: department_annual_budget
+        name: annual_budget
+        logicalType: number
+        physicalType: DOUBLE
+        description: "In the university's accounting currency"
+        logicalTypeOptions:
+          minimum: 0
+        classification: confidential
+  - id: enrollment
+    name: enrollment
+    physicalType: table
+    description: "A student's place in a section"
+    tags: [academics]
+    dataGranularityDescription: One row per student per section
+    quality:
+      - metric: rowCount
+        mustBeGreaterThan: 0
+        type: library
+    relationships:
+      - type: foreignKey
+        from: [enrollment.course_code, enrollment.term_code, enrollment.section_number]
+        to: [section.course_code, section.term_code, section.section_number]
+    properties:
+      - id: enrollment_student_id
+        name: student_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 1
+        relationships:
+          - to: student.student_id
+      - id: enrollment_course_code
+        name: course_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 2
+      - id: enrollment_term_code
+        name: term_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 3
+      - id: enrollment_section_number
+        name: section_number
+        logicalType: integer
+        physicalType: INTEGER
+        primaryKey: true
+        primaryKeyPosition: 4
+      - id: enrollment_status
+        name: status
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: "Where the student stands in this section"
+        enum:
+          - value: ENROLLED
+            tags: [active]
+          - value: WAITLISTED
+            tags: [active]
+            description: Waiting for a seat; becomes ENROLLED when one frees up
+          - value: DROPPED
+            tags: [terminal]
+          - value: COMPLETED
+            tags: [terminal]
+      - id: enrollment_enrolled_on
+        name: enrolled_on
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        required: true
+      - id: enrollment_dropped_on
+        name: dropped_on
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+      - id: enrollment_letter_grade
+        name: letter_grade
+        logicalType: string
+        physicalType: VARCHAR
+        description: "Final grade, assigned when the status becomes COMPLETED"
+        enum:
+          - value: A
+          - value: B
+          - value: C
+          - value: D
+          - value: F
+            description: Fail
+      - id: enrollment_grade_points
+        name: grade_points
+        logicalType: number
+        physicalType: DOUBLE
+        description: "Points earned for the letter grade"
+        logicalTypeOptions:
+          minimum: 0.0
+          maximum: 4.0
+  - id: faculty
+    name: faculty
+    physicalType: table
+    description: "A member of the teaching staff"
+    tags: [people]
+    properties:
+      - id: faculty_faculty_id
+        name: faculty_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+      - id: faculty_department_id
+        name: department_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        relationships:
+          - to: department.department_id
+      - id: faculty_given_name
+        name: given_name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: faculty_family_name
+        name: family_name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: faculty_email
+        name: email
+        logicalType: string
+        physicalType: VARCHAR
+        unique: true
+        description: "University address; unique when present"
+        logicalTypeOptions:
+          format: email
+          pattern: '^[^@ ]+@[^@ ]+$'
+        classification: restricted
+      - id: faculty_hired_on
+        name: hired_on
+        logicalType: date
+        physicalType: DATE
+        required: true
+      - id: faculty_mentor_faculty_id
+        name: mentor_faculty_id
+        logicalType: string
+        physicalType: VARCHAR
+        description: "A senior colleague who mentors this person; null for the most senior"
+        relationships:
+          - to: faculty.faculty_id
+      - id: faculty_is_tenured
+        name: is_tenured
+        logicalType: boolean
+        physicalType: BOOLEAN
+        required: true
+      - id: faculty_salary
+        name: salary
+        logicalType: number
+        physicalType: DOUBLE
+        logicalTypeOptions:
+          minimum: 0
+        classification: restricted
+  - id: payment
+    name: payment
+    physicalType: table
+    description: "Money received from or on behalf of a student"
+    tags: [finance]
+    properties:
+      - id: payment_payment_id
+        name: payment_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+      - id: payment_student_id
+        name: student_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        relationships:
+          - to: student.student_id
+      - id: payment_term_code
+        name: term_code
+        logicalType: string
+        physicalType: VARCHAR
+        description: "Term the payment is for; null for deposits"
+        relationships:
+          - to: term.term_code
+      - id: payment_amount
+        name: amount
+        logicalType: number
+        physicalType: DOUBLE
+        required: true
+        logicalTypeOptions:
+          exclusiveMinimum: 0
+        businessName: amount received
+      - id: payment_method
+        name: method
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: "How the money arrived"
+        enum:
+          - value: CARD
+          - value: TRANSFER
+          - value: CHEQUE
+          - value: SCHOLARSHIP
+      - id: payment_received_at
+        name: received_at
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        required: true
+      - id: payment_reference
+        name: reference
+        logicalType: string
+        physicalType: VARCHAR
+        description: "Bank or card reference, as the student's statement shows it"
+  - id: prerequisite
+    name: prerequisite
+    physicalType: table
+    description: "A course that must be passed before another may be taken"
+    tags: [academics]
+    properties:
+      - id: prerequisite_course_code
+        name: course_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: "The course with the requirement"
+        relationships:
+          - to: course.course_code
+      - id: prerequisite_prerequisite_code
+        name: prerequisite_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: "The course that must be passed first"
+        relationships:
+          - to: course.course_code
+      - id: prerequisite_minimum_grade
+        name: minimum_grade
+        logicalType: string
+        physicalType: VARCHAR
+        description: "Letter grade required in the prerequisite; null means a pass is enough"
+        enum:
+          - value: A
+          - value: B
+          - value: C
+          - value: D
+  - id: program
+    name: program
+    physicalType: table
+    description: "A degree program a student enrols in"
+    tags: [academics]
+    properties:
+      - id: program_program_id
+        name: program_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+      - id: program_department_id
+        name: department_id
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        relationships:
+          - to: department.department_id
+      - id: program_name
+        name: name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: program_degree_level
+        name: degree_level
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: "The award the program leads to"
+        enum:
+          - value: CERTIFICATE
+          - value: BACHELOR
+          - value: MASTER
+          - value: DOCTORATE
+      - id: program_credits_required
+        name: credits_required
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+        logicalTypeOptions:
+          exclusiveMinimum: 0
+  - id: room
+    name: room
+    physicalType: table
+    description: "A teaching room. Room numbers repeat across buildings, so the key is building plus number."
+    tags: [places]
+    properties:
+      - id: room_building_id
+        name: building_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 1
+        relationships:
+          - to: building.building_id
+      - id: room_room_number
+        name: room_number
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: "As painted on the door"
+        logicalTypeOptions:
+          maxLength: 10
+        examples: ['101', 'B-12']
+      - id: room_capacity
+        name: capacity
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+        description: "Seats"
+        logicalTypeOptions:
+          minimum: 1
+        examples: [40, 120]
+      - id: room_has_projector
+        name: has_projector
+        logicalType: boolean
+        physicalType: BOOLEAN
+  - id: scholarship
+    name: scholarship
+    physicalType: table
+    description: "A fund that pays part of a student's tuition"
+    tags: [finance]
+    properties:
+      - id: scholarship_scholarship_id
+        name: scholarship_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+      - id: scholarship_name
+        name: name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: scholarship_sponsor
+        name: sponsor
+        logicalType: string
+        physicalType: VARCHAR
+      - id: scholarship_annual_amount
+        name: annual_amount
+        logicalType: number
+        physicalType: DOUBLE
+        required: true
+        logicalTypeOptions:
+          minimum: 0
+      - id: scholarship_is_renewable
+        name: is_renewable
+        logicalType: boolean
+        physicalType: BOOLEAN
+        required: true
+  - id: section
+    name: section
+    physicalType: table
+    description: "One offering of a course in a term, taught by one instructor in one room"
+    tags: [academics]
+    relationships:
+      - type: foreignKey
+        from: [section.building_id, section.room_number]
+        to: [room.building_id, room.room_number]
+    properties:
+      - id: section_course_code
+        name: course_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 1
+        relationships:
+          - to: course.course_code
+      - id: section_term_code
+        name: term_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 2
+        relationships:
+          - to: term.term_code
+      - id: section_section_number
+        name: section_number
+        logicalType: integer
+        physicalType: INTEGER
+        primaryKey: true
+        primaryKeyPosition: 3
+        description: "1, 2, 3 ... within the course and term"
+        logicalTypeOptions:
+          minimum: 1
+      - id: section_faculty_id
+        name: faculty_id
+        logicalType: string
+        physicalType: VARCHAR
+        description: "Instructor; null until assigned"
+        relationships:
+          - to: faculty.faculty_id
+      - id: section_building_id
+        name: building_id
+        logicalType: string
+        physicalType: VARCHAR
+        description: "Room, together with room_number; both null for online sections"
+      - id: section_room_number
+        name: room_number
+        logicalType: string
+        physicalType: VARCHAR
+      - id: section_seats
+        name: seats
+        logicalType: integer
+        physicalType: INTEGER
+        required: true
+        description: "Enrollment cap"
+        logicalTypeOptions:
+          minimum: 1
+      - id: section_first_meeting_at
+        name: first_meeting_at
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        description: "Wall-clock time at the campus, no zone"
+  - id: student
+    name: student
+    physicalType: table
+    description: "A person admitted to a program. The student's advisor is a member of faculty."
+    tags: [people]
+    businessName: Students
+    authoritativeDefinitions:
+      - type: businessDefinition
+        url: https://example.edu/registrar/definitions#student
+    customProperties:
+      - property: owner
+        value: Registrar
+    properties:
+      - id: student_student_id
+        name: student_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        description: "Identity of the student"
+        criticalDataElement: true
+      - id: student_student_number
+        name: student_number
+        logicalType: integer
+        physicalType: BIGINT
+        required: true
+        unique: true
+        description: "Number printed on the student card; unique"
+        businessName: student card number
+        customProperties:
+          - property: issuedBy
+            value: Registrar
+      - id: student_given_name
+        name: given_name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: student_family_name
+        name: family_name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: student_email
+        name: email
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        unique: true
+        description: "University address; unique"
+        logicalTypeOptions:
+          format: email
+          pattern: '^[^@ ]+@[^@ ]+$'
+        classification: restricted
+      - id: student_birth_date
+        name: birth_date
+        logicalType: date
+        physicalType: DATE
+        classification: restricted
+      - id: student_program_id
+        name: program_id
+        logicalType: string
+        physicalType: VARCHAR
+        description: "Null for non-degree students"
+        relationships:
+          - to: program.program_id
+      - id: student_advisor_faculty_id
+        name: advisor_faculty_id
+        logicalType: string
+        physicalType: VARCHAR
+        relationships:
+          - to: faculty.faculty_id
+      - id: student_home_campus_code
+        name: home_campus_code
+        logicalType: string
+        physicalType: VARCHAR
+        description: "Refers to campus.code; not an enforced foreign key because campus.code is not a key of campus"
+        logicalTypeOptions:
+          pattern: '^[A-Z]{2,4}$'
+      - id: student_gpa
+        name: gpa
+        logicalType: number
+        physicalType: DOUBLE
+        description: "Grade point average on a 4.0 scale"
+        logicalTypeOptions:
+          minimum: 0
+          maximum: 4
+      - id: student_enrolled_at
+        name: enrolled_at
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        required: true
+        description: "When the student first enrolled, UTC"
+      - id: student_is_international
+        name: is_international
+        logicalType: boolean
+        physicalType: BOOLEAN
+        required: true
+  - id: term
+    name: term
+    physicalType: table
+    description: "An academic term such as 'Fall 2026'"
+    tags: [academics]
+    properties:
+      - id: term_term_code
+        name: term_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        description: "Year and season, the season being SP, SU or FA"
+        logicalTypeOptions:
+          pattern: '^[0-9]{4}(SP|SU|FA)$'
+        examples: [2026FA, 2027SP]
+      - id: term_name
+        name: name
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+      - id: term_starts_on
+        name: starts_on
+        logicalType: date
+        physicalType: DATE
+        required: true
+        logicalTypeOptions:
+          minimum: "1990-01-01"
+      - id: term_ends_on
+        name: ends_on
+        logicalType: date
+        physicalType: DATE
+        required: true
+      - id: term_is_current
+        name: is_current
+        logicalType: boolean
+        physicalType: BOOLEAN
+        required: true
+  - id: tuition_rate
+    name: tuition_rate
+    physicalType: table
+    description: "Price per credit for a program over a date range. Rates never overlap for one program; the model does not enforce that."
+    tags: [finance]
+    properties:
+      - id: tuition_rate_program_id
+        name: program_id
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 1
+        relationships:
+          - to: program.program_id
+      - id: tuition_rate_eff_start_date
+        name: eff_start_date
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: "Start of validity, UTC; the default is 1900-01-01"
+        logicalTypeOptions:
+          minimum: "1900-01-01T00:00:00Z"
+      - id: tuition_rate_eff_end_date
+        name: eff_end_date
+        logicalType: timestamp
+        physicalType: TIMESTAMP
+        primaryKey: true
+        primaryKeyPosition: 3
+        description: "End of validity, UTC; the default is 9999-12-31 23:59:59"
+        logicalTypeOptions:
+          maximum: "9999-12-31T23:59:59Z"
+      - id: tuition_rate_rate_per_credit
+        name: rate_per_credit
+        logicalType: number
+        physicalType: DOUBLE
+        required: true
+        logicalTypeOptions:
+          minimum: 0
+      - id: tuition_rate_currency
+        name: currency
+        logicalType: string
+        physicalType: VARCHAR
+        required: true
+        description: "ISO 4217 code"
+
+        logicalTypeOptions:
+          minLength: 3
+          maxLength: 3
+          pattern: '^[A-Z]{3}$'
+        examples: [USD, EUR]

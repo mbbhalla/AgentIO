@@ -19,7 +19,7 @@ This approach preserves the ergonomic benefits of traditional function compositi
 AgentIO/
 ├── agentio-core/                  Core SDK — agents, tools, MCP, CMMs, event listeners
 ├── agentio-module-camel/          Apache Camel component — run agents as nodes in Camel routes
-├── agentio-module-data/           Data environment module — DuckDB, typed SQL, SQL authorization, Dataset, MVEL
+├── agentio-module-data/           Data environment module — DuckDB, typed SQL, SQL authorization, Open Data Contract domain models, Dataset, MVEL
 ├── agentio-module-text2sql/       Text2SQL module — NL-to-SQL agentic function, MCP server
 ├── agentio-module-solver/         SMTLIB2 + Z3 solver facade with correctness-at-construction
 ├── agentio-module-compass/        Constraint optimization via multi-agent problem analysis + solver synthesis

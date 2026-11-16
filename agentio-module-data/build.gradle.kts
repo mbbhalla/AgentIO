@@ -9,6 +9,8 @@ dependencies {
 
     // DuckDB JDBC
     implementation("org.duckdb:duckdb_jdbc:2.0.0.1")
+    // RE2 for Java — validates ValueConstraint.Pattern with the regex engine DuckDB's regexp_matches uses
+    implementation("com.google.re2j:re2j:1.7")
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -33,5 +35,8 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.jetbrains.kotlin:kotlin-test:2.2.0")
     testImplementation("io.mockk:mockk:1.13.13")
+    // Validates the ODCS test fixture against the standard's published JSON Schema
+    testImplementation("com.networknt:json-schema-validator:1.5.3")
+    testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.1")
     testRuntimeOnly("ch.qos.logback:logback-classic:1.5.12")
 }

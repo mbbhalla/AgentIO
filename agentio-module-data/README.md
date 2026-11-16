@@ -1,6 +1,6 @@
 # agentio-module-data
 
-Data environment module for AgentIO. Provides typed data models, SQL statement validation, row-level SQL authorization, and database environment abstraction backed by DuckDB.
+Data environment module for AgentIO. Provides typed data models, SQL statement validation, row-level SQL authorization, a relational domain model read from Open Data Contract Standard documents, and database environment abstraction backed by DuckDB.
 
 ## Core Principle: Correctness at Construction
 
@@ -16,6 +16,10 @@ Every data type enforces validity when it is created: in its `init` block, or, f
 | `S3ObjectKey` | Non-blank, no leading `/` |
 | `S3Uri` | Valid `s3://bucket/key` format |
 | `MVELExpression` | Compiles via `MVEL.compileExpression()` — syntactically valid |
+| `ValueConstraint` | `OneOf` non-empty, distinct, one kind; bounds are numbers or instants; lengths non-negative; `Pattern` compiles under RE2 |
+| `ColumnDefinition` | Every constraint fits the column type, one of each kind, minimum ≤ maximum with some value between exclusive bounds, minimum length ≤ maximum length, every enumerated value satisfies the other constraints |
+| `TableDefinition` | At least one column, no duplicate column names; every key names existing columns, none twice; unique keys non-empty and not implied by the primary key or another unique key; primary key columns not nullable; no duplicate foreign key, none referencing its own columns |
+| `DomainModel` | At least one table, names unique; every foreign key references a table in the model, columns that exist there, forming its primary key or a unique key in that order, with identical types; foreign keys form no cycle, so `creationOrder` exists. DuckDB accepts every `DomainModel` |
 | `SelectSqlStatement` | Created only by `env.selectStatement(sql)`: EXPLAIN passes on `env` + DuckDB parses exactly one read-only SELECT (no writes inside CTEs). Records `env`; `executeQuery` on any other environment fails |
 | `InsertSqlStatement` | Created only by `env.insertStatement(sql)`: EXPLAIN passes on `env` + plan is INSERT |
 | `UpdateSqlStatement` | Created only by `env.updateStatement(sql)`: EXPLAIN passes on `env` + plan is UPDATE |
@@ -32,9 +36,13 @@ io.github.mbbhalla.agentio.data/
 │   ├── ConstraintStrategies.kt — ViolationBehavior enum + ConstraintStrategies (THROW/IGNORE per constraint type)
 │   ├── S3Models.kt         — S3ObjectKey, S3Uri, Version, VersionSet, DatabaseEnvironmentSnapshot
 │   ├── ExplainResult.kt    — sealed: Success | Failure
-│   └── MVELExpression.kt   — validated MVEL expression (compiled at construction)
+│   ├── MVELExpression.kt   — validated MVEL expression (compiled at construction)
+│   ├── DomainModel.kt      — DomainModel (tables in foreign-key creation order), TableDefinition, ColumnDefinition, ForeignKey
+│   ├── ValueConstraint.kt  — OneOf, Minimum, Maximum, MinLength, MaxLength, Pattern: rules on a column's values, rendered as CHECK
+│   └── OpenDataContract.kt — internal: parses Open Data Contract Standard (ODCS v3) documents into TableDefinitions
 ├── env/
-│   ├── DuckDbDatabaseEnvironment.kt  — the environment: fromStatements() + fromParquet(dir, constraintStrategies) + fromS3(timestamp, s3Uri, s3Client, constraintStrategies); selectStatement/insertStatement/updateStatement/deleteStatement create validated statements; internal parseSelect/renderSelect give the authorizer DuckDB's SELECT parse tree
+│   ├── DuckDbDatabaseEnvironment.kt  — the environment: fromStatements() + fromParquet(dir, constraintStrategies) + fromS3(timestamp, s3Uri, s3Client, constraintStrategies) + fromDomainModel(model) + fromOdcs(dir); selectStatement/insertStatement/updateStatement/deleteStatement create validated statements; executeQuery/executeUpdate run them; internal parseSelect/renderSelect give the authorizer DuckDB's SELECT parse tree
+│   ├── DomainModelDdl.kt             — internal: renders a TableDefinition as CREATE TABLE (keys and CHECKs inline) and COMMENT ON statements
 │   └── SqlStatements.kt              — SelectSqlStatement, InsertSqlStatement, UpdateSqlStatement, DeleteSqlStatement
 └── authz/
     ├── SqlAuthorizer.kt              — rewrites a SelectSqlStatement so every base table it reads is filtered by the caller's Criteria
@@ -87,6 +95,115 @@ val env = DuckDbDatabaseEnvironment.fromS3(
 // Also downloads schemaMetadata.yml if present at the same prefix
 // env.snapshot contains fully-resolved DatabaseEnvironmentSnapshot (timestamp + VersionSet)
 ```
+
+### Create an empty target environment from a domain model
+
+A *domain model* describes what data must look like: tables, typed and documented columns, and the
+primary, unique and foreign keys between them, and the rules on a column's values: an enumeration, bounds,
+lengths, a pattern. It is written as an [Open Data Contract Standard](https://bitol-io.github.io/open-data-contract-standard/)
+document. `fromOdcs` builds an empty DuckDB database from it in which every description is a `COMMENT ON` an agent can query and
+every key and rule is a constraint DuckDB enforces on `INSERT` and `UPDATE`. Nothing is loaded; data arrives later and is
+every key is a constraint DuckDB enforces on `INSERT`. Nothing is loaded; data arrives later and is
+accepted only if it satisfies the model.
+
+```kotlin
+val env = DuckDbDatabaseEnvironment.fromOdcs(Path("/models/university/"))   // every *.yml / *.yaml in the directory
+env.listTables().size                                                        // 17
+env.getTableInfo(TableName("building")).columns.first { it.name.value == "campus_id" }.foreignKey
+// ForeignKeyRef(table=campus, column=campus_id)
+
+val insert = env.insertStatement("INSERT INTO building (building_id, campus_id, name) VALUES ('B1', 'C-missing', 'Annex')").getOrThrow()
+env.executeUpdate(insert)
+// java.sql.SQLException: Constraint Error: Violates foreign key constraint because key "campus_id: C-missing" does not exist in the referenced table
+```
+
+The model is a value you can build and inspect without a database:
+
+```kotlin
+val model: DomainModel = DomainModel.fromOdcs(listOf(Path("/models/university/university.odcs.yaml")))
+model.creationOrder.map { it.name.value }      // [campus, scholarship, term, building, ...] — referenced tables first
+val env = DuckDbDatabaseEnvironment.fromDomainModel(model)
+```
+
+#### Open Data Contract Standard (ODCS)
+
+ODCS is the Linux Foundation (Bitol) YAML standard for data contracts. Only the `schema` section is
+read; `servers`, `team`, `slaProperties`, `price` and the rest are accepted and ignored. Schema
+objects become tables, properties become columns, and `relationships` (ODCS v3.1+) become foreign keys.
+
+```yaml
+apiVersion: v3.2.0
+kind: DataContract
+schema:
+  - name: section
+    description: One offering of a course in a term, taught by one instructor in one room
+    relationships:                                   # object level: composite foreign key
+      - type: foreignKey
+        from: [section.building_id, section.room_number]
+        to: [room.building_id, room.room_number]
+    properties:
+      - name: course_code
+        logicalType: string
+        physicalType: VARCHAR
+        primaryKey: true
+        primaryKeyPosition: 1
+        relationships:                               # property level: single-column foreign key
+          - to: course.course_code
+      - name: term_code
+        logicalType: string
+        primaryKey: true
+        primaryKeyPosition: 2
+        relationships: [{ to: term.term_code }]
+      - name: section_number
+        logicalType: integer
+        primaryKey: true
+        primaryKeyPosition: 3
+        description: 1, 2, 3 ... within the course and term
+      - name: faculty_id
+        logicalType: string
+        description: Instructor; null until assigned
+        relationships: [{ to: faculty.faculty_id }]
+      - name: seats
+        logicalType: integer
+        required: true
+        description: Enrollment cap
+        logicalTypeOptions:
+          minimum: 1
+      - name: first_meeting_at
+        logicalType: timestamp
+      - name: delivery
+        logicalType: string
+        required: true
+        enum: [IN_PERSON, ONLINE, HYBRID]
+        physicalType: TIMESTAMP
+```
+
+| ODCS | DuckDB |
+|------|--------|
+| schema object | table named by `physicalName`, else `name`, lower-cased |
+| property | column named by `physicalName`, else `name`, lower-cased |
+| `description` | `COMMENT ON TABLE` / `COMMENT ON COLUMN` |
+| `physicalType` (`VARCHAR(18)`, `BIGINT`, `decimal(10,2)`, ...) | the column type; a parenthesised size is ignored. Decides when present |
+| `logicalType` `string` / `integer` / `number` / `boolean` / `date` / `timestamp` | `VARCHAR` / `INTEGER` / `DOUBLE` / `BOOLEAN` / `DATE` / `TIMESTAMP` when `physicalType` is absent; `integer` with `logicalTypeOptions.format` `i64` or `u32` is `BIGINT` |
+| `required: true`, or any primary key property | `NOT NULL` |
+| `primaryKey: true`, ordered by `primaryKeyPosition` | `PRIMARY KEY (...)`; a composite key needs a distinct position on every key property |
+| `unique: true` | `UNIQUE (col)`; ODCS has no composite unique key. Ignored on a single-column primary key, which it only repeats |
+| property `relationships: [{to: object.property}]` | single-column `FOREIGN KEY`; `to` is shorthand `object.property` (by `name`) or fully qualified `schema/<id>/properties/<id>` (by `id`) |
+| object `relationships: [{from: [...], to: [...]}]` | composite `FOREIGN KEY`; `from` must name the object's own properties |
+| `enum` (entries `{value: ...}`, optionally with `label`, `description`, `tags`) | `CHECK (col IN (...))`; values typed by the column |
+| `logicalTypeOptions.minimum` / `maximum` / `exclusiveMinimum` / `exclusiveMaximum` | `CHECK (col >= v)` and the like; numbers, dates and timestamps |
+| `logicalTypeOptions.minLength` / `maxLength` / `pattern` | `CHECK (length(col) >= n)`, `CHECK (regexp_matches(col, 'p'))`; strings; the pattern is RE2 |
+
+Properties with `logicalType` `time`, `object`, `array`, `map` or `vector` have no column mapping and
+are rejected naming the file, schema object and property, as are references into another contract
+(`other.yaml#/...`) and to nested properties. `quality` rules, `logicalTypeOptions.format` and
+`multipleOf` are accepted but not enforced. Foreign keys are collected property-level
+first, in property order, then object-level in declared order. An unknown key on a schema object,
+property or relationship is an error, so a misspelt `primaryKey` cannot silently drop a key. Several
+files may hold one model; references resolve across them.
+`src/test/resources/domainmodel/university/university.odcs.yaml` is a 17-table model that exercises composite and
+self-referencing keys, a four-deep foreign-key chain, every supported type, enumerations, bounds, lengths and
+patterns; its `Manifest.md` documents the mapping and the fixture.
 
 ### Schema Metadata (optional)
 
@@ -186,6 +303,9 @@ A statement is created by the environment that validates it, and can only run on
 // Valid — Result.success
 val stmt: SelectSqlStatement = env.selectStatement("SELECT * FROM orders WHERE amount > 10").getOrThrow()
 val dataset = env.executeQuery(stmt)
+val inserted: Int = env.executeUpdate(env.insertStatement("INSERT INTO orders VALUES ('O-2', 7.5)").getOrThrow())
+// executeUpdate also takes UpdateSqlStatement and DeleteSqlStatement; a row that breaks a constraint
+// makes DuckDB reject the whole statement with a java.sql.SQLException naming the constraint and key
 
 // Invalid — Result.failure(IllegalArgumentException)
 env.selectStatement("SELECT * FROM nonexistent_table")  // fails: EXPLAIN rejects
@@ -311,7 +431,11 @@ A small infix DSL is provided: `ColumnName("site") eq StringValue("TX")`, `isIn`
 - **`schemaMetadata.yml` — dbt-inspired sidecar metadata.** Parquet carries data + physical schema but no descriptions, constraints, or relationships. A YAML sidecar file (optional, loaded from local directory or S3) enriches `TableInfo`/`ColumnInfo` with descriptions and declares PK/UNIQUE/NOT NULL/FK constraints. Format follows dbt `schema.yml` conventions for familiarity.
 - **Constraints are enforced at load time.** Data that violates declared constraints is invalid state. By default, `fromParquet`/`fromS3` throw `IllegalStateException` on violation. `ConstraintStrategies` allows callers to downgrade specific constraint types to IGNORE (log + continue) for exploratory workflows.
 - **UNIQUE via `CREATE UNIQUE INDEX`** — DuckDB does not support `ALTER TABLE ADD UNIQUE`. Indexes create dependencies that prevent further `ALTER TABLE`, so constraint application order is: NOT NULL → PRIMARY KEY → UNIQUE INDEX.
-- **FK validated post-load via query** — DuckDB FK constraints are informational only (not enforced at runtime). Referential integrity is validated by querying for orphaned rows after all tables are loaded. Null FK values are allowed (standard SQL semantics).
+- **FK validated post-load via query for Parquet** — `fromParquet`/`fromS3` create tables with `CREATE TABLE AS SELECT`, and DuckDB can only declare a `FOREIGN KEY` inside `CREATE TABLE` (no `ALTER TABLE ADD FOREIGN KEY`), so for Parquet-loaded tables referential integrity is validated by querying for orphaned rows after all tables are loaded. Null FK values are allowed (standard SQL semantics). Environments built from a `DomainModel` declare the keys inline, and DuckDB enforces them on every `INSERT`.
+- **`DomainModel` is correct by construction; `DomainModelDdl` only renders it.** The model holds tables and keys as values and checks, when built, every rule DuckDB applies to the DDL (referenced columns exist and form a key in the same order, types match exactly) plus what a database cannot see (creation order, cycles, tables outside the model). `fromDomainModel` therefore cannot be rejected; if DuckDB ever does reject a statement that is an `IllegalStateException`, a defect in rendering or a DuckDB change, not a bad model. The rules were established by probing DuckDB 2.0.0.1 and are pinned by a property test that builds random valid models in DuckDB and reads the catalog back.
+- **One encoding, the Open Data Contract Standard.** A target model is a contract between the team that owns it and whoever loads data into it, which is what ODCS describes: it has keys, relationships, descriptions, enumerations and value bounds natively, is governed by the Linux Foundation, and the Data Contract Specification now migrates into it. `DomainModel` stays engine- and format-neutral, so a second adapter (JSON Schema, Protobuf, Smithy) can be added when a consumer brings a model in that format; none is kept speculatively.
+- **Names are lower-cased.** DuckDB folds unquoted identifiers to lower case and `TableName`/`ColumnName` require it, so `Customer` becomes `customer`; generated DDL quotes identifiers so a column named like a keyword (`order`, `level`) still works.
+- **Value constraints are structured, not SQL.** `ValueConstraint` holds an enumeration, a bound, a length or a pattern as values; `DomainModelDdl` renders the `CHECK`. The model can therefore validate them (type fit, min ≤ max, RE2 syntax via re2j, the engine behind DuckDB's `regexp_matches`) and stay correct by construction, and a future adapter maps onto the same six kinds. A raw-SQL `check` would be DuckDB-specific and unvalidated until `CREATE TABLE`.
 - **`fromS3` is `suspend`** — uses AWS S3 Kotlin SDK (suspend functions). Blocking I/O (`Files.createTempDirectory`, `Files.write`) wrapped in `withContext(Dispatchers.IO)`. Consistent with `agentio-core` concurrency pattern.
 - **Point-in-time S3 resolution** — `fromS3` uses `listObjectVersions` to resolve each parquet file to its version at-or-before the given timestamp. Downloads with explicit `versionId` for reproducibility. Pre-versioning objects (versionId="null") are included best-effort with `versionId = null` in the snapshot.
 - **`fromStatements` and `fromParquet` are non-suspend** — blocking JDBC. Callers wrap in `runBlocking` or `withContext(Dispatchers.IO)` if needed.
@@ -322,11 +446,12 @@ A small infix DSL is provided: `ColumnName("site") eq StringValue("TX")`, `isIn`
 ## Dependencies
 
 - `agentio-core` (for `generateList` utility)
-- DuckDB JDBC 1.5.2.0
+- DuckDB JDBC 2.0.0.1
+- re2j 1.7 (validates `ValueConstraint.Pattern` with DuckDB's regex engine)
 - MVEL2 2.5.2.Final
 - AWS SDK Kotlin S3 1.6.68
 - Kotlinx Serialization
-- kaml 0.104.0 (YAML parsing via kotlinx-serialization)
+- kaml 0.104.0 (YAML parsing: `schemaMetadata.yml` via kotlinx-serialization, ODCS via its node tree)
 - Kotlinx Coroutines
 
 ## Build & Test
@@ -335,6 +460,11 @@ A small infix DSL is provided: `ColumnName("site") eq StringValue("TX")`, `isIn`
 ./gradlew :agentio-module-data:build
 ./gradlew :agentio-module-data:test
 ```
+
+Domain-model tests parse the 17-table university contract, build it in DuckDB and assert that
+`duckdb_constraints()` holds every declared key, that comments are queryable, and that `INSERT`s
+breaking a primary key, unique key, foreign key (single, two- and three-column composite,
+self-referencing) or `NOT NULL` are rejected with DuckDB's message.
 
 Authorization tests run every case on an in-memory DuckDB and compare the authorized rows with the
 same query filtered by hand: nested `WITH`, derived tables, joins, unions, recursive CTEs,

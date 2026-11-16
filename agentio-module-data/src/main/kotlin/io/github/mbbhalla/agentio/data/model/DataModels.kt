@@ -31,8 +31,12 @@ enum class ColumnType {
     ;
 
     companion object {
-        fun fromTypeName(typeName: String): ColumnType =
-            when (typeName.uppercase()) {
+        /** The column type for a DuckDB or SQL type name; anything unrecognised is [VARCHAR]. */
+        fun fromTypeName(typeName: String): ColumnType = fromTypeNameOrNull(typeName) ?: VARCHAR
+
+        /** The column type for a DuckDB or SQL type name, or `null` when the name is not recognised. */
+        fun fromTypeNameOrNull(typeName: String): ColumnType? =
+            when (typeName.trim().uppercase()) {
                 "VARCHAR", "TEXT", "STRING" -> VARCHAR
                 "INTEGER", "INT", "INT4", "SIGNED" -> INTEGER
                 "BIGINT", "INT8", "LONG" -> BIGINT
@@ -40,7 +44,7 @@ enum class ColumnType {
                 "BOOLEAN", "BOOL", "LOGICAL" -> BOOLEAN
                 "TIMESTAMP", "DATETIME", "TIMESTAMP WITH TIME ZONE" -> TIMESTAMP
                 "DATE" -> DATE
-                else -> VARCHAR
+                else -> null
             }
     }
 }

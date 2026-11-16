@@ -35,7 +35,7 @@ internal object CriteriaRenderer {
     fun identifier(name: String): String = "\"" + name.replace("\"", "\"\"") + "\""
 
     /** String literals follow the SQL standard in DuckDB: only `'` is doubled; backslash is an ordinary character. */
-    private fun literal(value: DataValue): String =
+    fun literal(value: DataValue): String =
         when (value) {
             is DataValue.StringValue -> "'" + value.value.replace("'", "''") + "'"
             is DataValue.LongValue -> value.value.toString()

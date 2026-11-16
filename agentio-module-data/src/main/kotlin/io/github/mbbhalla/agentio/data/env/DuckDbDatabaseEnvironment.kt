@@ -11,11 +11,13 @@ import io.github.mbbhalla.agentio.data.model.ColumnType
 import io.github.mbbhalla.agentio.data.model.ConstraintStrategies
 import io.github.mbbhalla.agentio.data.model.DatabaseEnvironmentSnapshot
 import io.github.mbbhalla.agentio.data.model.Dataset
+import io.github.mbbhalla.agentio.data.model.DomainModel
 import io.github.mbbhalla.agentio.data.model.ExplainResult
 import io.github.mbbhalla.agentio.data.model.ForeignKeyRef
 import io.github.mbbhalla.agentio.data.model.S3ObjectKey
 import io.github.mbbhalla.agentio.data.model.S3Uri
 import io.github.mbbhalla.agentio.data.model.SchemaMetadata
+import io.github.mbbhalla.agentio.data.model.TableDefinition
 import io.github.mbbhalla.agentio.data.model.TableInfo
 import io.github.mbbhalla.agentio.data.model.TableName
 import io.github.mbbhalla.agentio.data.model.Version
@@ -39,6 +41,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.SQLException
 
 private val logger = LoggerFactory.getLogger(DuckDbDatabaseEnvironment::class.java)
 
@@ -84,6 +87,31 @@ class DuckDbDatabaseEnvironment private constructor(
         return connection.createStatement().use { stmt ->
             Dataset.from(stmt.executeQuery(sql.value))
         }
+    }
+
+    /**
+     * Runs [sql] on this environment and returns the number of rows inserted. A row that breaks a
+     * constraint (`PRIMARY KEY`, `UNIQUE`, `NOT NULL`, `FOREIGN KEY`, type conversion) makes DuckDB
+     * reject the whole statement with a [java.sql.SQLException] whose message names the constraint
+     * and the offending key.
+     *
+     * @throws IllegalArgumentException if [sql] was validated by a different environment
+     */
+    fun executeUpdate(sql: InsertSqlStatement): Int = executeUpdate(sql.value, sql.environment, "InsertSqlStatement")
+
+    /** Runs [sql] and returns the number of rows updated; see [executeUpdate] for constraint failures. */
+    fun executeUpdate(sql: UpdateSqlStatement): Int = executeUpdate(sql.value, sql.environment, "UpdateSqlStatement")
+
+    /** Runs [sql] and returns the number of rows deleted; see [executeUpdate] for constraint failures. */
+    fun executeUpdate(sql: DeleteSqlStatement): Int = executeUpdate(sql.value, sql.environment, "DeleteSqlStatement")
+
+    private fun executeUpdate(
+        sql: String,
+        validatedBy: DuckDbDatabaseEnvironment,
+        statementKind: String,
+    ): Int {
+        require(validatedBy === this) { "$statementKind was validated by a different environment" }
+        return connection.createStatement().use { stmt -> stmt.executeUpdate(sql) }
     }
 
     private fun validate(
@@ -217,6 +245,65 @@ class DuckDbDatabaseEnvironment private constructor(
                 dml.forEach { stmt.execute(it) }
             }
             return DuckDbDatabaseEnvironment(connection, tableMetadata.associateBy { it.name }, snapshot = null)
+        }
+
+        /**
+         * An empty environment whose tables, comments and constraints are exactly what [model]
+         * declares. Tables are created in [DomainModel.creationOrder] so every `FOREIGN KEY` finds its
+         * referenced table; descriptions become `COMMENT ON` statements, so agents can read them from
+         * the database as well as from [getTableInfo]. Data loaded later must satisfy every key, or
+         * DuckDB rejects it (see [executeUpdate]).
+         *
+         * A [DomainModel] is correct by construction: every rule DuckDB applies to this DDL was checked
+         * when the model was created, so DuckDB accepts it.
+         *
+         * @throws IllegalStateException if DuckDB nevertheless rejects a statement; that is a defect in
+         *   the DDL rendering or a change in DuckDB, not in the model, and the message names the table
+         *   and carries DuckDB's reason
+         */
+        fun fromDomainModel(model: DomainModel): DuckDbDatabaseEnvironment {
+            Class.forName("org.duckdb.DuckDBDriver")
+            val connection = DriverManager.getConnection("jdbc:duckdb:")
+            return runCatching {
+                connection.createStatement().use { stmt -> model.creationOrder.forEach { createTable(stmt, it) } }
+                DuckDbDatabaseEnvironment(connection, model.creationOrder.associate { it.name to it.toTableInfo() }, snapshot = null)
+            }.onFailure { connection.close() }.getOrThrow()
+        }
+
+        private fun createTable(
+            stmt: java.sql.Statement,
+            table: TableDefinition,
+        ) {
+            try {
+                stmt.execute(DomainModelDdl.createTable(table))
+                DomainModelDdl.comments(table).forEach { stmt.execute(it) }
+            } catch (e: SQLException) {
+                throw IllegalStateException(
+                    "DuckDB rejected DDL for table '${table.name.value}' of a valid domain model: ${e.message}",
+                    e,
+                )
+            }
+        }
+
+        /**
+         * [fromDomainModel] over every `.yml` and `.yaml` file in [directory], parsed as Open Data
+         * Contract Standard documents with [DomainModel.fromOdcs].
+         *
+         * @throws IllegalArgumentException if [directory] does not exist or holds no YAML file
+         */
+        fun fromOdcs(directory: Path): DuckDbDatabaseEnvironment =
+            fromDomainModel(DomainModel.fromOdcs(modelFiles(directory, DomainModel.YAML_EXTENSIONS)))
+
+        /** The files in [directory] with one of [extensions], in name order so the model does not depend on the file system. */
+        private fun modelFiles(
+            directory: Path,
+            extensions: Set<String>,
+        ): List<Path> {
+            val files =
+                directory.toFile().listFiles { f -> f.extension in extensions }
+                    ?: throw IllegalArgumentException("Directory does not exist: $directory")
+            require(files.isNotEmpty()) { "No ${extensions.joinToString(" or ") { ".$it" }} files found in: $directory" }
+            return files.sortedBy { it.name }.map { it.toPath() }
         }
 
         fun fromParquet(
