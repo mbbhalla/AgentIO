@@ -24,7 +24,7 @@ AgentIO/
 ├── agentio-module-solver/         SMTLIB2 + Z3 solver facade with correctness-at-construction
 ├── agentio-module-compass/        Constraint optimization via multi-agent problem analysis + solver synthesis
 ├── agentio-module-patterns/       Agent design patterns (Adversarial, Orchestration, GOAP, Plan-and-Execute, Routing, Handoff, Cascade, HITL)
-└── agentio-examples/              Example agents (Hacker News, Git Analyzer, Text2SQL, etc.)
+└── agentio-examples/              Example agents (Git Analyzer, Text2SQL, COMPASS, etc.)
 ```
 
 ### Maven Coordinates
@@ -225,7 +225,7 @@ val agentConfiguration = AgentConfiguration(
 ## Running Examples
 
 ```bash
-./gradlew :agentio-examples:RunHackerNewsAgenticFunction
+./gradlew :agentio-examples:RunGitAnalyzerAgenticFunction
 ```
 
 Agent design patterns (Adversarial, Orchestration, GOAP, Plan-and-Execute, Routing, Handoff, Model Cascade, Human-in-the-Loop) live in [`agentio-module-patterns`](agentio-module-patterns/README.md):
