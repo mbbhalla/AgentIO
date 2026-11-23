@@ -49,8 +49,8 @@ import kotlin.io.path.readText
  * | schema object                                   | table; `physicalName`, else `name`, lower-cased              |
  * | property                                        | column; `physicalName`, else `name`, lower-cased             |
  * | `description`                                   | description                                                  |
- * | `physicalType` (`VARCHAR(18)`, `BIGINT`, ...)   | column type; decides when present                            |
- * | `logicalType` string/integer/number/boolean/date/timestamp | VARCHAR/INTEGER/DOUBLE/BOOLEAN/DATE/TIMESTAMP when `physicalType` is absent; `integer` with `logicalTypeOptions.format` i64 or u32 is BIGINT |
+ * | `logicalType` string/integer/number/boolean/date/timestamp/time | VARCHAR/INTEGER/DOUBLE/BOOLEAN/DATE/TIMESTAMP/TIME; `integer` with `logicalTypeOptions.format` i64 or u32 is BIGINT |
+ * | `physicalType`                                  | not read: it is the type in the contract's source system, which need not be DuckDB |
  * | `required: true`, or a primary key property     | `NOT NULL`                                                   |
  * | `primaryKey: true`, ordered by `primaryKeyPosition` | `PRIMARY KEY`; a composite key needs distinct positions  |
  * | `unique: true`                                  | single-column `UNIQUE` (ODCS has no composite unique key); ignored on a single-column primary key, which it repeats |
@@ -60,8 +60,14 @@ import kotlin.io.path.readText
  * | `logicalTypeOptions.minimum` / `maximum` / `exclusiveMinimum` / `exclusiveMaximum` | `CHECK (col >= v)` and the like; numbers, dates and timestamps |
  * | `logicalTypeOptions.minLength` / `maxLength` / `pattern` | `CHECK (length(col) >= n)`, `CHECK (regexp_matches(col, 'p'))`; strings |
  *
- * `time`, `object`, `array`, `map` and `vector` properties have no column mapping and are rejected,
- * as are relationships to external contracts and nested properties. `quality` rules and
+ * The model is engine-neutral, so column types come from the standard's portable `logicalType` alone.
+ * `physicalType` is "the physical element data type in the data source": `int4` in a PostgreSQL
+ * contract, `NUMBER(10)` in an Oracle one. Reading it as a DuckDB type would make the model depend on
+ * whichever engine the contract was written for, so it is accepted and ignored; a property without
+ * `logicalType` is rejected.
+ *
+ * `object`, `array`, `map` and `vector` properties have no column mapping and are rejected, as are
+ * relationships to external contracts and nested properties. `quality` rules and
  * `logicalTypeOptions.multipleOf` are accepted but not enforced. Keys are collected property-level
  * first, in property order, then object-level in declared order. An unknown key on a schema object or
  * property is an error, so a misspelt `primaryKey` cannot silently drop a key.
@@ -75,8 +81,9 @@ internal object OpenDataContract {
             "boolean" to ColumnType.BOOLEAN,
             "date" to ColumnType.DATE,
             "timestamp" to ColumnType.TIMESTAMP,
+            "time" to ColumnType.TIME,
         )
-    private val UNMAPPED_LOGICAL_TYPES = setOf("time", "object", "array", "map", "vector")
+    private val UNMAPPED_LOGICAL_TYPES = setOf("object", "array", "map", "vector")
     private val INTEGER_FORMATS =
         mapOf(
             "i8" to ColumnType.INTEGER,
@@ -132,8 +139,6 @@ internal object OpenDataContract {
     private const val FOREIGN_KEY = "foreignKey"
     private const val NO_POSITION = -1
 
-    /** `VARCHAR(18)`, `decimal(10, 2)`, `TIMESTAMP WITH TIME ZONE`: the type name without a parenthesized size. */
-    private val PHYSICAL_TYPE = Regex("""^\s*([A-Za-z][A-Za-z ]*?)\s*(\([^)]*\))?\s*$""")
     private val FULLY_QUALIFIED = Regex("""^schema/([^/]+)/properties/([^/]+)$""")
     private val SHORTHAND = Regex("""^([^./#]+)\.([^./#]+)$""")
 
@@ -266,22 +271,16 @@ internal object OpenDataContract {
         )
     }
 
+    /** The column type for the property's `logicalType`; `physicalType` belongs to the source system and is not read. */
     private fun columnType(
         property: YamlMap,
         where: String,
     ): ColumnType {
-        val physical = property.string("physicalType", where)
-        if (physical != null) {
-            val baseName = PHYSICAL_TYPE.find(physical)?.groupValues?.get(1)
-            return baseName?.let { ColumnType.fromTypeNameOrNull(it) }
-                ?: throw IllegalArgumentException(
-                    "$where: physicalType '$physical' has no column mapping; use one of ${ColumnType.entries.map {
-                        it.name
-                    }} or a common alias",
-                )
-        }
         val logical =
-            property.string("logicalType", where) ?: throw IllegalArgumentException("$where: a property needs logicalType or physicalType")
+            property.string("logicalType", where)
+                ?: throw IllegalArgumentException(
+                    "$where: a property needs logicalType; physicalType is the source system's type and does not decide the column type",
+                )
         if (logical == "integer") {
             val format =
                 property
@@ -418,7 +417,7 @@ internal object OpenDataContract {
     ): DataValue =
         when (type) {
             ColumnType.DATE, ColumnType.TIMESTAMP, ColumnType.INTEGER, ColumnType.BIGINT, ColumnType.DOUBLE -> value(scalar, type, where)
-            ColumnType.VARCHAR, ColumnType.BOOLEAN ->
+            ColumnType.VARCHAR, ColumnType.BOOLEAN, ColumnType.TIME ->
                 scalar.content.toLongOrNull()?.let { DataValue.LongValue(it) }
                     ?: scalar.content.toDoubleOrNull()?.let { DataValue.DoubleValue(it) }
                     ?: runCatching {
@@ -434,7 +433,8 @@ internal object OpenDataContract {
     ): DataValue {
         val text = scalar.content
         return when (type) {
-            ColumnType.VARCHAR -> DataValue.StringValue(text)
+            // A time is read as text so that the model, not the parser, rejects constraints a TIME column cannot have.
+            ColumnType.VARCHAR, ColumnType.TIME -> DataValue.StringValue(text)
             ColumnType.INTEGER, ColumnType.BIGINT ->
                 DataValue.LongValue(
                     text.toLongOrNull() ?: throw IllegalArgumentException("$where: expected an integer for a $type column, found '$text'"),

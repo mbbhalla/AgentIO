@@ -87,6 +87,7 @@ class DuckDbDatabaseEnvironmentDomainModelTest {
         val family = random.nextInt(4)
         return when {
             family == 0 -> emptyList()
+            type == ColumnType.TIME -> emptyList() // no value constraint applies to a time of day
             type == ColumnType.BOOLEAN -> listOf(ValueConstraint.OneOf(listOf(DataValue.BooleanValue(random.nextBoolean()))))
             type == ColumnType.VARCHAR && family == 1 ->
                 listOf(
@@ -778,7 +779,9 @@ class DuckDbDatabaseEnvironmentDomainModelTest {
                         ),
                     ),
                 )
-            env.insert("INSERT INTO t VALUES ('text', 7, 9000000000, 1.5, true, TIMESTAMP '2026-01-02 03:04:05', DATE '2026-01-02')")
+            env.insert(
+                "INSERT INTO t VALUES ('text', 7, 9000000000, 1.5, true, TIMESTAMP '2026-01-02 03:04:05', DATE '2026-01-02', TIME '07:00:00')",
+            )
             val row = env.query("SELECT * FROM t").records.single()
             assertEquals(DataValue.StringValue("text"), row[ColumnName("varchar")])
             assertEquals(DataValue.LongValue(7), row[ColumnName("integer")])
@@ -795,7 +798,9 @@ class DuckDbDatabaseEnvironmentDomainModelTest {
                     .toLocalDateTime()
             assertEquals(LocalDateTime.of(2026, 1, 2, 3, 4, 5), stored)
             assertEquals(DataValue.TimestampValue("2026-01-02T00:00:00Z"), row[ColumnName("date")])
+            assertEquals(DataValue.StringValue("07:00:00"), row[ColumnName("time")], "a time keeps its zero seconds")
             assertTrue(env.rejectsAtValidation("INSERT INTO t (bigint) VALUES ('nine billion')").contains("Could not convert"))
+            assertTrue(env.rejectsAtValidation("INSERT INTO t (\"time\") VALUES ('7am')").contains("time field value out of range"))
         }
     }
 

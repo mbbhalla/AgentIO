@@ -1,0 +1,25 @@
+Adventure Works Cycles - Cost Center Extract
+Run date: 30.06.2014 06:00
+cc_code;cc_name;cc_level;parent_cc;valid_from
+CC-100;Executive General and Administration;GROUP;;30.04.2008
+CC-110;Executive;DEPT;CC-100;30.04.2008
+CC-120;Human Resources;DEPT;CC-100;30.04.2008
+CC-130;Finance;DEPT;CC-100;30.04.2008
+CC-140;Information Services;DEPT;CC-100;30.04.2008
+CC-150;Facilities and Maintenance;DEPT;CC-100;30.04.2008
+CC-200;Research and Development;GROUP;;30.04.2008
+CC-210;Engineering;DEPT;CC-200;30.04.2008
+CC-220;Tool Design;DEPT;CC-200;30.04.2008
+CC-230;Research and Development;DEPT;CC-200;30.04.2008
+CC-300;Sales and Marketing;GROUP;;30.04.2008
+CC-310;Sales;DEPT;CC-300;30.04.2008
+CC-320;Marketing;DEPT;CC-300;30.04.2008
+CC-400;Inventory Management;GROUP;;30.04.2008
+CC-410;Purchasing;DEPT;CC-400;30.04.2008
+CC-420;Shipping and Receiving;DEPT;CC-400;30.04.2008
+CC-500;Manufacturing;GROUP;;30.04.2008
+CC-510;Production;DEPT;CC-500;30.04.2008
+CC-520;Production Control;DEPT;CC-500;30.04.2008
+CC-600;Quality Assurance;GROUP;;30.04.2008
+CC-610;Quality Assurance;DEPT;CC-600;30.04.2008
+CC-620;Document Control;DEPT;CC-600;30.04.2008

@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import org.mvel2.MVEL
 import java.sql.ResultSet
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 @Serializable
 data class ColumnName(
@@ -28,6 +29,9 @@ enum class ColumnType {
     BOOLEAN,
     TIMESTAMP,
     DATE,
+
+    /** A time of day without a date or time zone; values read back as `HH:mm:ss[.ffffff]` strings. */
+    TIME,
     ;
 
     companion object {
@@ -44,6 +48,7 @@ enum class ColumnType {
                 "BOOLEAN", "BOOL", "LOGICAL" -> BOOLEAN
                 "TIMESTAMP", "DATETIME", "TIMESTAMP WITH TIME ZONE" -> TIMESTAMP
                 "DATE" -> DATE
+                "TIME" -> TIME
                 else -> null
             }
     }
@@ -181,6 +186,8 @@ sealed class DataValue {
                 is java.time.LocalDateTime -> TimestampValue(obj.atZone(ZoneOffset.UTC).toInstant().toString())
                 is java.time.LocalDate -> TimestampValue(obj.atStartOfDay(ZoneOffset.UTC).toInstant().toString())
                 is java.time.Instant -> TimestampValue(obj.toString())
+                // LocalTime.toString() drops zero seconds ("07:00"); ISO_LOCAL_TIME keeps them ("07:00:00").
+                is java.time.LocalTime -> StringValue(obj.format(DateTimeFormatter.ISO_LOCAL_TIME))
                 else -> StringValue(obj.toString())
             }
     }

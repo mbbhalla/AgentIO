@@ -10,6 +10,7 @@ Example agents built with AgentIO, demonstrating how to use the SDK for real-wor
 | Text2SQL (Retail) | In-process | `RunText2SqlAgenticFunction-RetailDB` | DuckDB from SQL statements + correctness-at-construction |
 | Text2SQL (Employee) | In-process | `RunText2SqlAgenticFunction-EmployeeDB` | DuckDB from Parquet files + correctness-at-construction |
 | COMPASS | In-process | `RunCompassAgenticFunction` | Multi-agent, domain-agnostic: NL problem → grounded analysis → SMTLIB2 formula → Z3 solver models (sample run uses supply-chain data) |
+| ODCS ETL | In-process | `RunEtlAgenticFunction-AdventureWorks` | Multi-agent ETL: messy CSVs → load plan → per-table SQL proven against an ODCS-defined DuckDB target → standalone `etl.sql` |
 
 All examples are self-sufficient — no API keys or tokens required.
 
@@ -32,6 +33,11 @@ All examples are self-sufficient — no API keys or tokens required.
 ./gradlew :agentio-examples:RunCompassAgenticFunction
 ./gradlew :agentio-examples:RunCompassAgenticFunction \
     -Pobjective="Overstock at site DC-NEWARK for product MB-Z690 in June 2025"
+
+# ODCS ETL — CSV files → DuckDB database defined by an Open Data Contract (needs Bedrock credentials)
+./gradlew :agentio-examples:RunEtlAgenticFunction-AdventureWorks
+./gradlew :agentio-examples:RunEtlAgenticFunction-AdventureWorks \
+    -Pcontract=/path/to/contract.odcs.yaml -PsourceDir=/path/to/csvs -PoutputDir=/tmp/etl
 ```
 
 ## Git Analyzer Agent
@@ -214,6 +220,104 @@ thrown.
                              + Z3 turnkey)
 ```
 
+## ODCS ETL
+
+Loads CSV exports from other systems into a DuckDB database whose schema is an
+[Open Data Contract Standard](https://bitol-io.github.io/open-data-contract-standard/) document. The target
+exists before any data does; agents write the code that fills it, and DuckDB checks every row against the contract.
+
+### Target
+
+The contract is the ODCS project's AdventureWorks example (68 tables). The original,
+`agentio-module-data/src/test/resources/odcs/odcs_example.postgres.yaml`, describes a PostgreSQL database: its
+`physicalType`s are PostgreSQL types (`serial`, `int2`, `varchar[50]`) and AdventureWorks domains (`Name`, `Flag`).
+`odcs_example.generic.yaml` next to it is its engine-neutral conversion, with the logical types those imply, and is
+what the example loads. `OdcsExampleConversionTest` checks that the conversion changed only types, composite key
+positions and `apiVersion`.
+
+```kotlin
+val model = DomainModel.fromOdcs(listOf(Path.of("odcs_example.generic.yaml")))
+val workspace = EtlWorkspace(model, SourceFiles.of(sourceDir))   // empty DuckDB with every key and CHECK
+```
+
+### Sources
+
+`src/main/resources/etl/adventureworks/source/` holds five HR exports. None maps one-to-one to a target table:
+
+| File | What makes it hard |
+|------|--------------------|
+| `cost_centers.csv` | Two report lines before the header, `;`-delimited, `dd.mm.yyyy` dates; departments and their groups mixed in one hierarchy |
+| `shift_patterns.csv` | Shifts as `7:00 AM - 3:00 PM` ranges, no ids; the target wants `TIME` columns |
+| `hris_roster.csv` | One wide row per employee that feeds six tables: `Last, First Middle, Suffix` names, phones and email packed in one column, words for codes (`Female`, `Exempt`), two hire-date formats, national IDs with leading zeros, a manager column for the org hierarchy |
+| `org_assignment_events.csv` | Unsorted hire / transfer / shift-change / termination events keyed by login in mixed case, with department aliases (`R&D`); they become dated intervals |
+| `payroll_register.csv` | One row per pay period keyed by SSN, annual or hourly amounts as `"$90,000.00"`, one line repeated; 61 periods become 20 rate changes |
+
+### Pipeline
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ EtlPlannerAgenticFunction                                            │
+│   Tools:  list_target_tables, describe_target_table, profile_source, │
+│           run_query                                                  │
+│   Output: LoadPlan — target tables in load order, each with its      │
+│           sources and mapping, plus references the descriptions state│
+│   Check:  LoadPlanCheck — names exist, every source used, referenced │
+│           tables loaded first                                        │
+└──────────────────────────────────┬───────────────────────────────────┘
+                                   │ one step at a time
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ EtlSqlWriterAgenticFunction  (per table)                             │
+│   Tools:  describe_target_table, profile_source, run_query, try_load │
+│   Output: one SELECT whose columns are target columns                │
+│   Check:  try_load again after the conversation: rows inserted under │
+│           every constraint, no orphaned references                   │
+│   Then:   loaded for real, so later steps can join it                │
+└──────────────────────────────────┬───────────────────────────────────┘
+                                   ▼
+               etl.sql — CREATE TABLEs + INSERT ... BY NAME SELECTs,
+               replayed into a fresh DuckDB to prove it runs alone
+```
+
+A rejected plan or SELECT is retried with its error. A table that still fails stops the run, since later tables
+may depend on it, and the run reports every attempt's error.
+
+### Key Patterns
+
+- **DuckDB is the validator.** `try_load` inserts the agent's SELECT as `INSERT INTO <table> BY NAME`, so DuckDB
+  enforces types, primary keys, `NOT NULL` and the contract's `CHECK`s, then reports NULL counts, orphaned references
+  and sample rows, and deletes the rows again. The agent fixes its SQL from DuckDB's own error messages.
+- **The output is code, not data.** The run writes `load-plan.json` and `etl.sql`; the script loads an empty
+  database with `duckdb target.duckdb < etl.sql`, with no AgentIO or LLM involved.
+- **Agent SQL reads only the sources.** CSV content is untrusted input, and DuckDB can read any file the process
+  can. `SourceAccessGuard` walks DuckDB's own parse tree (`json_serialize_sql`) and allows `read_csv` only on the
+  run's source files by absolute literal path, plus target tables; other table functions, file scans, globs and
+  computed paths are rejected before the SQL is bound.
+- **Deterministic parts are tested without an LLM.** `EtlPipelineTest` drives the pipeline with a hand-written
+  reference load (`src/test/resources/etl/adventureworks/reference-etl.sql`) and checks row counts, references,
+  retries and the script replay.
+
+### Sample Run
+
+```
+$ ./gradlew :agentio-examples:RunEtlAgenticFunction-AdventureWorks
+
+Target: 68 tables from odcs_example.generic.yaml; sources: [cost_centers.csv, hris_roster.csv, ...]
+=== Planning, attempt 1/2
+Plan: businessentity -> person -> phonenumbertype -> personphone -> emailaddress -> employee -> department -> shift -> employeedepartmenthistory -> employeepayhistory
+=== Loading businessentity from [hris_roster.csv]
+...
+=== Result
+  16 rows into employee (attempt 1); script replay: 16 rows
+  19 rows into employeedepartmenthistory (attempt 1); script replay: 19 rows
+  20 rows into employeepayhistory (attempt 1); script replay: 20 rows
+  employeepayhistory.businessentityid -> employee.businessentityid: 0 orphaned rows
+Plan: .../build/etl-adventureworks/load-plan.json; ETL script: .../build/etl-adventureworks/etl.sql
+```
+
+A full run takes about six minutes on Claude Opus 5.5. In the recorded run every table loaded on the first attempt,
+and the loaded values matched the reference load column for column.
+
 ## Package Structure
 
 ```
@@ -239,6 +343,16 @@ io.github.mbbhalla.agentio.examples/
     │   ├── AnalysisResultValidatorTool.kt
     │   └── SmtLibV2SyntaxCheckerTool.kt
     └── server/CompassMcpServers.kt    — AnalyzerMcpServer, ConstraintGeneratorMcpServer
+└── etl/
+    ├── Runner.kt                      — contract → workspace → pipeline → load-plan.json + etl.sql + replay
+    ├── EtlAgenticFunctions.kt         — EtlPlannerAgenticFunction, EtlSqlWriterAgenticFunction
+    ├── EtlPipeline.kt                 — plan, then write, prove and load one table at a time, with retries
+    ├── EtlWorkspace.kt                — target DuckDB + sources: profile, query, try_load, load, orphan checks
+    ├── EtlTools.kt                    — MCP tools over the workspace, EtlMcpServer
+    ├── SourceAccessGuard.kt           — limits agent SQL to the source CSVs and target tables
+    ├── LoadPlanCheck.kt               — validates a LoadPlan before any SQL is written
+    ├── EtlScript.kt                   — renders and replays etl.sql
+    ├── SourceFiles.kt, EtlModels.kt
 ```
 
 ## Dependencies

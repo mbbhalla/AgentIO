@@ -716,6 +716,8 @@ schema:
       - id: student_student_number
         name: student_number
         logicalType: integer
+        logicalTypeOptions:
+          format: i64
         physicalType: BIGINT
         required: true
         unique: true

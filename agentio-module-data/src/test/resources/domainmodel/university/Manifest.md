@@ -20,8 +20,8 @@ Only the `schema` section describes the model. Everything else in the contract (
 | object `name` (or `physicalName`), lower-cased | table |
 | property `name` (or `physicalName`), lower-cased | column |
 | `description` | `COMMENT ON TABLE` / `COMMENT ON COLUMN` |
-| `physicalType` (`VARCHAR`, `BIGINT`, `varchar(18)`, ...) | column type, when present |
-| `logicalType` `string` / `integer` / `number` / `boolean` / `date` / `timestamp` | `VARCHAR` / `INTEGER` / `DOUBLE` / `BOOLEAN` / `DATE` / `TIMESTAMP`, when `physicalType` is absent; `integer` with `logicalTypeOptions.format` `i64` or `u32` is `BIGINT` |
+| `logicalType` `string` / `integer` / `number` / `boolean` / `date` / `timestamp` / `time` | `VARCHAR` / `INTEGER` / `DOUBLE` / `BOOLEAN` / `DATE` / `TIMESTAMP` / `TIME`; `integer` with `logicalTypeOptions.format` `i64` or `u32` is `BIGINT` |
+| `physicalType` (`VARCHAR`, `BIGINT`, ...) | not read; it documents the source system's type |
 | `required: true`, or a primary key property | `NOT NULL` |
 | `primaryKey: true` + `primaryKeyPosition` | `PRIMARY KEY`, columns in position order |
 | `unique: true` | single-column `UNIQUE`; ignored on a single-column primary key, which it only repeats |
@@ -91,7 +91,7 @@ still sees it through `COMMENT ON COLUMN`; `student.home_campus_code` refers to 
 | Length bounds and patterns | `campus.code` 2..4 chars `^[A-Z]+$`, `tuition_rate.currency` exactly 3 `^[A-Z]{3}$`, `term.term_code` `^[0-9]{4}(SP|SU|FA)$`, `course.course_code`, emails, `room.room_number` ≤ 10 |
 | Doc-only relationship to a non-key column | `student.home_campus_code` → `campus.code` |
 | A column named like a SQL keyword | `academic_calendar.date`; also `course.level` and `payment.method`, which DuckDB quotes in its messages |
-| Every supported type | `string`, `integer` (INTEGER and BIGINT), `number`, `boolean`, `date`, `timestamp` |
+| Every supported type but `time` | `string`, `integer` (INTEGER, and BIGINT through `format: i64` on `student.student_number`), `number`, `boolean`, `date`, `timestamp`; `time` is covered in `OpenDataContractTest` |
 | Metadata the builder ignores | `businessName`, `classification`, `criticalDataElement`, `examples`, `tags`, `authoritativeDefinitions`, `customProperties`, `dataGranularityDescription`, `quality`, `format`, and the contract's `team` and `support` |
 | Docs with apostrophes, for `COMMENT ON` escaping | `campus`, `student`, `scholarship`, `department.annual_budget`, `payment.reference` |
 

@@ -183,8 +183,8 @@ schema:
 | schema object | table named by `physicalName`, else `name`, lower-cased |
 | property | column named by `physicalName`, else `name`, lower-cased |
 | `description` | `COMMENT ON TABLE` / `COMMENT ON COLUMN` |
-| `physicalType` (`VARCHAR(18)`, `BIGINT`, `decimal(10,2)`, ...) | the column type; a parenthesised size is ignored. Decides when present |
-| `logicalType` `string` / `integer` / `number` / `boolean` / `date` / `timestamp` | `VARCHAR` / `INTEGER` / `DOUBLE` / `BOOLEAN` / `DATE` / `TIMESTAMP` when `physicalType` is absent; `integer` with `logicalTypeOptions.format` `i64` or `u32` is `BIGINT` |
+| `logicalType` `string` / `integer` / `number` / `boolean` / `date` / `timestamp` / `time` | `VARCHAR` / `INTEGER` / `DOUBLE` / `BOOLEAN` / `DATE` / `TIMESTAMP` / `TIME`; `integer` with `logicalTypeOptions.format` `i64` or `u32` is `BIGINT`. Every property needs one |
+| `physicalType` | not read: it is the type in the contract's source system (`int4` in PostgreSQL, `NUMBER(10)` in Oracle), not a DuckDB type |
 | `required: true`, or any primary key property | `NOT NULL` |
 | `primaryKey: true`, ordered by `primaryKeyPosition` | `PRIMARY KEY (...)`; a composite key needs a distinct position on every key property |
 | `unique: true` | `UNIQUE (col)`; ODCS has no composite unique key. Ignored on a single-column primary key, which it only repeats |
@@ -194,8 +194,8 @@ schema:
 | `logicalTypeOptions.minimum` / `maximum` / `exclusiveMinimum` / `exclusiveMaximum` | `CHECK (col >= v)` and the like; numbers, dates and timestamps |
 | `logicalTypeOptions.minLength` / `maxLength` / `pattern` | `CHECK (length(col) >= n)`, `CHECK (regexp_matches(col, 'p'))`; strings; the pattern is RE2 |
 
-Properties with `logicalType` `time`, `object`, `array`, `map` or `vector` have no column mapping and
-are rejected naming the file, schema object and property, as are references into another contract
+Properties with `logicalType` `object`, `array`, `map` or `vector` have no column mapping and
+are rejected naming the file, schema object and property. So are value constraints on a `time` column, and references into another contract
 (`other.yaml#/...`) and to nested properties. `quality` rules, `logicalTypeOptions.format` and
 `multipleOf` are accepted but not enforced. Foreign keys are collected property-level
 first, in property order, then object-level in declared order. An unknown key on a schema object,
@@ -434,6 +434,7 @@ A small infix DSL is provided: `ColumnName("site") eq StringValue("TX")`, `isIn`
 - **FK validated post-load via query for Parquet** — `fromParquet`/`fromS3` create tables with `CREATE TABLE AS SELECT`, and DuckDB can only declare a `FOREIGN KEY` inside `CREATE TABLE` (no `ALTER TABLE ADD FOREIGN KEY`), so for Parquet-loaded tables referential integrity is validated by querying for orphaned rows after all tables are loaded. Null FK values are allowed (standard SQL semantics). Environments built from a `DomainModel` declare the keys inline, and DuckDB enforces them on every `INSERT`.
 - **`DomainModel` is correct by construction; `DomainModelDdl` only renders it.** The model holds tables and keys as values and checks, when built, every rule DuckDB applies to the DDL (referenced columns exist and form a key in the same order, types match exactly) plus what a database cannot see (creation order, cycles, tables outside the model). `fromDomainModel` therefore cannot be rejected; if DuckDB ever does reject a statement that is an `IllegalStateException`, a defect in rendering or a DuckDB change, not a bad model. The rules were established by probing DuckDB 2.0.0.1 and are pinned by a property test that builds random valid models in DuckDB and reads the catalog back.
 - **One encoding, the Open Data Contract Standard.** A target model is a contract between the team that owns it and whoever loads data into it, which is what ODCS describes: it has keys, relationships, descriptions, enumerations and value bounds natively, is governed by the Linux Foundation, and the Data Contract Specification now migrates into it. `DomainModel` stays engine- and format-neutral, so a second adapter (JSON Schema, Protobuf, Smithy) can be added when a consumer brings a model in that format; none is kept speculatively.
+- **Column types come from `logicalType` only.** ODCS defines `physicalType` as "the physical element data type in the data source", so a contract written for PostgreSQL says `serial`, `int4` or `varchar[50]` there, and one for Oracle says `NUMBER(10)`. Reading those as DuckDB types would tie the domain model to whichever engine the contract was written for, and some read as a different DuckDB type (`VARCHAR[50]` is a fixed-size list). A contract written for one engine is converted once into an engine-neutral one, with the logical types the source engine implies; `agentio-examples` does this for the standard's PostgreSQL AdventureWorks example.
 - **Names are lower-cased.** DuckDB folds unquoted identifiers to lower case and `TableName`/`ColumnName` require it, so `Customer` becomes `customer`; generated DDL quotes identifiers so a column named like a keyword (`order`, `level`) still works.
 - **Value constraints are structured, not SQL.** `ValueConstraint` holds an enumeration, a bound, a length or a pattern as values; `DomainModelDdl` renders the `CHECK`. The model can therefore validate them (type fit, min ≤ max, RE2 syntax via re2j, the engine behind DuckDB's `regexp_matches`) and stay correct by construction, and a future adapter maps onto the same six kinds. A raw-SQL `check` would be DuckDB-specific and unvalidated until `CREATE TABLE`.
 - **`fromS3` is `suspend`** — uses AWS S3 Kotlin SDK (suspend functions). Blocking I/O (`Files.createTempDirectory`, `Files.write`) wrapped in `withContext(Dispatchers.IO)`. Consistent with `agentio-core` concurrency pattern.

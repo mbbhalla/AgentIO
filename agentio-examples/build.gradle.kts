@@ -37,6 +37,19 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    // Testing — the ETL example's deterministic parts (source guard, workspace, plan check, pipeline, script) run without an LLM
+    testImplementation("org.junit.jupiter:junit-jupiter:5.14.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("org.jetbrains.kotlin:kotlin-test:2.2.0")
+}
+
+/** The engine-neutral AdventureWorks contract, converted from the ODCS project's PostgreSQL example and tested in agentio-module-data. */
+val adventureWorksContract = "${rootProject.projectDir}/agentio-module-data/src/test/resources/odcs/odcs_example.generic.yaml"
+val adventureWorksSources = "${project.projectDir}/src/main/resources/etl/adventureworks/source"
+
+tasks.withType<Test> {
+    systemProperty("etl.contract", adventureWorksContract)
+    systemProperty("etl.sources", adventureWorksSources)
 }
 
 tasks.register<JavaExec>("RunGitAnalyzerAgenticFunction") {
@@ -122,6 +135,24 @@ tasks.register<JavaExec>("RunCamelText2SqlRoute") {
         listOf(
             project.findProperty("queriesFile")?.toString()
                 ?: "${project.projectDir}/src/main/resources/camel/text2sql-queries.txt",
+        )
+}
+
+tasks.register<JavaExec>("RunEtlAgenticFunction-AdventureWorks") {
+    mainClass.set("io.github.mbbhalla.agentio.examples.etl.RunnerKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    debug = false
+    debugOptions {
+        server = true
+        suspend = true
+        host = "localhost"
+        port = 5022
+    }
+    args =
+        listOf(
+            project.findProperty("contract")?.toString() ?: adventureWorksContract,
+            project.findProperty("sourceDir")?.toString() ?: adventureWorksSources,
+            project.findProperty("outputDir")?.toString() ?: "${project.layout.buildDirectory.get()}/etl-adventureworks",
         )
 }
 

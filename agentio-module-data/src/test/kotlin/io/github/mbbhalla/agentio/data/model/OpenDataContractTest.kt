@@ -37,7 +37,7 @@ class OpenDataContractTest {
             assertFalse(section.column("course_code").nullable, "a primary key property is NOT NULL without required: true")
             assertTrue(section.column("faculty_id").nullable)
             assertEquals(ColumnType.TIMESTAMP, section.column("first_meeting_at").type)
-            assertEquals(ColumnType.BIGINT, student.column("student_number").type, "physicalType BIGINT wins over logicalType integer")
+            assertEquals(ColumnType.BIGINT, student.column("student_number").type, "logicalType integer with format i64")
             assertEquals(ColumnType.DATE, student.column("birth_date").type)
         }
 
@@ -206,15 +206,13 @@ class OpenDataContractTest {
                 )
             val e = assertThrows<IllegalArgumentException> { DomainModel.fromOdcs(listOf(file)) }
             assertEquals(
-                "$file schema object 'receivers' property 'receiver_attributes': " +
-                    "physicalType 'MAP<STRING, STRING>' has no column mapping; " +
-                    "use one of ${ColumnType.entries.map { it.name }} or a common alias",
+                "$file schema object 'receivers' property 'receiver_attributes': logicalType 'map' has no column mapping",
                 e.message,
             )
         }
 
         @Test
-        fun `the full example parses once the unmappable property is removed, with physical names and parenthesised types`() {
+        fun `the full example parses once the unmappable property is removed, with physical names and logical types`() {
             val file =
                 contract(
                     "full",
@@ -249,11 +247,13 @@ class OpenDataContractTest {
                         - name: id
                           primaryKey: true
                           primaryKeyPosition: 1
+                          logicalType: string
                           physicalType: varchar(18)
                           unique: true
                         - name: country_code
                           primaryKey: true
                           primaryKeyPosition: 2
+                          logicalType: string
                           physicalType: varchar(2)
                     """,
                 )
@@ -272,7 +272,7 @@ class OpenDataContractTest {
                 "physicalName names the column",
             )
             assertEquals(ColumnType.DATE, tbl.columns[0].type)
-            assertEquals(ColumnType.VARCHAR, tbl.columns[1].type, "varchar(18) is VARCHAR")
+            assertEquals(ColumnType.VARCHAR, tbl.columns[1].type, "logicalType string; physicalType varchar(18) is not read")
             assertFalse(tbl.columns[1].nullable, "primary key overrides required: false")
             assertEquals(
                 listOf(
@@ -358,7 +358,7 @@ class OpenDataContractTest {
         }
 
         @Test
-        fun `logical types map to column types, and integer format selects BIGINT`() {
+        fun `logical types map to column types, integer format selects BIGINT, and physicalType is not read`() {
             val file =
                 contract(
                     "types",
@@ -374,7 +374,11 @@ class OpenDataContractTest {
                         - { name: b, logicalType: boolean }
                         - { name: d, logicalType: date }
                         - { name: ts, logicalType: timestamp, logicalTypeOptions: { timezone: true } }
+                        - { name: tm, logicalType: time, logicalTypeOptions: { format: "HH:mm:ss" } }
                         - { name: p, logicalType: string, physicalType: "DECIMAL(10, 2)" }
+                        - { name: pg_serial, logicalType: integer, physicalType: serial }
+                        - { name: pg_array, logicalType: string, physicalType: "varchar[50]" }
+                        - { name: pg_domain, logicalType: boolean, physicalType: Flag }
                     """,
                 )
             assertEquals(
@@ -388,7 +392,11 @@ class OpenDataContractTest {
                     ColumnType.BOOLEAN,
                     ColumnType.DATE,
                     ColumnType.TIMESTAMP,
-                    ColumnType.DOUBLE,
+                    ColumnType.TIME,
+                    ColumnType.VARCHAR,
+                    ColumnType.INTEGER,
+                    ColumnType.VARCHAR,
+                    ColumnType.BOOLEAN,
                 ),
                 table(file).columns.map { it.type },
             )
@@ -605,7 +613,8 @@ class OpenDataContractTest {
         @Test
         fun `a property needs a type, and unmappable or unknown types are named`() {
             assertEquals(
-                "${dir.resolve("none.odcs.yaml")} schema object 't' property 'a': a property needs logicalType or physicalType",
+                "${dir.resolve("none.odcs.yaml")} schema object 't' property 'a': a property needs logicalType; " +
+                    "physicalType is the source system's type and does not decide the column type",
                 message(contract("none", "- name: t\n  properties:\n    - name: a")),
             )
             assertTrue(
@@ -618,8 +627,12 @@ class OpenDataContractTest {
             )
             assertTrue(
                 message(
-                    contract("time", "- name: t\n  properties:\n    - name: a\n      logicalType: time"),
-                ).endsWith("property 'a': logicalType 'time' has no column mapping"),
+                    contract(
+                        "timebound",
+                        "- name: t\n  properties:\n    - name: a\n      logicalType: time\n      enum: [{ value: \"07:00:00\" }]",
+                    ),
+                ).contains("Column 'a' of type TIME cannot have the constraint OneOf"),
+                "a time of day takes no value constraint",
             )
             assertTrue(
                 message(
@@ -638,8 +651,9 @@ class OpenDataContractTest {
             )
             assertTrue(
                 message(
-                    contract("phys", "- name: t\n  properties:\n    - name: a\n      physicalType: GEOMETRY"),
-                ).contains("physicalType 'GEOMETRY' has no column mapping"),
+                    contract("phys", "- name: t\n  properties:\n    - name: a\n      physicalType: INTEGER"),
+                ).contains("property 'a': a property needs logicalType"),
+                "a physicalType alone does not type a column, even when it names a DuckDB type",
             )
         }
 
