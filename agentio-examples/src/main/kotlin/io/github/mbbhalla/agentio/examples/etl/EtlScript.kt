@@ -23,7 +23,7 @@ internal data class EtlScript(
 
     fun render(): String =
         buildString {
-            header.forEach { appendLine("-- $it") }
+            header.flatMap { it.lines() }.forEach { appendLine("-- $it".trimEnd()) }
             appendLine()
             appendLine("-- Target tables, with the keys and CHECK constraints of the contract")
             createTables.forEach { appendLine(it.trim().let { sql -> if (sql.endsWith(";")) sql else "$sql;" }) }
@@ -53,13 +53,13 @@ internal data class EtlScript(
     companion object {
         fun of(
             workspace: EtlWorkspace,
-            run: EtlRun,
+            loaded: List<LoadedTable>,
             header: List<String>,
         ): EtlScript =
             EtlScript(
                 createTables = workspace.createTableStatements().values.toList(),
                 loads =
-                    run.loaded.map {
+                    loaded.map {
                         val table = workspace.targetTable(it.table)
                         Load(table, it.explanation, workspace.insertSql(table, it.selectSql))
                     },

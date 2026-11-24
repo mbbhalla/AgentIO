@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -12,25 +13,19 @@ import kotlin.test.assertTrue
 class EtlPipelineTest {
     private val workspace = AdventureWorks.workspace()
 
-    private fun referenceAnswer(input: EtlSqlWriterAgenticFunction.Input) =
-        EtlSqlWriterAgenticFunction.Output(
-            targetTable = input.step.targetTable,
-            selectSql = AdventureWorks.referenceSql.getValue(input.step.targetTable),
-            explanation = "reference load",
-        )
-
     private fun pipeline(
-        planner: Planner = Planner { Result.success(AdventureWorks.referencePlan) },
-        writer: SqlWriter = SqlWriter { Result.success(referenceAnswer(it)) },
+        planner: Planner = AdventureWorks.referencePlanner,
+        writer: SqlWriter = AdventureWorks.referenceWriter,
     ) = EtlPipeline(workspace, planner, { writer })
 
     @Test
     fun `the reference load fills every planned table with no orphans, and its script replays alone`() {
         val run = runBlocking { pipeline().run() }.getOrThrow()
-        assertTrue(run.succeeded)
+        assertTrue(run.complete)
+        assertEquals(emptyList(), run.questions)
         assertEquals(AdventureWorks.expectedRows, run.loaded.associate { it.table to it.rows })
         assertEquals(AdventureWorks.references.associateWith { 0L }, run.orphans)
-        val script = EtlScript.of(workspace, run, header = listOf("test"))
+        val script = EtlScript.of(workspace, run.loaded, header = listOf("test"))
         assertEquals(68, script.createTables.size)
         assertEquals(AdventureWorks.expectedRows.mapKeys { TableName(it.key) }.mapValues { it.value.toLong() }, script.replay())
         assertContains(script.render(), "INSERT INTO \"employeepayhistory\" BY NAME SELECT * FROM (")
@@ -43,13 +38,13 @@ class EtlPipelineTest {
             SqlWriter { input ->
                 seen += input
                 if (input.step.targetTable == "shift" && input.previousAttemptError == null) {
-                    Result.success(referenceAnswer(input).copy(selectSql = "SELECT 'Day' AS name"))
+                    AdventureWorks.referenceWriter.write(input).map { it.copy(selectSql = "SELECT 'Day' AS name") }
                 } else {
-                    Result.success(referenceAnswer(input))
+                    AdventureWorks.referenceWriter.write(input)
                 }
             }
         val run = runBlocking { pipeline(writer = writer).run() }.getOrThrow()
-        assertTrue(run.succeeded)
+        assertTrue(run.complete)
         assertEquals(2, run.loaded.first { it.table == "shift" }.attempts)
         assertContains(seen.last { it.step.targetTable == "shift" }.previousAttemptError.orEmpty(), "NOT NULL constraint failed")
         assertEquals(listOf("department", "shift"), seen.first { it.step.targetTable == "phonenumbertype" }.loadedTables)
@@ -57,6 +52,58 @@ class EtlPipelineTest {
             listOf(Reference("employeepayhistory", "businessentityid", "employee", "businessentityid")),
             seen.first { it.step.targetTable == "employeepayhistory" }.references,
         )
+    }
+
+    @Test
+    fun `decisions and feedback reach the planner and every writer, and questions come back with their origin`() {
+        val decisions = listOf(DecidedQuestion("employee: How do Divorced and Widowed map?", "S"))
+        val plannerInputs = mutableListOf<EtlPlannerAgenticFunction.Input>()
+        val writerInputs = mutableListOf<EtlSqlWriterAgenticFunction.Input>()
+        val planQuestion = AdventureWorks.question("Load jobcandidate?")
+        val employeeQuestion = AdventureWorks.question("Is On Leave active?")
+        val planner =
+            Planner { input ->
+                plannerInputs += input
+                AdventureWorks.referencePlanner.plan(input).map { it.copy(questions = listOf(planQuestion)) }
+            }
+        val writer =
+            SqlWriter { input ->
+                writerInputs += input
+                val isEmployee = input.step.targetTable == "employee"
+                AdventureWorks.referenceWriter.write(input).map { if (isEmployee) it.copy(questions = listOf(employeeQuestion)) else it }
+            }
+        val run = runBlocking { pipeline(planner, writer).run(decisions, feedback = listOf("keep ids")) }.getOrThrow()
+        assertEquals(decisions, plannerInputs.single().decisions)
+        assertTrue(writerInputs.all { it.decisions == decisions && it.reviewerFeedback == listOf("keep ids") })
+        val openQuestions = writerInputs.associate { it.step.targetTable to it.openQuestions }
+        assertEquals(listOf(planQuestion), openQuestions.getValue("employee"), "writers are told what is already asked")
+        assertEquals(listOf(planQuestion, employeeQuestion), openQuestions.getValue("emailaddress"))
+        assertEquals(listOf(AgentQuestion("plan", planQuestion), AgentQuestion("employee", employeeQuestion)), run.questions)
+        assertTrue(run.complete, "questions with an assumption do not stop the load")
+    }
+
+    @Test
+    fun `a writer that needs answers first stops the run with its questions`() {
+        val writer =
+            SqlWriter { input ->
+                if (input.step.targetTable == "employeedepartmenthistory") {
+                    Result.success(
+                        EtlSqlWriterAgenticFunction.Output(
+                            input.step.targetTable,
+                            selectSql = null,
+                            explanation = "",
+                            questions = listOf(AdventureWorks.question("paula0 is not in the roster", assumed = null)),
+                        ),
+                    )
+                } else {
+                    AdventureWorks.referenceWriter.write(input)
+                }
+            }
+        val run = runBlocking { pipeline(writer = writer).run() }.getOrThrow()
+        assertEquals("employeedepartmenthistory", run.blocked)
+        assertFalse(run.complete)
+        assertEquals(8, run.loaded.size)
+        assertEquals(listOf("employeedepartmenthistory"), run.questions.map { it.origin })
     }
 
     @Test
@@ -68,18 +115,18 @@ class EtlPipelineTest {
                 ) {
                     Result.failure(IllegalStateException("tool call limit"))
                 } else {
-                    Result.success(referenceAnswer(input))
+                    AdventureWorks.referenceWriter.write(input)
                 }
             }
         val run = runBlocking { pipeline(writer = writer).run() }.getOrThrow()
         assertEquals(StepFailure("person", List(3) { "tool call limit" }), run.failure)
         assertEquals(listOf("department", "shift", "phonenumbertype", "businessentity"), run.loaded.map { it.table })
-        assertTrue(!run.succeeded)
+        assertFalse(run.complete)
     }
 
     @Test
     fun `an answer for another table is rejected`() {
-        val writer = SqlWriter { input -> Result.success(referenceAnswer(input).copy(targetTable = "shift")) }
+        val writer = SqlWriter { input -> AdventureWorks.referenceWriter.write(input).map { it.copy(targetTable = "shift") } }
         val run = runBlocking { pipeline(writer = writer).run() }.getOrThrow()
         assertEquals("department", run.failure?.table)
         assertContains(

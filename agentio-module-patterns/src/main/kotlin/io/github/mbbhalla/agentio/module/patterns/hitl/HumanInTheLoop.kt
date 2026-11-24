@@ -3,74 +3,124 @@ package io.github.mbbhalla.agentio.module.patterns.hitl
 import org.slf4j.LoggerFactory
 
 /**
- * Human-in-the-loop pattern: propose, review, then either apply, revise, or stop.
+ * Human-in-the-loop pattern: propose, review, then approve, revise or stop.
  *
- * The agent can only read; the one consequential step (changing the fleet) runs here and only after
- * [ReviewDecision.Approve]. [ReviewDecision.Revise] feeds the reviewer's words back into the next
- * proposal, bounded by [maxRounds]. [ReviewDecision.Reject] ends the loop with the fleet untouched.
+ * The agent only proposes; whatever is consequential runs in the caller, and only for
+ * [Outcome.Approved]. A proposal comes with the questions the agent could not decide. While any is
+ * open the reviewer answers them, and the agent proposes again bound by the answers; once none is open
+ * the reviewer signs off the proposal as a whole, or sends feedback for another round. Rounds are
+ * bounded by [maxRounds]. A reviewer who is not there yet ([ReviewReply.Pending]) stops the loop with
+ * [Outcome.AwaitingReview], whose request [run] resumes later, in this process or another.
  */
-internal class HumanInTheLoop(
-    private val advisor: RightsizingAdvisorAgenticFunction,
-    private val gate: ApprovalGate,
+class HumanInTheLoop<P>(
+    private val proposer: Proposer<P>,
+    private val gate: ReviewGate<P>,
     private val maxRounds: Int,
 ) {
-    companion object {
-        private val LOG = LoggerFactory.getLogger(HumanInTheLoop::class.java)
+    init {
+        require(maxRounds >= 1) { "maxRounds must be at least 1, found $maxRounds" }
     }
 
-    data class Round(
-        val iteration: Int,
-        val proposal: RightsizingProposal,
-        val decision: ReviewDecision,
+    data class Round<P>(
+        val request: ReviewRequest<P>,
+        val reply: ReviewReply,
     )
 
-    sealed interface Outcome {
-        val rounds: List<Round>
+    sealed interface Outcome<P> {
+        val rounds: List<Round<P>>
 
-        data class Applied(
-            val before: Fleet,
-            val after: Fleet,
-            override val rounds: List<Round>,
-        ) : Outcome
+        data class Approved<P>(
+            val proposal: P,
+            val decisions: List<Decision>,
+            override val rounds: List<Round<P>>,
+        ) : Outcome<P>
 
-        data class Rejected(
+        data class Rejected<P>(
             val reason: String,
-            override val rounds: List<Round>,
-        ) : Outcome
+            override val rounds: List<Round<P>>,
+        ) : Outcome<P>
 
-        data class Failed(
+        /** The reviewer has not replied to [request]; pass it to [run] to continue. */
+        data class AwaitingReview<P>(
+            val request: ReviewRequest<P>,
+            override val rounds: List<Round<P>>,
+        ) : Outcome<P>
+
+        data class Failed<P>(
             val reason: String,
-            override val rounds: List<Round>,
-        ) : Outcome
+            override val rounds: List<Round<P>>,
+        ) : Outcome<P>
     }
 
-    suspend fun run(fleet: Fleet): Outcome {
-        val rounds = mutableListOf<Round>()
-        val feedback = mutableListOf<String>()
-
-        for (iteration in 1..maxRounds) {
-            val proposal =
-                advisor
-                    .invoke(RightsizingAdvisorAgenticFunction.Input(iteration = iteration, reviewerFeedback = feedback))
-                    .map { it.output }
-                    .getOrElse { error -> return Outcome.Failed("Advisor failed on round $iteration: ${error.message}", rounds) }
-            LOG.info("[HITL] Proposal {}: {}", iteration, proposal.summary)
-            proposal.changes.forEach { LOG.info("[HITL]   {} {} — {}", it.action, it.resourceId, it.justification) }
-
-            val decision = gate.review(iteration, proposal)
-            rounds += Round(iteration = iteration, proposal = proposal, decision = decision)
-            LOG.info("[HITL] Reviewer decision: {}", decision)
-
-            when (decision) {
-                is ReviewDecision.Approve ->
-                    return fleet
-                        .apply(proposal)
-                        .map { after -> Outcome.Applied(before = fleet, after = after, rounds = rounds) as Outcome }
-                        .getOrElse { error -> Outcome.Failed("Approved proposal could not be applied: ${error.message}", rounds) }
-                is ReviewDecision.Reject -> return Outcome.Rejected(reason = decision.reason, rounds = rounds)
-                is ReviewDecision.Revise -> feedback += decision.feedback
+    /** Starts at round 1, or continues from [resume], a request that was awaiting review. */
+    suspend fun run(resume: ReviewRequest<P>? = null): Outcome<P> {
+        val rounds = mutableListOf<Round<P>>()
+        var request: ReviewRequest<P> =
+            resume ?: propose(round = 1, decisions = emptyList(), feedback = emptyList()).getOrElse { return failed(1, it, rounds) }
+        while (true) {
+            val reply = gate.review(request)
+            LOG.info("[HITL] Round {}: {}", request.round, describe(reply))
+            if (reply == ReviewReply.Pending) return Outcome.AwaitingReview(request, rounds)
+            rounds += Round(request, reply)
+            when (reply) {
+                ReviewReply.Pending -> error("handled above")
+                ReviewReply.Approve ->
+                    return if (request.isSignOff) {
+                        Outcome.Approved(request.proposal, request.decisions, rounds)
+                    } else {
+                        Outcome.Failed("Round ${request.round}: approval is only possible once no question is open", rounds)
+                    }
+                is ReviewReply.Reject -> return Outcome.Rejected(reply.reason, rounds)
+                is ReviewReply.Revise -> {
+                    val answered = decide(request, reply).getOrElse { return failed(request.round, it, rounds) }
+                    if (request.round >= maxRounds) return Outcome.Rejected("No approval within $maxRounds rounds", rounds)
+                    val decisions = request.decisions + answered
+                    val feedback = request.feedback + listOfNotNull(reply.feedback?.takeIf { it.isNotBlank() })
+                    request = propose(request.round + 1, decisions, feedback).getOrElse { return failed(request.round + 1, it, rounds) }
+                }
             }
         }
-        return Outcome.Rejected(reason = "No approval within $maxRounds rounds", rounds = rounds)
+    }
+
+    private suspend fun propose(
+        round: Int,
+        decisions: List<Decision>,
+        feedback: List<String>,
+    ): Result<ReviewRequest<P>> =
+        proposer.propose(round, decisions, feedback).mapCatching { proposal ->
+            LOG.info("[HITL] Round {}: proposal with {} open question(s)", round, proposal.questions.size)
+            ReviewRequest(round, proposal.value, proposal.questions, decisions, feedback)
+        }
+
+    private fun failed(
+        round: Int,
+        error: Throwable,
+        rounds: List<Round<P>>,
+    ): Outcome<P> = Outcome.Failed("Round $round: ${error.message}", rounds)
+
+    /** The reviewer's answers as decisions; an answer to a question that is not open is an error. */
+    private fun decide(
+        request: ReviewRequest<P>,
+        reply: ReviewReply.Revise,
+    ): Result<List<Decision>> =
+        runCatching {
+            val open = request.questions.associateBy { it.id }
+            reply.answers.map { (id, answer) ->
+                val question = requireNotNull(open[id]) { "answer to '$id', which is not an open question; open: ${open.keys}" }
+                Decision(request.round, question, answer)
+            }
+        }
+
+    private fun describe(reply: ReviewReply): String =
+        when (reply) {
+            ReviewReply.Pending -> "awaiting the reviewer"
+            ReviewReply.Approve -> "approved"
+            is ReviewReply.Reject -> "rejected: ${reply.reason}"
+            is ReviewReply.Revise ->
+                "revise with ${reply.answers.size} answer(s)" + if (reply.feedback.isNullOrBlank()) "" else " and feedback"
+        }
+
+    companion object {
+        private val LOG = LoggerFactory.getLogger(HumanInTheLoop::class.java)
     }
 }

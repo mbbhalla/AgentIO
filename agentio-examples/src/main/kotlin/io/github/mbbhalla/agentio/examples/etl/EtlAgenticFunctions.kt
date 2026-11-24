@@ -30,6 +30,25 @@ private val SQL_RULES =
       try_ functions that turn a bad value into NULL.
     """.trimIndent()
 
+/** When the agents ask the reviewer instead of deciding, and how they treat the reviewer's answers. */
+private val REVIEW_RULES =
+    """
+    QUESTIONS FOR THE REVIEWER:
+    - A load can pass every constraint and still be wrong. When a choice changes the loaded data and neither the sources
+      nor the target descriptions settle it, raise a question instead of deciding silently. Typical cases: a source code
+      or status with no matching target code; a unit or conversion the description does not give; a target column no
+      source provides that you would fill with a default rather than leave NULL; rows you would drop or merge to satisfy
+      a constraint, such as rows that reference something the sources do not contain.
+    - Give two to four options, the evidence (source values with counts, the target description, any DuckDB error) and
+      the index of the option your SQL uses meanwhile. Choose the least destructive option and keep going with it, so the
+      rest of the load can still be checked.
+    - Do not ask what the sources or descriptions settle, about formatting, or anything already decided.
+    - DECISIONS in your input are the reviewer's answers to earlier questions, and REVIEWER FEEDBACK is the reviewer's
+      own instruction. Both are binding: apply them exactly and do not ask about them again.
+    - OPEN QUESTIONS in your input, when there are any, are already with the reviewer. Follow their assumed option and do
+      not raise them again, not even in other words.
+    """.trimIndent()
+
 private fun configuration(
     agentId: String,
     systemPrompt: String,
@@ -80,6 +99,10 @@ internal class EtlPlannerAgenticFunction private constructor(
         val sourceFiles: List<String>,
         @field:Description("Number of tables in the target database")
         val targetTableCount: Int,
+        @field:Description("DECISIONS: the reviewer's answers to earlier questions; binding")
+        val decisions: List<DecidedQuestion>,
+        @field:Description("REVIEWER FEEDBACK on earlier proposals, oldest first; binding")
+        val reviewerFeedback: List<String>,
         @field:Description("Why the previous plan was rejected, if there was one")
         val previousAttemptError: String?,
     ) : Instructible.WithInstruction {
@@ -89,6 +112,7 @@ internal class EtlPlannerAgenticFunction private constructor(
             "Plan how the ${sourceFiles.size} source CSV files $sourceFiles load into the target database of " +
                 "$targetTableCount tables: which tables they feed, in what order, how each table's rows and columns " +
                 "derive from them, and which column references between the planned tables the descriptions state." +
+                (if (decisions.isEmpty() && reviewerFeedback.isEmpty()) "" else " Apply every decision and all reviewer feedback.") +
                 (previousAttemptError?.let { " The previous plan was rejected: $it" } ?: "")
 
         override fun systemInstruction(): String? = null
@@ -98,7 +122,12 @@ internal class EtlPlannerAgenticFunction private constructor(
 
     override fun getOutputKClass() = LoadPlan::class
 
-    override fun validateOutput(output: LoadPlan): Result<LoadPlan> = LoadPlanCheck.validate(output, workspace)
+    override fun validateOutput(output: LoadPlan): Result<LoadPlan> =
+        LoadPlanCheck.validate(output, workspace).mapCatching { plan ->
+            val problems = plan.questions.flatMap { it.problems() }
+            require(problems.isEmpty()) { "The plan's questions are invalid: ${problems.joinToString("; ")}" }
+            plan
+        }
 
     companion object {
         private val SYSTEM_PROMPT =
@@ -120,8 +149,13 @@ internal class EtlPlannerAgenticFunction private constructor(
             5. In each step's mapping, state the grain, how each key is derived so that it is identical in every table
                that uses it, how each column is converted, and which rows are merged or dropped and why.
             6. List the column references between planned tables that the descriptions state.
+            7. Raise a question for each choice you can already see while planning: which tables or rows to load, which
+               key scheme to use, or how a column is converted. The SQL writers follow your assumed options and raise
+               only what they find later.
 
             $SQL_RULES
+
+            $REVIEW_RULES
             """.trimIndent()
 
         suspend fun create(
@@ -162,6 +196,12 @@ internal class EtlSqlWriterAgenticFunction private constructor(
         val loadedTables: List<String>,
         @field:Description("References from this table that must have no orphaned values")
         val references: List<Reference>,
+        @field:Description("DECISIONS: the reviewer's answers to earlier questions; binding")
+        val decisions: List<DecidedQuestion>,
+        @field:Description("REVIEWER FEEDBACK on earlier proposals, oldest first; binding")
+        val reviewerFeedback: List<String>,
+        @field:Description("OPEN QUESTIONS: already put to the reviewer this round by the planner or earlier steps")
+        val openQuestions: List<RaisedQuestion>,
         @field:Description("Why the previous attempt at this step was rejected, if there was one")
         val previousAttemptError: String?,
     ) : Instructible.WithInstruction {
@@ -170,6 +210,7 @@ internal class EtlSqlWriterAgenticFunction private constructor(
         override fun instruction() =
             "Write the DuckDB SELECT that loads target table '${step.targetTable}' from ${step.sourceFiles}, following " +
                 "the step's mapping, and prove it with try_load." +
+                (if (decisions.isEmpty() && reviewerFeedback.isEmpty()) "" else " Apply every decision and all reviewer feedback.") +
                 (previousAttemptError?.let { " The previous attempt was rejected: $it" } ?: "")
 
         override fun systemInstruction(): String? = null
@@ -179,22 +220,34 @@ internal class EtlSqlWriterAgenticFunction private constructor(
     data class Output(
         @field:Description("The step's target table")
         val targetTable: String,
-        @field:Description("The SELECT that try_load last accepted")
-        val selectSql: String,
+        @field:Description("The SELECT that try_load last accepted; null only when no SQL can pass without the reviewer's answers")
+        val selectSql: String?,
         @field:Description("How the SELECT derives the table, including any rows it merges or drops and why")
         val explanation: String,
+        @field:Description("Choices for the reviewer that the sources and descriptions do not settle; empty when there are none")
+        val questions: List<RaisedQuestion>,
     )
 
     override fun getInputKClass() = Input::class
 
     override fun getOutputKClass() = Output::class
 
-    /** The SQL must still load under every constraint, with rows and without orphans, once the conversation has ended. */
+    /**
+     * SQL must still load under every constraint, with rows and without orphans, once the conversation has
+     * ended; an answer without SQL must say what it needs to know.
+     */
     override fun validateOutput(output: Output): Result<Output> =
         runCatching {
-            val trial = workspace.tryLoad(output.targetTable, output.selectSql, references)
-            require(trial.insertedRows > 0) { "The SELECT loads no rows into '${trial.table}'" }
-            require(trial.orphanedReferences.isEmpty()) { "The SELECT leaves orphaned references: ${trial.orphanedReferences}" }
+            val problems = output.questions.flatMap { it.problems() }
+            require(problems.isEmpty()) { "The questions are invalid: ${problems.joinToString("; ")}" }
+            val sql = output.selectSql
+            if (sql == null) {
+                require(output.questions.isNotEmpty()) { "An answer without selectSql must raise the questions that block it" }
+            } else {
+                val trial = workspace.tryLoad(output.targetTable, sql, references)
+                require(trial.insertedRows > 0) { "The SELECT loads no rows into '${trial.table}'" }
+                require(trial.orphanedReferences.isEmpty()) { "The SELECT leaves orphaned references: ${trial.orphanedReferences}" }
+            }
             output
         }
 
@@ -213,10 +266,14 @@ internal class EtlSqlWriterAgenticFunction private constructor(
                the same key in every table.
             4. try_load the SELECT. Fix it until try_load reports no error and no orphaned references, and its NULL counts
                and inserted rows are what the sources imply. Every source row that belongs in the table must load; merge or
-               drop rows only when they are exact duplicates or the mapping says so, and say why in your explanation.
-            5. Answer with the SELECT that try_load last accepted.
+               drop rows only when they are exact duplicates, the mapping says so, or a decision says so. Any other merge
+               or drop needs a question, and your explanation says which rows and why.
+            5. Answer with the SELECT that try_load last accepted and your questions. Only when no SQL can pass without the
+               reviewer's answers, answer with selectSql null and the questions that block you.
 
             $SQL_RULES
+
+            $REVIEW_RULES
             """.trimIndent()
 
         suspend fun create(

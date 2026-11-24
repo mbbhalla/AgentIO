@@ -16,13 +16,14 @@ internal object Runner {
     private const val MODE_INTERACTIVE = "interactive"
 
     private val SCRIPTED_REVIEWER =
-        ScriptedApprovalGate(
+        ScriptedReviewGate<RightsizingProposal>(
             listOf(
-                ReviewDecision.Revise(
-                    "Leave ci-runner unchanged: build load spikes at release time and the 30-day average hides it. " +
-                        "Also no terminations this quarter, downsizing only.",
+                ReviewReply.Revise(
+                    feedback =
+                        "Leave ci-runner unchanged: build load spikes at release time and the 30-day average hides it. " +
+                            "Also no terminations this quarter, downsizing only.",
                 ),
-                ReviewDecision.Approve,
+                ReviewReply.Approve,
             ),
         )
 
@@ -34,7 +35,7 @@ internal object Runner {
             val gate =
                 when (mode) {
                     MODE_SCRIPTED -> SCRIPTED_REVIEWER
-                    MODE_INTERACTIVE -> ConsoleApprovalGate()
+                    MODE_INTERACTIVE -> ConsoleReviewGate(::describe)
                     else -> throw IllegalArgumentException("mode must be '$MODE_SCRIPTED' or '$MODE_INTERACTIVE'")
                 }
             val fleet = Fleet.SAMPLE
@@ -42,34 +43,43 @@ internal object Runner {
             LOG.info("=== Human-in-the-Loop Pattern: Fleet Right-sizing ({} reviewer) ===", mode)
             LOG.info("Fleet before: {} resources, ${'$'}{}/month", fleet.resources.size, fleet.monthlyCostUsd)
 
+            val advisor =
+                RightsizingAdvisorAgenticFunction(
+                    agentId = ADVISOR_AGENT_ID,
+                    toolsProvider = PatternAgents.inProcessTools("fleet", FleetMcpServer(fleet)),
+                )
             val loop =
                 HumanInTheLoop(
-                    advisor =
-                        RightsizingAdvisorAgenticFunction(
-                            agentId = ADVISOR_AGENT_ID,
-                            toolsProvider = PatternAgents.inProcessTools("fleet", FleetMcpServer(fleet)),
-                        ),
+                    proposer = { round, _, feedback ->
+                        advisor
+                            .invoke(RightsizingAdvisorAgenticFunction.Input(iteration = round, reviewerFeedback = feedback))
+                            .map { Proposal(it.output) }
+                            .onSuccess { LOG.info("[HITL] Proposal {}:\n{}", round, describe(it.value)) }
+                    },
                     gate = gate,
                     maxRounds = MAX_ROUNDS,
                 )
 
-            val outcome = loop.run(fleet)
+            val outcome = loop.run()
 
             LOG.info("\n=== {} review round(s) ===", outcome.rounds.size)
             when (outcome) {
-                is HumanInTheLoop.Outcome.Applied -> {
-                    LOG.info(
-                        "Applied. Fleet after: {} resources, ${'$'}{}/month",
-                        outcome.after.resources.size,
-                        outcome.after.monthlyCostUsd,
-                    )
-                    LOG.info("Monthly saving: ${'$'}{}", outcome.before.monthlyCostUsd - outcome.after.monthlyCostUsd)
-                    outcome.after.resources.forEach { LOG.info("  {} {} {}", it.id, it.size, it.workload) }
-                }
+                is HumanInTheLoop.Outcome.Approved ->
+                    fleet
+                        .apply(outcome.proposal)
+                        .onSuccess { after ->
+                            LOG.info("Applied. Fleet after: {} resources, ${'$'}{}/month", after.resources.size, after.monthlyCostUsd)
+                            LOG.info("Monthly saving: ${'$'}{}", fleet.monthlyCostUsd - after.monthlyCostUsd)
+                            after.resources.forEach { LOG.info("  {} {} {}", it.id, it.size, it.workload) }
+                        }.onFailure { LOG.error("Approved proposal could not be applied, fleet unchanged: {}", it.message) }
                 is HumanInTheLoop.Outcome.Rejected -> LOG.info("Rejected, fleet unchanged: {}", outcome.reason)
                 is HumanInTheLoop.Outcome.Failed -> LOG.error("Failed, fleet unchanged: {}", outcome.reason)
+                is HumanInTheLoop.Outcome.AwaitingReview -> LOG.info("Awaiting the reviewer, fleet unchanged")
             }
         }
+
+    private fun describe(proposal: RightsizingProposal): String =
+        (listOf(proposal.summary) + proposal.changes.map { "  ${it.action} ${it.resourceId} — ${it.justification}" }).joinToString("\n")
 }
 
 fun main(args: Array<String>) {

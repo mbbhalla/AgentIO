@@ -70,6 +70,27 @@ internal object AdventureWorks {
             "employeepayhistory" to listOf("payroll_register.csv"),
         )
 
+    /** A planner that always answers [referencePlan]. */
+    val referencePlanner = Planner { Result.success(referencePlan) }
+
+    /** A writer that answers each step with the reference SQL and no questions. */
+    val referenceWriter =
+        SqlWriter { input ->
+            Result.success(
+                EtlSqlWriterAgenticFunction.Output(
+                    targetTable = input.step.targetTable,
+                    selectSql = referenceSql.getValue(input.step.targetTable),
+                    explanation = "reference load",
+                    questions = emptyList(),
+                ),
+            )
+        }
+
+    fun question(
+        text: String,
+        assumed: Int? = 0,
+    ) = RaisedQuestion(text, evidence = "evidence for: $text", options = listOf("yes", "no"), assumedOption = assumed)
+
     /** The plan the reference load implements. */
     val referencePlan: LoadPlan =
         LoadPlan(

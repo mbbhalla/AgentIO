@@ -9,6 +9,8 @@ dependencies {
     implementation(project(":agentio-module-text2sql"))
     implementation(project(":agentio-module-solver"))
     implementation(project(":agentio-module-compass"))
+    // Human-in-the-loop review for the ETL example
+    implementation(project(":agentio-module-patterns"))
 
     // Apache Camel routing engine for the route example.
     implementation("org.apache.camel:camel-core:$camelVersion")
@@ -138,6 +140,9 @@ tasks.register<JavaExec>("RunCamelText2SqlRoute") {
         )
 }
 
+/** Who answers the ETL agents' questions: "file" (SYSTEM_INPUT.md, default) or "console". */
+val etlReview = project.findProperty("review")?.toString() ?: "file"
+
 tasks.register<JavaExec>("RunEtlAgenticFunction-AdventureWorks") {
     mainClass.set("io.github.mbbhalla.agentio.examples.etl.RunnerKt")
     classpath = sourceSets["main"].runtimeClasspath
@@ -153,7 +158,10 @@ tasks.register<JavaExec>("RunEtlAgenticFunction-AdventureWorks") {
             project.findProperty("contract")?.toString() ?: adventureWorksContract,
             project.findProperty("sourceDir")?.toString() ?: adventureWorksSources,
             project.findProperty("outputDir")?.toString() ?: "${project.layout.buildDirectory.get()}/etl-adventureworks",
+            etlReview,
         )
+    // The console reviewer answers in this terminal; the file reviewer (default) answers in SYSTEM_INPUT.md between runs.
+    if (etlReview == "console") standardInput = System.`in`
 }
 
 tasks.register<JavaExec>("RunRerouteDemo") {

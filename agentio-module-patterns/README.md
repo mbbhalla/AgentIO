@@ -15,7 +15,7 @@ agents coordinate stay in [`agentio-examples`](../agentio-examples/README.md).
 | Routing | `RunRoutingAgenticFunction` | LLM classifier, once | One cheap classification, exactly one specialist runs, decline on low confidence |
 | Handoff | `RunHandoffAgenticFunction` | The working agent | Control transfers peer-to-peer with the transcript; policy enforced by code |
 | Model Cascade | `RunModelCascadeAgenticFunction` | Code (verify, escalate) | Cheapest tier first, escalate on failed verification; token cost per attempt |
-| Human-in-the-Loop | `RunHumanInTheLoopAgenticFunction` | A human | Propose → review → apply / revise / reject; the agent can only read |
+| Human-in-the-Loop | `RunHumanInTheLoopAgenticFunction` | A human | Propose → answer questions → sign off / revise / reject, generic over the proposal; the agent can only read |
 
 All patterns are self-sufficient — no API keys or tokens required beyond AWS credentials for Bedrock.
 
@@ -226,15 +226,49 @@ confidence by the tool-less tier and resolves at the tooled tier, verified again
 
 ## Human-in-the-Loop
 
-The advisor agent proposes fleet right-sizing changes from a read-only tool. `HumanInTheLoop` hands each `RightsizingProposal` to an
-`ApprovalGate`: `Approve` applies it (a pure `Fleet.apply`), `Revise(feedback)` feeds the reviewer's words into the next proposal,
-`Reject` ends the loop with the fleet untouched. The agent never has a tool that changes anything.
+`HumanInTheLoop<P>` is generic over the proposal type `P`. A `Proposer<P>` makes each round's proposal together with the
+questions the agent could not decide. A `ReviewGate<P>` puts them to a reviewer:
+
+| Round has | Reviewer replies | Loop |
+|-----------|------------------|------|
+| Open questions | `Revise(answers, feedback)`: an option or a written answer per question, some or all | Next round, bound by every `Decision` so far |
+| No open question | `Approve` | Ends with `Outcome.Approved(proposal, decisions)`; the caller applies it |
+| No open question | `Revise(feedback = ...)` | Next round with the feedback |
+| Either | `Reject(reason)` | Ends with `Outcome.Rejected`; nothing is applied |
+| Either | `Pending` (no reply yet) | Ends with `Outcome.AwaitingReview(request)`; `run(resume = request)` continues, in this process or another |
+
+```kotlin
+val loop = HumanInTheLoop(
+    proposer = { round, decisions, feedback -> agent.invoke(Input(round, decisions, feedback)).map { Proposal(it.output, it.output.questions) } },
+    gate = FileReviewGate(outputDir, MyProposal.serializer(), describe = ::markdown, title = "Review", howToContinue = "run again"),
+    maxRounds = 5,
+)
+when (val outcome = loop.run(resume = gate.pending())) {
+    is HumanInTheLoop.Outcome.Approved -> apply(outcome.proposal)
+    is HumanInTheLoop.Outcome.AwaitingReview -> println("Answer ${gate.file}, then run again")
+    else -> Unit
+}
+```
+
+Gates:
+
+- `ScriptedReviewGate`: replies fixed in advance, for unattended runs and tests
+- `ConsoleReviewGate`: asks at the terminal, one question at a time, then sign-off
+- `FileReviewGate`: writes `SYSTEM_INPUT.md`, with a checkbox per option, an `Answer:` line per question, a Feedback section, the
+  decisions so far and the proposal, then returns `Pending` so the process can end. A later process resumes from
+  `SYSTEM_INPUT.state.json` and reads the person's edits; an ambiguous edit fails naming the question. `record(outcome)` turns the
+  file into the record of every decision. Used by the ODCS ETL example in `agentio-examples`.
+
+The fleet example uses it without questions: the advisor proposes right-sizing changes from a read-only tool, `Approve` applies
+them with a pure `Fleet.apply`, `Revise(feedback)` feeds the reviewer's words into the next proposal, and `Reject` leaves the fleet
+untouched. The agent never has a tool that changes anything.
 
 ### Key Patterns
 
-- **The consequential step is outside the agent** — applying changes happens in code, only after approval
-- **Feedback loop with a human** — `Revise` feedback becomes part of the next instruction, bounded by `maxRounds`
-- **Pluggable gate** — `ScriptedApprovalGate` for unattended runs and tests, `ConsoleApprovalGate` for a real reviewer
+- **The consequential step is outside the agent** — applying changes happens in the caller, only after `Outcome.Approved`
+- **Questions, then sign-off** — while a question is open the reviewer answers; approval is only possible once none is
+- **Decisions bind later rounds** — every answer is passed to every later proposal, bounded by `maxRounds`
+- **Reviewers may be slow** — `Pending` and `run(resume = ...)` let a review span processes and days
 - **Pure state transition** — `Fleet.apply` returns a new fleet and rejects impossible changes, so before/after cost is exact
 
 ## Project Structure
@@ -269,7 +303,8 @@ io.github.mbbhalla.agentio.module.patterns/
 │   ├── ModelCascade.kt, TaskAgenticFunction.kt, ComputeToolsMcpServer.kt
 │   └── Runner.kt
 └── hitl/
-    ├── FleetModel.kt, FleetMcpServer.kt, ApprovalGate.kt, RightsizingAdvisorAgenticFunction.kt, HumanInTheLoop.kt
+    ├── Review.kt, HumanInTheLoop.kt, ReviewGates.kt, FileReviewGate.kt   — the generic loop, its types and gates
+    ├── FleetModel.kt, FleetMcpServer.kt, RightsizingAdvisorAgenticFunction.kt
     └── Runner.kt
 ```
 

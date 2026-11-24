@@ -115,6 +115,8 @@ FROM c JOIN phonenumbertype AS p ON lower(p.name) = c.label;
 -- table: employeedepartmenthistory
 -- Events become intervals: department and shift carry forward, the next event ends an interval the day
 -- before it starts, a termination ends it on that day. Employees are found by login, departments by name.
+-- The two events for adventure-works\paula0, who is not in the roster, are dropped by the join: a decision
+-- the agents are expected to put to the reviewer rather than take silently.
 WITH ev AS (
     SELECT strptime(event_time, '%Y-%m-%d %H:%M') AS ts,
            lower(login) AS login,

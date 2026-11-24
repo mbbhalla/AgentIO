@@ -54,13 +54,13 @@ class FleetTest {
     }
 
     @Test
-    fun scriptedGate_replaysDecisionsThenRejects() =
+    fun scriptedGate_replaysRepliesThenRejects() =
         runTest {
-            val gate = ScriptedApprovalGate(listOf(ReviewDecision.Revise("tighter"), ReviewDecision.Approve))
-            val anyProposal = proposal()
+            val gate = ScriptedReviewGate<RightsizingProposal>(listOf(ReviewReply.Revise(feedback = "tighter"), ReviewReply.Approve))
 
-            assertEquals(ReviewDecision.Revise("tighter"), gate.review(1, anyProposal))
-            assertEquals(ReviewDecision.Approve, gate.review(2, anyProposal))
-            assertIs<ReviewDecision.Reject>(gate.review(3, anyProposal))
+            fun request(round: Int) = ReviewRequest(round, proposal(), emptyList(), emptyList(), emptyList())
+            assertEquals(ReviewReply.Revise(feedback = "tighter"), gate.review(request(1)))
+            assertEquals(ReviewReply.Approve, gate.review(request(2)))
+            assertIs<ReviewReply.Reject>(gate.review(request(3)))
         }
 }

@@ -10,7 +10,7 @@ Example agents built with AgentIO, demonstrating how to use the SDK for real-wor
 | Text2SQL (Retail) | In-process | `RunText2SqlAgenticFunction-RetailDB` | DuckDB from SQL statements + correctness-at-construction |
 | Text2SQL (Employee) | In-process | `RunText2SqlAgenticFunction-EmployeeDB` | DuckDB from Parquet files + correctness-at-construction |
 | COMPASS | In-process | `RunCompassAgenticFunction` | Multi-agent, domain-agnostic: NL problem → grounded analysis → SMTLIB2 formula → Z3 solver models (sample run uses supply-chain data) |
-| ODCS ETL | In-process | `RunEtlAgenticFunction-AdventureWorks` | Multi-agent ETL: messy CSVs → load plan → per-table SQL proven against an ODCS-defined DuckDB target → standalone `etl.sql` |
+| ODCS ETL | In-process | `RunEtlAgenticFunction-AdventureWorks` | Multi-agent ETL with a human in the loop: messy CSVs → load plan → per-table SQL proven against an ODCS-defined DuckDB target → reviewer answers and sign-off → standalone `etl.sql` |
 
 All examples are self-sufficient — no API keys or tokens required.
 
@@ -35,7 +35,9 @@ All examples are self-sufficient — no API keys or tokens required.
     -Pobjective="Overstock at site DC-NEWARK for product MB-Z690 in June 2025"
 
 # ODCS ETL — CSV files → DuckDB database defined by an Open Data Contract (needs Bedrock credentials)
+# Each run is one review round: answer build/etl-adventureworks/SYSTEM_INPUT.md, then run again
 ./gradlew :agentio-examples:RunEtlAgenticFunction-AdventureWorks
+./gradlew :agentio-examples:RunEtlAgenticFunction-AdventureWorks -Preview=console   # answer in the terminal instead
 ./gradlew :agentio-examples:RunEtlAgenticFunction-AdventureWorks \
     -Pcontract=/path/to/contract.odcs.yaml -PsourceDir=/path/to/csvs -PoutputDir=/tmp/etl
 ```
@@ -224,7 +226,8 @@ thrown.
 
 Loads CSV exports from other systems into a DuckDB database whose schema is an
 [Open Data Contract Standard](https://bitol-io.github.io/open-data-contract-standard/) document. The target
-exists before any data does; agents write the code that fills it, and DuckDB checks every row against the contract.
+exists before any data does; agents write the code that fills it, DuckDB checks every row against the contract, and a
+person decides what neither can.
 
 ### Target
 
@@ -249,7 +252,7 @@ val workspace = EtlWorkspace(model, SourceFiles.of(sourceDir))   // empty DuckDB
 | `cost_centers.csv` | Two report lines before the header, `;`-delimited, `dd.mm.yyyy` dates; departments and their groups mixed in one hierarchy |
 | `shift_patterns.csv` | Shifts as `7:00 AM - 3:00 PM` ranges, no ids; the target wants `TIME` columns |
 | `hris_roster.csv` | One wide row per employee that feeds six tables: `Last, First Middle, Suffix` names, phones and email packed in one column, words for codes (`Female`, `Exempt`), two hire-date formats, national IDs with leading zeros, a manager column for the org hierarchy |
-| `org_assignment_events.csv` | Unsorted hire / transfer / shift-change / termination events keyed by login in mixed case, with department aliases (`R&D`); they become dated intervals |
+| `org_assignment_events.csv` | Unsorted hire / transfer / shift-change / termination events keyed by login in mixed case, with department aliases (`R&D`); they become dated intervals. Two events belong to a login that is not in the roster |
 | `payroll_register.csv` | One row per pay period keyed by SSN, annual or hourly amounts as `"$90,000.00"`, one line repeated; 61 periods become 20 rate changes |
 
 ### Pipeline
@@ -277,10 +280,48 @@ val workspace = EtlWorkspace(model, SourceFiles.of(sourceDir))   // empty DuckDB
                                    ▼
                etl.sql — CREATE TABLEs + INSERT ... BY NAME SELECTs,
                replayed into a fresh DuckDB to prove it runs alone
+                                   │ + the agents' questions
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ HumanInTheLoop (agentio-module-patterns)                             │
+│   Open questions → reviewer answers → the agents rerun with them     │
+│   None open      → reviewer approves, or sends feedback for a round  │
+│   Gate:   SYSTEM_INPUT.md (default) or the console                   │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-A rejected plan or SELECT is retried with its error. A table that still fails stops the run, since later tables
-may depend on it, and the run reports every attempt's error.
+A rejected plan or SELECT is retried with its error. A table that still fails stops the round, since later tables
+may depend on it, and becomes a question that shows every attempt's error.
+
+### Human in the loop
+
+Passing every constraint does not make a mapping correct. `maritalstatus` is a plain `VARCHAR` described as
+"M = Married, S = Single": DuckDB accepts `S`, `M` or NULL for a divorced employee alike, and only the target's owner
+knows which is meant. So the agents raise a question whenever a choice changes the loaded data and neither the
+sources nor the descriptions settle it, and whenever they cannot make a table load. Each question has options, the
+evidence (source values with counts, the column's description, any DuckDB error) and the option the agents assumed
+meanwhile, so one round still produces a complete, constraint-clean mapping to review.
+
+A run is one round. It writes the round's `etl.sql` and `load-plan.json`, then `SYSTEM_INPUT.md`:
+
+```markdown
+### [Q3] employee: How should employee.maritalstatus store the roster values Widowed and Divorced, given the
+description defines only M = Married and S = Single?
+
+> Roster Marital values: Married, Single, Widowed (1 row, E-1010) and Divorced (1 row, E-1004).
+
+- [ ] 1. Leave them NULL _(the agent's assumption)_
+- [ ] 2. Map them to 'S' (not married)
+- [ ] 3. Store new codes 'W' and 'D'
+
+Answer:
+```
+
+Tick a box or write an answer, then run the task again: the agents rerun from an empty target with every answer as a
+binding decision. When no question is open, the file asks for sign-off of the whole mapping, with the decisions and
+the proposal below it. Approving writes the final `etl.sql` from the approved SQL, without running the agents again,
+replays it, and turns `SYSTEM_INPUT.md` into the record of every decision; the script's header lists them too.
+`SYSTEM_INPUT.state.json` beside it carries the round between runs. To start over, delete both files.
 
 ### Key Patterns
 
@@ -293,9 +334,12 @@ may depend on it, and the run reports every attempt's error.
   can. `SourceAccessGuard` walks DuckDB's own parse tree (`json_serialize_sql`) and allows `read_csv` only on the
   run's source files by absolute literal path, plus target tables; other table functions, file scans, globs and
   computed paths are rejected before the SQL is bound.
-- **Deterministic parts are tested without an LLM.** `EtlPipelineTest` drives the pipeline with a hand-written
-  reference load (`src/test/resources/etl/adventureworks/reference-etl.sql`) and checks row counts, references,
-  retries and the script replay.
+- **Constraint-clean is not correct.** Choices no constraint can settle go to a person as multiple-choice questions;
+  approval is only possible once none is open.
+- **Deterministic parts are tested without an LLM.** `EtlPipelineTest` and `EtlReviewTest` drive the pipeline and
+  the review loop with a hand-written reference load (`src/test/resources/etl/adventureworks/reference-etl.sql`): row
+  counts, references, retries, the script replay, questions, a table blocked until it is answered, resuming from an
+  answered `SYSTEM_INPUT.md`, and sign-off.
 
 ### Sample Run
 
@@ -304,19 +348,25 @@ $ ./gradlew :agentio-examples:RunEtlAgenticFunction-AdventureWorks
 
 Target: 68 tables from odcs_example.generic.yaml; sources: [cost_centers.csv, hris_roster.csv, ...]
 === Planning, attempt 1/2
-Plan: businessentity -> person -> phonenumbertype -> personphone -> emailaddress -> employee -> department -> shift -> employeedepartmenthistory -> employeepayhistory
+Plan: businessentity -> person -> employee -> phonenumbertype -> personphone -> emailaddress -> department -> shift -> employeedepartmenthistory -> employeepayhistory
 === Loading businessentity from [hris_roster.csv]
 ...
+[HITL] Round 1: proposal with 8 open question(s)
 === Result
-  16 rows into employee (attempt 1); script replay: 16 rows
-  19 rows into employeedepartmenthistory (attempt 1); script replay: 19 rows
-  20 rows into employeepayhistory (attempt 1); script replay: 20 rows
-  employeepayhistory.businessentityid -> employee.businessentityid: 0 orphaned rows
-Plan: .../build/etl-adventureworks/load-plan.json; ETL script: .../build/etl-adventureworks/etl.sql
+Round 1 awaits the reviewer: 8 open question(s).
+  [Q1] plan: How should businessentityid (...) be derived from hris_roster "Emp ID"?
+  [Q3] plan: How should hris_roster Marital values Divorced and Widowed load into employee.maritalstatus?
+  [Q4] plan: How should hris_roster Status 'On Leave' load into employee.currentflag?
+  [Q5] plan: How should ANNUAL salary amounts in payroll_register be converted to employeepayhistory.rate?
+  [Q7] plan: Should org_assignment_events rows for logins missing from hris_roster be loaded into employeedepartmenthistory?
+  ...
+Answer .../build/etl-adventureworks/SYSTEM_INPUT.md and run the task again.
 ```
 
-A full run takes about six minutes on Claude Opus 5.5. In the recorded run every table loaded on the first attempt,
-and the loaded values matched the reference load column for column.
+A round takes about six minutes on Claude Opus 5.5. In the recorded first round every table loaded on the first
+attempt, with no orphaned references, and the agents asked eight questions: the two key schemes, Divorced and Widowed,
+On Leave, the annual-to-hourly divisor, how a transfer ends the previous interval, the orphan login's events, and the
+hierarchy path.
 
 ## Package Structure
 
@@ -351,6 +401,7 @@ io.github.mbbhalla.agentio.examples/
     ├── EtlTools.kt                    — MCP tools over the workspace, EtlMcpServer
     ├── SourceAccessGuard.kt           — limits agent SQL to the source CSVs and target tables
     ├── LoadPlanCheck.kt               — validates a LoadPlan before any SQL is written
+    ├── EtlReview.kt                   — EtlProposer (one review round), questions, review Markdown, artifacts
     ├── EtlScript.kt                   — renders and replays etl.sql
     ├── SourceFiles.kt, EtlModels.kt
 ```
